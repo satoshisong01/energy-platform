@@ -1,0 +1,452 @@
+.previewPanel {
+  width: 60%;
+  height: 100%;
+  background-color: #cbd5e1;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+.a4Page {
+  width: 297mm;
+  min-height: 210mm;
+  height: auto;
+  background-color: white;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  flex-shrink: 0;
+}
+.header {
+  padding: 2.5rem 3rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.logoBox {
+  background-color: #2563eb;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+}
+.companyInfo {
+  text-align: right;
+}
+.companyName {
+  color: #2563eb;
+  font-weight: 800;
+  font-size: 1.125rem;
+  margin: 0;
+}
+.companySub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+.footer {
+  padding: 1.5rem 3rem;
+  margin-top: auto;
+}
+.dateBox {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+.dateText {
+  background-color: #22c55e;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  font-weight: 800;
+  font-size: 1.125rem;
+  z-index: 10;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.dateLine {
+  position: absolute;
+  top: 50%;
+  width: 100%;
+  border-top: 1px solid #cbd5e1;
+  z-index: 0;
+}
+.contactInfo {
+  border-top: 2px solid #2563eb;
+  padding-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.body {
+  flex: 1;
+  padding: 2rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.titleSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 1rem;
+}
+.mainTitle {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0;
+}
+.highlight {
+  color: #2563eb;
+}
+.subTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-top: 0.5rem;
+}
+.contractCard {
+  padding: 0.5rem 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  text-align: right;
+}
+.contractLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #3b82f6;
+  text-transform: uppercase;
+}
+.contractValue {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+.chartSection {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+}
+.chartTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.chartWrapper {
+  height: 220px;
+  width: 100%;
+}
+.chartFooter {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+.tableHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: #334155;
+  font-size: 0.9rem;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+.table th {
+  padding: 0.5rem;
+  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  font-weight: 700;
+  color: #334155;
+}
+.table td {
+  padding: 0.4rem;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+.alignRight {
+  text-align: right;
+}
+.bold {
+  font-weight: 700;
+}
+.textBlue {
+  color: #2563eb;
+}
+.textGreen {
+  color: #16a34a;
+}
+.textOrange {
+  color: #ea580c;
+}
+.textLightBlue {
+  color: #bae6fd;
+}
+.textYellow {
+  color: #fbbf24;
+}
+.textRed {
+  color: #ef4444;
+}
+.headerGray {
+  background-color: #f8fafc;
+}
+.headerBlue {
+  background-color: #eff6ff;
+  color: #1e3a8a;
+}
+.headerOrange {
+  background-color: #fff7ed;
+  color: #9a3412;
+}
+.totalRow td {
+  background-color: #1e293b;
+  color: white;
+  font-weight: bold;
+  border-top: 2px solid #94a3b8;
+}
+.badgeWrapper {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px dashed #e2e8f0;
+}
+.badge {
+  background: linear-gradient(to right, #fce7f3, #fbcfe8);
+  color: #db2777;
+  border: 1px solid #f9a8d4;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-size: 1.2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+}
+.finalMetricBox {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.finalLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: -0.02em;
+}
+.finalValue {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #2563eb;
+  line-height: 1;
+}
+.finalUnit {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.financialSection {
+  margin-top: 3rem;
+  border-top: 2px dashed #cbd5e1;
+  padding-top: 2rem;
+}
+.sectionTitle {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.summaryBox {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.summaryLabel {
+  font-weight: 600;
+  color: #64748b;
+}
+.summaryValue {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+.finTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  text-align: center;
+  margin-bottom: 2rem;
+  border: 1px solid #cbd5e1;
+}
+.finTable th {
+  padding: 0.5rem;
+  border: 1px solid #cbd5e1;
+  font-weight: 700;
+}
+.finTable td {
+  padding: 0.4rem;
+  border: 1px solid #e2e8f0;
+  /* color: #334155; */
+}
+.bgPurpleHeader {
+  background-color: #f3e8ff;
+  color: #581c87;
+}
+.bgBlueHeader {
+  background-color: #eff6ff;
+  color: #1e3a8a;
+}
+.bgTotal {
+  background-color: #1e293b;
+  color: white;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+.bgPinkRow {
+  background-color: #fdf2f8;
+}
+.bgYellowRow {
+  background-color: #fefce8;
+}
+.bgGreenRow {
+  background-color: #f0fdf4;
+}
+.textRight {
+  text-align: right;
+  padding-right: 1rem;
+}
+.textBold {
+  font-weight: 800;
+}
+
+.printButton {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #334155; /* Slate-700 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease;
+  z-index: 10;
+}
+
+.printButton:hover {
+  background-color: #475569; /* Slate-600 (호버 시 약간 밝게) */
+}
+
+.lastPageContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  /* 화면에서는 적당히 띄움 */
+  min-height: 80vh;
+  padding-bottom: 20px;
+}
+
+.pageSection {
+  width: 100%;
+  min-height: 80vh; /* 화면에서 볼 때 적당한 높이 */
+  padding: 20px 0;
+  box-sizing: border-box;
+}
+
+/* [NEW] 표지 페이지 (Page 1) 스타일: 중앙 정렬 */
+.coverPage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 수직 중앙 */
+  align-items: center; /* 수평 중앙 */
+  text-align: center;
+  min-height: 90vh; /* 화면 꽉 차게 */
+}
+
+/* [NEW] 엔딩 페이지 (Last Page) 스타일: 중앙 정렬 */
+.endingPage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 90vh;
+  background-color: #f8fafc; /* 화면에서 구분되게 연한 배경 */
+  border-radius: 12px;
+}
+
+@media print {
+  .lastPageContainer {
+    /* 인쇄 시 A4 높이 확보하여 푸터를 바닥으로 밈 */
+    height: 180mm;
+    min-height: 180mm;
+  }
+  .page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+    display: block;
+    height: 0;
+  }
+  /* 각 섹션은 인쇄 시 페이지 꽉 차게 */
+  .pageSection {
+    min-height: 100vh;
+    padding: 0;
+  }
+  .print-section {
+    padding-top: 20px;
+  }
+  .coverPage,
+  .endingPage {
+    min-height: 100vh;
+    justify-content: center;
+    align-items: center;
+    background: none !important; /* 배경색 제거 */
+  }
+  .printButton {
+    display: none !important;
+  }
+}

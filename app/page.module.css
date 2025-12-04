@@ -1,0 +1,605 @@
+/* =========================================
+   Layout: 전체 컨테이너
+   ========================================= */
+.container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background-color: #f1f5f9; /* slate-100 */
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  color: #334155; /* slate-700 */
+}
+
+/* =========================================
+   Left Panel: 입력 영역
+   ========================================= */
+.inputPanel {
+  width: 40%;
+  height: 100%;
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05);
+  overflow-y: auto;
+}
+
+.stickyHeader {
+  position: sticky;
+  top: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  backdrop-filter: blur(4px);
+  z-index: 30;
+}
+
+.headerTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e3a8a; /* blue-900 */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.headerDesc {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.25rem;
+}
+
+.formContent {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  padding-bottom: 6rem;
+}
+
+/* 섹션 공통 스타일 */
+.sectionTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stepBadge {
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: #dbeafe;
+  color: #2563eb;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.card {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+/* 폼 컨트롤 */
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.375rem;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background-color: white;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.inputReadOnly {
+  width: 100%;
+  padding: 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+  border: 1px solid #bfdbfe;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.inputIconWrap {
+  position: relative;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  color: #94a3b8;
+}
+
+.inputWithIcon {
+  width: 100%;
+  padding: 0.625rem 0.625rem 0.625rem 2.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+/* 지붕 면적 리스트 */
+.roofHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.addButton {
+  font-size: 0.75rem;
+  background-color: #eff6ff;
+  color: #2563eb;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.addButton:hover {
+  background-color: #dbeafe;
+}
+
+.roofItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: white;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.roofIndex {
+  width: 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.inputBare {
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  outline: none;
+  width: 100%;
+}
+
+.roofUnit {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.deleteButton {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.deleteButton:hover {
+  color: #ef4444;
+}
+
+/* 합계 배지 */
+.summaryBadge {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.summaryLabel {
+  font-size: 0.75rem;
+  opacity: 0.9;
+  margin-bottom: 0.25rem;
+}
+
+.summaryValue {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.summaryUnit {
+  font-size: 0.875rem;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* 복합 테이블 (Sheet 4, 5) */
+.tableWrapper {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  overflow-x: auto; /* 가로 스크롤 */
+  background-color: white;
+}
+
+.complexTable {
+  width: 100%;
+  min-width: 500px; /* 최소 너비 확보 */
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.complexTable th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+}
+
+.complexTable th:last-child {
+  border-right: none;
+}
+
+.subHeader th {
+  font-size: 0.75rem;
+  padding: 0.375rem;
+}
+
+.tableRow td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0;
+}
+
+.tableRow:last-child td {
+  border-bottom: none;
+}
+
+.colMonth {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  background-color: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+.cellInput {
+  width: 100%;
+  text-align: right;
+  padding: 0.5rem;
+  border: none;
+  outline: none;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.cellInput:focus {
+  background-color: #f0f9ff;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+/* 배경색 구분 */
+.bgBlueLight {
+  background-color: #eff6ff; /* 자가소비 컬럼 강조 */
+}
+
+.bgOrangeLight {
+  background-color: #fff7ed; /* 기본요금 컬럼 강조 */
+}
+
+.textBlue {
+  color: #2563eb;
+}
+.textOrange {
+  color: #ea580c;
+}
+
+/* =========================================
+   Right Panel: 미리보기 (A4)
+   ========================================= */
+.previewPanel {
+  width: 60%;
+  height: 100%;
+  background-color: #fff;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column; /* 세로 정렬 */
+  align-items: center; /* 가로 중앙 정렬 */
+  padding: 2rem;
+}
+
+.a4Page {
+  /* ✅ [수정] 가로 모드 (Landscape) 사이즈 */
+  width: 297mm;
+  min-height: 210mm;
+  height: auto;
+  background-color: white;
+  /* box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); */
+  display: flex;
+  flex-direction: column;
+  /* 가로로 넓어졌으므로 여백 조정 */
+  margin: auto;
+  flex-shrink: 0; /* 줄어들지 않도록 고정 */
+}
+
+.pageHeader {
+  padding: 2.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.logoBox {
+  background-color: #2563eb;
+  color: white;
+  padding: 0.25rem 1rem;
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+}
+
+.companyInfo h2 {
+  color: #2563eb;
+  font-weight: 800;
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.companyInfo p {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.pageBody {
+  flex: 1;
+  padding: 2rem 3rem; /* 좌우 여백 확보 */
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.reportTitle {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.mainTitle {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0;
+}
+
+.highlight {
+  color: #2563eb;
+}
+
+.divider {
+  width: 4rem;
+  height: 0.25rem;
+  background-color: #3b82f6;
+  margin: 1rem auto;
+  border-radius: 9999px;
+}
+
+.subTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* 차트 박스 */
+.chartBox {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.chartTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chartSubtitle {
+  text-align: right;
+}
+
+.subLabel {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.subValue {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.chartFooter {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* 정보 카드 */
+.infoCard {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.infoLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #3b82f6;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.infoValue {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: white;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+/* 페이지 푸터 */
+.pageFooter {
+  padding: 3rem;
+  margin-top: auto;
+}
+
+.dateBox {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.dateText {
+  background-color: #22c55e;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  font-weight: 800;
+  font-size: 1.125rem;
+  z-index: 10;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.dateLine {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  border-top: 1px solid #cbd5e1;
+  z-index: 0;
+}
+
+.contactInfo {
+  border-top: 2px solid #2563eb;
+  padding-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reportTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem; /* 글자 크기 작게 */
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.reportTable th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  padding: 0.4rem;
+  border: 1px solid #e2e8f0;
+}
+
+.reportTable td {
+  padding: 0.4rem;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+/* 소계 행 강조 */
+.reportTotalRow td {
+  background-color: #1e293b;
+  color: white;
+  font-weight: bold;
+}
+
+.previewSavingBadge {
+  background-color: #fdf2f8; /* pink-50 */
+  color: #db2777; /* pink-600 */
+  border: 1px solid #fbcfe8;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: inline-block;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}

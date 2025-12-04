@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
@@ -23,4 +23,108 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@media print {
+  /* 1. 모든 요소 숨기기 */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 2. 우리가 지정한 프리뷰 영역(#print-area)과 그 자식들만 보이게 하기 */
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+
+  /* [NEW] 강제 페이지 넘김 클래스 */
+  .print-page-break {
+    page-break-before: always !important; /* 구형 브라우저 호환 */
+    break-before: page !important; /* 최신 표준 */
+    display: block;
+    height: 0;
+    margin: 0;
+  }
+
+  /* [NEW] 페이지 내부 여백 확보 (프린트 시 내용이 너무 붙지 않게) */
+  .print-section {
+    padding-top: 20px;
+    margin-bottom: 20px;
+  }
+
+  /* 3. 프리뷰 영역을 종이의 맨 왼쪽 위로 강제 이동 */
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white; /* 배경색 확보 */
+  }
+
+  /* 4. 불필요한 UI 요소 숨기기 (버튼 등) */
+  .no-print,
+  button,
+  input,
+  select {
+    display: none !important;
+  }
+
+  /* 5. 페이지 설정 (A4, 여백 제거) */
+  @page {
+    size: A4 landscape;
+    margin: 10mm; /* 프린터 여백 최소화 */
+  }
+
+  /* 2. 배경색/그래픽 강제 출력 */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 3. 화면 UI 숨김 */
+  .no-print,
+  button,
+  input,
+  select,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  /* 4. 프리뷰 영역 설정 */
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    visibility: visible !important;
+  }
+
+  /* [중요] 모든 자식 요소도 보이게 설정 */
+  #print-area * {
+    visibility: visible !important;
+  }
+
+  /* 5. 페이지 넘김 제어 유틸리티 클래스 (새로 추가) */
+
+  /* (A) 표나 섹션이 페이지 중간에 잘리지 않게 통째로 넘김 */
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* (B) 강제로 다음 페이지에서 시작하게 함 (필요시 사용) */
+  .print-force-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
