@@ -245,7 +245,7 @@ export default function PreviewPanel() {
     // [중요] 프린트 영역 ID 지정
     <div className={styles.a4Page} id="print-area">
       <div className={styles.header}>
-        <div className={styles.logoBox}>FIRST</div>
+        <div className={styles.logoBox}>FIRST C&D</div>
         <div className={styles.companyInfo}>
           <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
           <p className={styles.companySub}>FIRST C&D Inc.</p>
