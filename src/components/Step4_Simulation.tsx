@@ -1,17 +1,16 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useProposalStore, ModuleTier, BusinessModel } from '../lib/store';
+import { useProposalStore, ModuleTier } from '../lib/store';
 import styles from './Step4_Simulation.module.css';
 import {
   LucideTruck,
   LucideZap,
-  LucideSettings,
-  LucideTrendingUp,
   LucideInfo,
   LucideAlertTriangle,
   LucideCheckCircle2,
   LucideTable,
+  LucideTrendingUp,
 } from 'lucide-react';
 
 // [Helper] 반올림 함수
@@ -261,7 +260,7 @@ export default function Step4_Simulation() {
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
           <span>
-            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소{' '}
+            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소
             <b>-{store.degradationRate}%</b>
           </span>
         </div>
@@ -291,7 +290,7 @@ export default function Step4_Simulation() {
       ===================================================================================== */}
       <div className="mt-4">
         <div className="flex items-center gap-2 mb-2 text-blue-800">
-          <LucideTable size={16} />{' '}
+          <LucideTable size={16} />
           <span className="text-sm font-bold">초기 투자비 상세 (VAT 별도)</span>
         </div>
         <div className="border rounded-lg overflow-hidden text-xs bg-white">
@@ -320,7 +319,8 @@ export default function Step4_Simulation() {
                 <td className="text-blue-600 font-bold">
                   {solarCount.toFixed(2)} ea
                 </td>
-                <td>{ecCount} ea</td>
+                {/* [수정] useEcReal 조건에 따라 수량 표시 */}
+                <td>{useEcReal ? ecCount : 0} ea</td>
                 <td>{tractorCost > 0 ? 1 : 0} ea</td>
                 <td>{platformCost > 0 ? 1 : 0} set</td>
                 <td>1 set</td>
@@ -374,7 +374,7 @@ export default function Step4_Simulation() {
       ===================================================================================== */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2 text-green-800">
-          <LucideTrendingUp size={16} />{' '}
+          <LucideTrendingUp size={16} />
           <span className="text-sm font-bold">연간 수익 상세 분석</span>
         </div>
 
@@ -385,7 +385,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {Math.round(volume_self).toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>kWh</span>
             </span>
           </div>
@@ -394,7 +394,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {Math.round(volume_surplus).toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>kWh</span>
             </span>
           </div>
@@ -403,7 +403,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {Math.round(volume_ec).toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>kWh</span>
             </span>
           </div>
@@ -422,7 +422,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {appliedSavingsPrice.toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>원</span>
             </span>
           </div>
@@ -431,7 +431,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {config.unit_price_kepco.toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>원</span>
             </span>
           </div>
@@ -440,7 +440,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {appliedSellPrice.toLocaleString()}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>원</span>
             </span>
           </div>
@@ -453,7 +453,7 @@ export default function Step4_Simulation() {
             <span>
               <span className={styles.dVal}>
                 {(totalRevenue / 100000000).toFixed(2)}
-              </span>{' '}
+              </span>
               <span className={styles.dUnit}>억원</span>
             </span>
           </div>
@@ -487,7 +487,7 @@ export default function Step4_Simulation() {
             <div className="flex justify-between items-center mb-2">
               <span className="font-bold text-slate-800">연간 실제 수익</span>
               <span className="text-xl font-extrabold text-blue-600">
-                {(netProfit / 100000000).toFixed(2)}{' '}
+                {(netProfit / 100000000).toFixed(2)}
                 <span className="text-sm">억원</span>
               </span>
             </div>
@@ -511,7 +511,7 @@ export default function Step4_Simulation() {
           </div>
 
           <div className="bg-yellow-400 text-black font-bold text-center py-2">
-            수익률 (ROI) {roiPercent.toFixed(1)}% (회수{' '}
+            수익률 (ROI) {roiPercent.toFixed(1)}% (회수
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)
           </div>
         </div>

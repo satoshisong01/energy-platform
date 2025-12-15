@@ -223,7 +223,7 @@ export const useProposalStore = create<ProposalState>(
       selectedModel: 'RE100',
       moduleTier: 'STANDARD',
       useEc: true,
-      maintenanceRate: 20.0,
+      maintenanceRate: 25.0,
       degradationRate: 0.5,
       totalInvestment: 0,
 
