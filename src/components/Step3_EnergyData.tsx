@@ -7,7 +7,7 @@ import { LucideCopy } from 'lucide-react';
 
 const TARIFF_OPTIONS = [
   { name: '산업용(을) 고압A - 선택2', rate: 8320, savings: 210.5 },
-  { name: '산업용(갑)2 고압A - 선택2', rate: 7470, savings: 136.5 },
+  { name: '산업용(갑)2 고압A - 선택2', rate: 7470, savings: 136.47 },
   { name: '일반용(갑) 1 저압', rate: 6160, savings: 114.4 },
   { name: '산업용(갑)1 저압', rate: 5550, savings: 108.4 },
 ];
@@ -43,7 +43,7 @@ export default function Step3_EnergyData() {
     const solarGeneration = store.capacityKw * dailyGenHours * days;
 
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
-    const unitPriceSavings = store.unitPriceSavings || 136.5;
+    const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
 

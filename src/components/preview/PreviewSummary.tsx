@@ -6,7 +6,6 @@ import styles from './PreviewSummary.module.css';
 import {
   LucideArrowRight,
   LucideWallet,
-  LucideZap,
   LucideChevronsDown,
 } from 'lucide-react';
 
@@ -36,14 +35,14 @@ export default function PreviewSummary() {
 
   // (A) Standard Data (REC 1.5)
   const getStandardData = () => {
-    // 투자비
-    const invest = store.totalInvestment; // 억원
+    // 투자비 (억원)
+    const invest = store.totalInvestment;
     const ecCount =
       store.useEc && store.selectedModel !== 'KEPCO'
         ? Math.min(3, Math.floor(capacity / 100))
         : 0;
 
-    // 연간 수익
+    // 연간 수익 (1차년도)
     const revenue_saving = Math.min(annualGen, annualSelf) * unitPriceSavings;
     let revenue_sales = 0;
     if (store.useEc && store.selectedModel !== 'KEPCO') {
@@ -53,24 +52,36 @@ export default function PreviewSummary() {
     }
     const grossRevenue = revenue_saving + revenue_sales;
 
-    // 비용
+    // 비용 (1차년도 기준)
     const laborCost =
       store.useEc && ecCount > 0
         ? (config.price_labor_ec || 0.24) * 100000000
         : 0;
-    const annualCost = (grossRevenue * store.maintenanceRate) / 100 + laborCost;
-    const netProfit = grossRevenue - annualCost;
+    const initialAnnualCost =
+      (grossRevenue * store.maintenanceRate) / 100 + laborCost;
 
-    // 20년 누적
+    // [수정] 20년 총 투자비 (초기비 + 20년 운영비) - 분모용 (원 단위)
+    const totalInvest20YearsWon = invest * 100000000 + initialAnnualCost * 20;
+
+    const netProfit = grossRevenue - initialAnnualCost;
+
+    // 20년 누적 순수익
     let totalNet20 = 0;
     let currentGen = annualGen;
     for (let i = 0; i < 20; i++) {
       const ratio = currentGen / annualGen;
       const yrRev = grossRevenue * ratio;
+      // 매년 줄어드는 매출에 따라 유지보수비도 줄어듦 (인건비는 고정)
       const yrCost = (yrRev * store.maintenanceRate) / 100 + laborCost;
       totalNet20 += yrRev - yrCost;
       currentGen *= 1 - store.degradationRate / 100;
     }
+
+    // [수정] ROI 계산: 분모를 '20년 총 투자비'로 적용하여 보수적으로 산출
+    const roiPercent =
+      totalInvest20YearsWon > 0
+        ? (totalNet20 / totalInvest20YearsWon) * 100
+        : 0;
 
     return {
       title: '☀️ Standard Plan (REC 1.5)',
@@ -78,7 +89,7 @@ export default function PreviewSummary() {
       ecCount,
       netProfit,
       totalNet20,
-      roiPercent: invest > 0 ? (totalNet20 / (invest * 100000000)) * 100 : 0,
+      roiPercent,
       roiYears: netProfit > 0 ? (invest * 100000000) / netProfit : 0,
       isPro: false,
     };
@@ -108,8 +119,13 @@ export default function PreviewSummary() {
 
     // 비용 (EC 인건비 필수로 포함)
     const laborCost = (config.price_labor_ec || 0.24) * 100000000;
-    const annualCost = (grossRevenue * store.maintenanceRate) / 100 + laborCost;
-    const netProfit = grossRevenue - annualCost;
+    const initialAnnualCost =
+      (grossRevenue * store.maintenanceRate) / 100 + laborCost;
+
+    // [수정] 20년 총 투자비 (초기비 + 20년 운영비) - 분모용 (원 단위)
+    const totalInvest20YearsWon = invest * 100000000 + initialAnnualCost * 20;
+
+    const netProfit = grossRevenue - initialAnnualCost;
 
     // 20년 누적
     let totalNet20 = 0;
@@ -122,13 +138,19 @@ export default function PreviewSummary() {
       currentGen *= 1 - store.degradationRate / 100;
     }
 
+    // [수정] ROI 계산: 분모를 '20년 총 투자비'로 적용
+    const roiPercent =
+      totalInvest20YearsWon > 0
+        ? (totalNet20 / totalInvest20YearsWon) * 100
+        : 0;
+
     return {
       title: '🚀 Premium Plan (REC 5.0 / 설비확장)',
       invest,
       ecCount,
       netProfit,
       totalNet20,
-      roiPercent: invest > 0 ? (totalNet20 / (invest * 100000000)) * 100 : 0,
+      roiPercent,
       roiYears: netProfit > 0 ? (invest * 100000000) / netProfit : 0,
       isPro: true,
     };
@@ -143,12 +165,8 @@ export default function PreviewSummary() {
   const toUk = (val: number) => val.toFixed(2);
   const toUkFromWon = (val: number) => (val / 100000000).toFixed(2);
 
-  // 반복되는 카드 행(Row)을 그려주는 함수
   const renderRow = (d: typeof stdData) => (
     <div className={`${styles.flowContainer} ${d.isPro ? styles.proRow : ''}`}>
-      {/* 타이틀 (Row 좌측에 작게 표시하거나, 상단에 표시) */}
-      {/* {d.isPro && <div className={styles.rowLabelBadge}>Extended</div>} */}
-
       {/* 1. 투자 */}
       <div className={`${styles.card} ${styles.cardInvest}`}>
         <div
@@ -239,7 +257,7 @@ export default function PreviewSummary() {
             <span className={styles.unit}>억원</span>
           </div>
           <div className={styles.roiBadge}>
-            ROI {d.roiPercent.toFixed(0)}% ({d.roiYears.toFixed(1)}년)
+            ROI {d.roiPercent.toFixed(1)}% ({d.roiYears.toFixed(1)}년)
           </div>
           {d.isPro && (
             <div className={styles.deltaText}>

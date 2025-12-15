@@ -101,28 +101,28 @@ export default function PreviewFinancialTable({
           <tr>
             <td>태양광</td>
             <td>100 kW</td>
-            <td>{solarCount.toFixed(2)}</td>
+            <td>{solarCount.toFixed(2)} ea</td>
             <td>{solarPrice}</td>
             <td className={styles.textBold}>{solarCost.toFixed(2)}</td>
           </tr>
           <tr>
             <td>에너지캐리어</td>
             <td>100 kW</td>
-            <td>{ecCount}</td>
+            <td>{ecCount} ea</td>
             <td>{config.price_ec_unit}</td>
             <td className={styles.textBold}>{ecCost.toFixed(2)}</td>
           </tr>
           <tr>
             <td>이동트랙터</td>
             <td>1 ton</td>
-            <td>{tractorCost > 0 ? 1 : 0}</td>
+            <td>{tractorCost > 0 ? 1 : 0} ea</td>
             <td>{config.price_tractor}</td>
             <td className={styles.textBold}>{tractorCost.toFixed(2)}</td>
           </tr>
           <tr>
             <td>운영플랫폼</td>
             <td>1 set</td>
-            <td>{platformCost > 0 ? 1 : 0}</td>
+            <td>{platformCost > 0 ? 1 : 0} ea</td>
             <td>{config.price_platform}</td>
             <td className={styles.textBold}>{platformCost.toFixed(2)}</td>
           </tr>

@@ -35,7 +35,7 @@ export default function PreviewPanel() {
     const solarGeneration = store.capacityKw * 3.64 * days;
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
 
-    const unitPriceSavings = store.unitPriceSavings || 136.5;
+    const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
 
