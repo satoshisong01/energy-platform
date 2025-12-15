@@ -25,25 +25,22 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* =========================================
+   [PRINT] 인쇄 스타일 설정
+   ========================================= */
 @media print {
   /* 1. 모든 요소 숨기기 */
   body * {
     visibility: hidden;
   }
 
-  /* 2. 우리가 지정한 프리뷰 영역(#print-area)과 그 자식들만 보이게 하기 */
+  /* 2. 프리뷰 영역(#print-area)과 그 자식들만 보이기 */
   #print-area,
   #print-area * {
     visibility: visible;
   }
 
-  /* [NEW] 페이지 내부 여백 확보 */
-  .print-section {
-    padding-top: 20px;
-    margin-bottom: 20px;
-  }
-
-  /* 3. 화면 UI 숨김 */
+  /* 3. 화면 UI 숨김 (버튼 등) */
   .no-print,
   button,
   input,
@@ -56,15 +53,17 @@ body {
   /* 4. 페이지 설정 (A4 가로, 여백 최소화) */
   @page {
     size: A4 landscape;
-    margin: 10mm;
+    margin: 0; /* 여백을 0으로 하고 내부 패딩으로 조절 */
   }
 
   body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    margin: 0;
+    padding: 0;
   }
 
-  /* 5. 프리뷰 영역 설정 및 스케일 조정 [수정됨] */
+  /* 5. 프리뷰 영역 설정 */
   #print-area {
     position: absolute;
     left: 0;
@@ -73,27 +72,37 @@ body {
     margin: 0;
     padding: 0;
     background: white;
-    /* [핵심] 75% 정도로 축소하여 A4 한 장에 정보가 잘리지 않고 들어오게 함 */
+    /* 전체 비율 축소 (A4 한 장에 넉넉히 들어오게) */
     zoom: 0.75;
   }
 
-  /* 6. 페이지 넘김 제어 유틸리티 */
+  /* [핵심] 페이지별 중앙 정렬 래퍼 
+     - 각 섹션을 이 클래스로 감싸면 새 페이지로 넘어가고 중앙에 배치됨
+  */
+  .print-page-center {
+    break-before: page; /* 강제 페이지 넘김 */
+    page-break-before: always; /* 구형 브라우저 지원 */
 
-  /* (A) 내용이 잘리지 않게 보호 */
+    width: 100%;
+    height: 100vh; /* 페이지 높이를 꽉 채움 */
+
+    display: flex; /* Flexbox 사용 */
+    flex-direction: column; /* 세로 정렬 */
+    justify-content: center; /* [수직 중앙 정렬] */
+    align-items: center; /* [수평 중앙 정렬] */
+
+    padding: 40px; /* 내부 여백 */
+    box-sizing: border-box;
+  }
+
+  /* 첫 번째 페이지는 페이지 넘김 방지 (빈 페이지 방지) */
+  .print-page-center:first-of-type {
+    break-before: auto !important;
+    page-break-before: auto !important;
+  }
+
+  /* 표나 차트 내부에서 잘림 방지 */
   .print-avoid-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* (B) [NEW] 무조건 새 페이지에서 시작 (각 파트별 분리용) */
-  .print-page-start {
-    break-before: page;
-    page-break-before: always;
-    display: block;
-    margin-top: 0 !important; /* 페이지 시작 부분 여백 제거 */
-  }
-
-  tr {
     break-inside: avoid;
     page-break-inside: avoid;
   }

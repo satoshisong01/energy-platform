@@ -20,7 +20,7 @@ export default function PreviewPanel() {
   const store = useProposalStore();
   const { config } = store;
 
-  // [NEW] 프린트 핸들러
+  // 프린트 핸들러
   const handlePrint = () => {
     window.print();
   };
@@ -28,7 +28,7 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산
+  // [1] 월별 데이터 계산 (기존 로직 유지)
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
@@ -116,7 +116,7 @@ export default function PreviewPanel() {
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
 
   // ----------------------------------------------------------------
-  // [2] 투자비 및 수익 계산
+  // [2] 투자비 및 수익 계산 (기존 로직 유지)
   // ----------------------------------------------------------------
   const initialAnnualGen = totals.solarGeneration;
   const annualSelfConsumption = totals.selfConsumption;
@@ -207,7 +207,7 @@ export default function PreviewPanel() {
       : 0;
   const roiYears = totalInitialInvestment / (firstYearNetProfit / 100000000);
 
-  // 자식에게 넘겨줄 데이터 패키징
+  // 데이터 패키징
   const revenueDetails = {
     volume_self,
     volume_ec,
@@ -242,27 +242,30 @@ export default function PreviewPanel() {
   // UI 렌더링
   // ----------------------------------------------------------------
   return (
-    // [중요] 프린트 영역 ID 지정
     <div className={styles.a4Page} id="print-area">
-      <div className={styles.header}>
-        <div className={styles.logoBox}>FIRST C&D</div>
-        <div className={styles.companyInfo}>
-          <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
-          <p className={styles.companySub}>FIRST C&D Inc.</p>
+      {/* [페이지 1] 표지 + 요약 (중앙 정렬)
+          Header와 Title, Summary를 묶어서 한 페이지의 중앙에 오게 함
+      */}
+      <div className="print-page-center">
+        {/* Header */}
+        <div className={styles.header} style={{ width: '100%' }}>
+          <div className={styles.logoBox}>FIRST C&D</div>
+          <div className={styles.companyInfo}>
+            <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
+            <p className={styles.companySub}>FIRST C&D Inc.</p>
+          </div>
+          {/* 프린트 버튼 (화면에만 보임) */}
+          <button
+            onClick={handlePrint}
+            className={`${styles.printButton} no-print`}
+          >
+            <LucidePrinter size={18} />
+            PDF 저장 / 인쇄
+          </button>
         </div>
 
-        {/* 프린트 버튼 */}
-        <button
-          onClick={handlePrint}
-          className={`${styles.printButton} no-print`}
-        >
-          <LucidePrinter size={18} />
-          PDF 저장 / 인쇄
-        </button>
-      </div>
-
-      <div className={styles.body}>
-        <div className={styles.titleSection}>
+        {/* Title */}
+        <div className={styles.titleSection} style={{ width: '100%' }}>
           <div>
             <h1 className={styles.mainTitle}>
               <span className={styles.highlight}>RE100</span> 에너지 발전시스템
@@ -279,13 +282,16 @@ export default function PreviewPanel() {
           </div>
         </div>
 
-        {/* 1. 요약(확장플랜 포함) - 첫 페이지 */}
-        <div className="print-avoid-break">
+        {/* Summary Component */}
+        <div style={{ width: '100%', marginTop: '20px' }}>
           <PreviewSummary />
         </div>
+      </div>
 
-        {/* 2. 차트 컴포넌트 - 다음 페이지로 강제 넘김 */}
-        <div className="print-page-start">
+      {/* [페이지 2] 차트 (중앙 정렬)
+       */}
+      <div className="print-page-center">
+        <div style={{ width: '100%' }}>
           <PreviewChart
             data={computedData}
             savingRate={savingRate}
@@ -293,9 +299,12 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
+      </div>
 
-        {/* 3. 월별 상세 테이블 컴포넌트 - 다음 페이지로 강제 넘김 */}
-        <div className="print-page-start">
+      {/* [페이지 3] 상세 데이터 테이블 (중앙 정렬)
+       */}
+      <div className="print-page-center">
+        <div style={{ width: '100%' }}>
           <PreviewDetailTable
             data={computedData}
             totals={totals}
@@ -304,9 +313,12 @@ export default function PreviewPanel() {
             totalBenefit={totalBenefit}
           />
         </div>
+      </div>
 
-        {/* 4. 투자비 및 수익 분석 테이블 컴포넌트 - 다음 페이지로 강제 넘김 */}
-        <div className="print-page-start">
+      {/* [페이지 4] 투자 및 수익 분석 (중앙 정렬)
+       */}
+      <div className="print-page-center">
+        <div style={{ width: '100%' }}>
           <PreviewFinancialTable
             totals={totals}
             netProfit={netProfit}
@@ -321,16 +333,22 @@ export default function PreviewPanel() {
             investmentDetails={investmentDetails}
           />
         </div>
+      </div>
 
-        {/* 5. 모델 비주얼 - 다음 페이지로 강제 넘김 */}
-        <div className="print-page-start">
+      {/* [페이지 5] 모델 비주얼 (중앙 정렬)
+       */}
+      <div className="print-page-center">
+        <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
+      </div>
 
-        {/* 6. 비교 테이블 및 푸터 - 다음 페이지로 강제 넘김 */}
-        <div className="print-page-start">
+      {/* [페이지 6] 비교 테이블 및 푸터 (중앙 정렬)
+       */}
+      <div className="print-page-center">
+        <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
-          <div className={styles.footer}>
+          <div className={styles.footer} style={{ marginTop: '40px' }}>
             <div className={styles.contactInfo}>
               <div>김 종 우 &nbsp;|&nbsp; 010.5617.9500</div>
               <div>jongwoo@firstcorea.com</div>
