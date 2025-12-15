@@ -73,7 +73,7 @@ body {
     padding: 0;
     background: white;
     /* 전체 비율 축소 (A4 한 장에 넉넉히 들어오게) */
-    zoom: 0.75;
+    zoom: 0.9;
   }
 
   /* [핵심] 페이지별 중앙 정렬 래퍼 
