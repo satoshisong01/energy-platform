@@ -3,7 +3,7 @@
 import React from 'react';
 import { useProposalStore } from '../lib/store';
 import styles from './PreviewPanel.module.css';
-import { LucidePrinter } from 'lucide-react'; // 프린터 아이콘
+import { LucidePrinter } from 'lucide-react';
 
 // 분리된 컴포넌트 임포트
 import PreviewChart from './preview/PreviewChart';
@@ -251,7 +251,7 @@ export default function PreviewPanel() {
           <p className={styles.companySub}>FIRST C&D Inc.</p>
         </div>
 
-        {/* [수정됨] CSS 모듈 클래스(.printButton)와 글로벌 클래스(.no-print) 함께 적용 */}
+        {/* 프린트 버튼 */}
         <button
           onClick={handlePrint}
           className={`${styles.printButton} no-print`}
@@ -279,12 +279,13 @@ export default function PreviewPanel() {
           </div>
         </div>
 
-        {/* 요약(확장플랜 포함) 컴포넌트 */}
+        {/* 1. 요약(확장플랜 포함) - 첫 페이지 */}
         <div className="print-avoid-break">
           <PreviewSummary />
         </div>
-        {/* 1. 차트 컴포넌트 */}
-        <div className="print-avoid-break" style={{ marginTop: '20px' }}>
+
+        {/* 2. 차트 컴포넌트 - 다음 페이지로 강제 넘김 */}
+        <div className="print-page-start">
           <PreviewChart
             data={computedData}
             savingRate={savingRate}
@@ -293,8 +294,8 @@ export default function PreviewPanel() {
           />
         </div>
 
-        {/* 2. 월별 상세 테이블 컴포넌트 */}
-        <div className="print-avoid-break" style={{ marginTop: '20px' }}>
+        {/* 3. 월별 상세 테이블 컴포넌트 - 다음 페이지로 강제 넘김 */}
+        <div className="print-page-start">
           <PreviewDetailTable
             data={computedData}
             totals={totals}
@@ -304,8 +305,8 @@ export default function PreviewPanel() {
           />
         </div>
 
-        {/* 3. 투자비 및 수익 분석 테이블 컴포넌트 */}
-        <div className="print-avoid-break" style={{ marginTop: '20px' }}>
+        {/* 4. 투자비 및 수익 분석 테이블 컴포넌트 - 다음 페이지로 강제 넘김 */}
+        <div className="print-page-start">
           <PreviewFinancialTable
             totals={totals}
             netProfit={netProfit}
@@ -320,10 +321,14 @@ export default function PreviewPanel() {
             investmentDetails={investmentDetails}
           />
         </div>
-        <div className="print-avoid-break">
+
+        {/* 5. 모델 비주얼 - 다음 페이지로 강제 넘김 */}
+        <div className="print-page-start">
           <PreviewModelVisual />
         </div>
-        <div className="print-avoid-break">
+
+        {/* 6. 비교 테이블 및 푸터 - 다음 페이지로 강제 넘김 */}
+        <div className="print-page-start">
           <PreviewComparisonTable />
           <div className={styles.footer}>
             <div className={styles.contactInfo}>
