@@ -8,6 +8,7 @@ import {
   LucideSettings,
   LucideSave,
   LucideFolderOpen,
+  LucideFilePlus, // [NEW] 새 문서 아이콘 추가
 } from 'lucide-react';
 
 // 분리한 컴포넌트들 임포트
@@ -17,9 +18,9 @@ import Step3_EnergyData from '../src/components/Step3_EnergyData';
 import Step4_Simulation from '../src/components/Step4_Simulation';
 import PreviewPanel from '../src/components/PreviewPanel';
 import ConfigModal from '../src/components/ConfigModal';
-import Step5_Comparison from '@/src/components/Step5_Comparison';
+import Step5_Comparison from '../src/components/Step5_Comparison';
 
-// [NEW] 새로 만든 불러오기 팝업 임포트
+// 불러오기 팝업 임포트
 import ProposalListModal from '../src/components/ProposalListModal';
 
 export default function Home() {
@@ -27,9 +28,21 @@ export default function Home() {
 
   // 팝업 상태 관리
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false); // [NEW] 불러오기 팝업 상태
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
-  // [수정됨] 저장 핸들러 (이름 입력 + 타입 에러 해결)
+  // [NEW] 초기화(새 문서) 핸들러
+  const handleReset = () => {
+    if (
+      confirm(
+        '작성 중인 내용이 모두 사라집니다.\n새로운 견적서를 작성하시겠습니까?'
+      )
+    ) {
+      store.resetProposal();
+      window.scrollTo(0, 0); // 맨 위로 스크롤
+    }
+  };
+
+  // 저장 핸들러
   const handleSave = async () => {
     const defaultName = store.proposalName || `${store.clientName} 견적서`;
     const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
@@ -51,7 +64,7 @@ export default function Home() {
       />
 
       {/* ------------------------------------------------------------
-          📂 불러오기 팝업 (Modal) - [NEW] 여기에 추가
+          📂 불러오기 팝업 (Modal)
       ------------------------------------------------------------ */}
       <ProposalListModal
         isOpen={isLoadModalOpen}
@@ -79,6 +92,15 @@ export default function Home() {
 
             {/* 상단 액션 버튼 그룹 */}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {/* [NEW] 새 문서(초기화) 버튼 - 톱니바퀴 왼쪽에 배치 */}
+              <button
+                onClick={handleReset}
+                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
+                title="새 문서 작성 (초기화)"
+              >
+                <LucideFilePlus size={20} />
+              </button>
+
               {/* 기준 단가 설정 버튼 */}
               <button
                 onClick={() => setIsConfigOpen(true)}
@@ -88,7 +110,7 @@ export default function Home() {
                 <LucideSettings size={20} />
               </button>
 
-              {/* [수정됨] 불러오기 버튼 -> 모달 열기 */}
+              {/* 불러오기 버튼 */}
               <button
                 onClick={() => setIsLoadModalOpen(true)}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
@@ -97,7 +119,7 @@ export default function Home() {
                 <LucideFolderOpen size={20} />
               </button>
 
-              {/* [수정됨] 저장 버튼 -> handleSave 함수 연결 */}
+              {/* 저장 버튼 */}
               <button
                 onClick={handleSave}
                 className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-700 transition shadow-sm"
