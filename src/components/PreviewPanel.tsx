@@ -16,12 +16,9 @@ import PreviewSummary from './preview/PreviewSummary';
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
-// ============================================================================
-// [NEW] 페이지 하단 Footer 컴포넌트 (페이지번호 + 프로젝트명)
-// ============================================================================
+// [NEW] 페이지 하단 Footer 컴포넌트
 const PageFooter = ({ page }: { page: number }) => {
   const { proposalName, clientName } = useProposalStore();
-  // 프로젝트명이 없으면 '고객사명 + 견적서'로 표시
   const displayName = proposalName || `${clientName} 태양광 발전 제안서`;
 
   return (
@@ -34,7 +31,7 @@ const PageFooter = ({ page }: { page: number }) => {
 
 export default function PreviewPanel() {
   const store = useProposalStore();
-  const { config, rationalization } = store;
+  const { config, rationalization, truckCount } = store; // [수정] truckCount 추가
 
   // 프린트 핸들러
   const handlePrint = () => {
@@ -54,7 +51,9 @@ export default function PreviewPanel() {
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
 
-    const surplusPower = solarGeneration - data.selfConsumption;
+    // [수정] 잉여전력: 생산 - 소비 (마이너스 허용 시 로직 주의, 여기선 0 이상으로 가정)
+    // *단, 여기서 잉여전력은 '자가소비 후 남은 전력'을 의미함 (EC 이동 전)
+    const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
 
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
@@ -82,6 +81,8 @@ export default function PreviewPanel() {
 
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
+
+    // 단순 표기용 잉여수익 (EC 고려 안 된 개별 월 데이터)
     const unitPriceSell = store.unitPriceSell || 192.79;
     const surplusRevenue = surplusPower * unitPriceSell;
 
@@ -157,11 +158,13 @@ export default function PreviewPanel() {
     : 0;
 
   // ----------------------------------------------------------------
-  // [2] 투자비 및 수익 계산
+  // [2] 투자비 및 수익 계산 (핵심 수정 부분)
   // ----------------------------------------------------------------
   const initialAnnualGen = totals.solarGeneration;
   const annualSelfConsumption = totals.selfConsumption;
-  const annualSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
+
+  // 1. 자가소비 후 잉여전력 (기초)
+  const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
@@ -174,56 +177,73 @@ export default function PreviewPanel() {
   let revenue_saving = 0,
     revenue_ec = 0,
     revenue_surplus = 0;
-  const volume_self = annualSelfConsumption;
-  let volume_ec = 0;
-  let volume_surplus_final = 0;
 
-  const rawEcCount = Math.floor(store.capacityKw / 100);
-  const ecCount = Math.min(3, rawEcCount);
-  const ec_capacity_annual = ecCount * 4 * 100 * 365;
+  // 자가소비 인정 물량
+  const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
+
+  // EC 운용 가능 물량 (트럭 수 기반)
+  const ec_capacity_annual = truckCount * 100 * 4 * 365;
+
+  let volume_ec = 0;
+  let volume_surplus_final = 0; // 최종 한전 판매 물량
 
   if (store.selectedModel === 'KEPCO') {
-    revenue_surplus = initialAnnualGen * config.unit_price_kepco;
-    volume_surplus_final = initialAnnualGen;
+    // EC 미사용 모델
+    revenue_surplus = rawSurplus * config.unit_price_kepco;
+    volume_surplus_final = rawSurplus;
+    revenue_saving = volume_self * appliedSavingsPrice; // KEPCO 모델도 자가소비 절감은 있음
   } else {
-    revenue_saving =
-      Math.min(initialAnnualGen, annualSelfConsumption) * appliedSavingsPrice;
-    const sellPrice = store.useEc ? appliedSellPrice : config.unit_price_kepco;
+    revenue_saving = volume_self * appliedSavingsPrice;
 
+    // EC 사용 여부 확인
     if (store.useEc) {
-      volume_ec = Math.min(annualSurplus, ec_capacity_annual);
-      const volume_real_surplus = annualSurplus - volume_ec;
+      volume_ec = Math.min(rawSurplus, ec_capacity_annual);
+      const volume_real_surplus = rawSurplus - volume_ec;
+
       revenue_ec = volume_ec * appliedSellPrice;
       revenue_surplus = volume_real_surplus * config.unit_price_kepco;
       volume_surplus_final = volume_real_surplus;
     } else {
-      revenue_surplus = annualSurplus * sellPrice;
-      volume_surplus_final = annualSurplus;
+      // EC 미사용 (일반 판매)
+      const sellPrice = config.unit_price_kepco;
+      revenue_surplus = rawSurplus * sellPrice;
+      volume_surplus_final = rawSurplus;
     }
   }
 
+  // 총 수익 (합리화 절감액 포함)
   const totalRevenue =
     revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
+  // 비용 (EC 인건비 + O&M)
   const maintenanceCost = totalRevenue * (store.maintenanceRate / 100);
+
+  // [수정] 인건비: EC 사용하고 트럭이 1대 이상일 때만
   let fixedLaborCost = 0;
-  if (store.useEc && store.selectedModel !== 'KEPCO') {
+  if (store.useEc && store.selectedModel !== 'KEPCO' && truckCount > 0) {
     fixedLaborCost = config.price_labor_ec * 100000000;
   }
+
   const totalAnnualCost = maintenanceCost + fixedLaborCost;
   const netProfit = totalRevenue - totalAnnualCost;
 
-  // 투자비
+  // 투자비 계산
   let solarPrice = config.price_solar_standard;
   if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
   if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
 
   const solarCount = store.capacityKw / 100;
   const solarCost = solarCount * solarPrice;
+
   const useEcReal = store.useEc && store.selectedModel !== 'KEPCO';
-  const ecCost = useEcReal ? ecCount * config.price_ec_unit : 0;
-  const tractorCost = useEcReal && ecCount > 0 ? 1 * config.price_tractor : 0;
-  const platformCost = useEcReal && ecCount > 0 ? 1 * config.price_platform : 0;
+
+  // [수정] EC 투자비: 트럭 수 * 단가
+  const ecCost = useEcReal ? truckCount * config.price_ec_unit : 0;
+  const tractorCost =
+    useEcReal && truckCount > 0 ? 1 * config.price_tractor : 0;
+  const platformCost =
+    useEcReal && truckCount > 0 ? 1 * config.price_platform : 0;
+
   const maintenanceTableValue = totalAnnualCost / 100000000;
 
   const totalInitialInvestment =
@@ -267,7 +287,7 @@ export default function PreviewPanel() {
     solarCount,
     solarPrice,
     solarCost,
-    ecCount,
+    ecCount: truckCount, // [수정] store.truckCount 전달
     ecCost,
     tractorCost,
     platformCost,
@@ -283,7 +303,7 @@ export default function PreviewPanel() {
   };
 
   // ----------------------------------------------------------------
-  // UI 렌더링 (PageFooter 추가)
+  // UI 렌더링
   // ----------------------------------------------------------------
   return (
     <div className={styles.a4Page} id="print-area">
@@ -325,7 +345,7 @@ export default function PreviewPanel() {
           <PreviewSummary />
         </div>
 
-        {/* ✅ Page 1 Footer */}
+        {/* Footer */}
         <PageFooter page={1} />
       </div>
 
@@ -339,7 +359,6 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
-        {/* ✅ Page 2 Footer */}
         <PageFooter page={2} />
       </div>
 
@@ -354,7 +373,6 @@ export default function PreviewPanel() {
             totalBenefit={totalBenefit}
           />
         </div>
-        {/* ✅ Page 3 Footer */}
         <PageFooter page={3} />
       </div>
 
@@ -375,7 +393,6 @@ export default function PreviewPanel() {
             investmentDetails={investmentDetails}
           />
         </div>
-        {/* ✅ Page 4 Footer */}
         <PageFooter page={4} />
       </div>
 
@@ -384,7 +401,6 @@ export default function PreviewPanel() {
         <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
-        {/* ✅ Page 5 Footer */}
         <PageFooter page={5} />
       </div>
 
@@ -400,7 +416,6 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
-        {/* ✅ Page 6 Footer */}
         <PageFooter page={6} />
       </div>
     </div>

@@ -19,13 +19,10 @@ type Props = {
   investmentDetails: any;
 };
 
-// [Helper] 반올림
-const round2 = (num: number) => Math.round(num * 100) / 100;
-
 export default function PreviewFinancialTable({
   totals,
   netProfit,
-  totalRevenue, // Step4에서 계산된 합리화 포함 수익이 넘어오면 베스트, 아니면 아래 로직으로 보정
+  totalRevenue, // Step4/PreviewPanel에서 계산된 합리화 포함 총 수익
   revenueDetails,
   totalAnnualCost,
   roiPercent,
@@ -33,10 +30,10 @@ export default function PreviewFinancialTable({
   investmentDetails,
 }: Props) {
   const store = useProposalStore();
-  const { config, rationalization } = store;
+  const { config, rationalization, truckCount } = store; // [NEW] truckCount 가져오기
 
   // --------------------------------------------------------------------------
-  // [NEW] 합리화 절감액 계산 (Preview에서도 보여주기 위함)
+  // [NEW] 합리화 절감액 계산 (Preview 표시용)
   // --------------------------------------------------------------------------
   const isEul = store.contractType.includes('(을)');
 
@@ -56,14 +53,7 @@ export default function PreviewFinancialTable({
       saving_max
     : 0;
 
-  // [보정] 만약 부모(Step4)에서 넘겨준 totalRevenue에 합리화 금액이 빠져있을 수 있으므로
-  // 여기서 확실하게 합산된 값을 보여주거나, 기존 값에 더해서 보여줍니다.
-  // (일관성을 위해 여기서는 단순 표시용으로 totalRevenue를 그대로 쓰거나,
-  //  만약 Step4의 로직이 스토어 저장값이 아니라면 여기서 다시 더해주는 게 안전합니다.)
-  //  -> Step4 수정본에서 totalRevenue 변수를 스토어에 저장하지 않았다면
-  //     부모 컴포넌트(Page.tsx 등)에서 넘겨줄 때 반영되지 않았을 수 있습니다.
-  //     따라서 화면 표시용으로는 [기존 3개 수익 + 합리화 수익]을 다시 더해서 보여주는 것이 정확합니다.
-
+  // 화면 표시용 수익 총액 (검증용)
   const displayTotalRevenue =
     revenueDetails.revenue_saving +
     revenueDetails.revenue_ec +
@@ -77,14 +67,21 @@ export default function PreviewFinancialTable({
     solarCount,
     solarPrice,
     solarCost,
-    ecCount,
-    ecCost,
+    // ecCount, // 기존 값 대신 store.truckCount 사용
+    // ecCost,  // 기존 값 대신 재계산 사용 (정합성 위해)
     tractorCost,
     platformCost,
     useEcReal,
     totalInitialInvestment,
     totalInvestment20Years,
   } = investmentDetails;
+
+  // [보정] 트럭 수에 따른 EC 투자비 재계산 (화면 표시용)
+  const currentEcCost = useEcReal ? truckCount * config.price_ec_unit : 0;
+
+  // 합계 보정 (PreviewPanel에서 넘겨준 값과 차이가 날 경우를 대비해 여기서 다시 합산하거나,
+  // 넘겨받은 totalInitialInvestment를 그대로 쓰되 구성요소만 보여줍니다.
+  // 여기서는 구성요소의 합이 전체와 맞아떨어지도록 표시합니다.)
 
   return (
     <div className={styles.financialSection}>
@@ -105,7 +102,7 @@ export default function PreviewFinancialTable({
         <div className={styles.summaryItem}>
           <span className={styles.summaryLabel}>EC 운용</span>
           <span className={styles.summaryValue}>
-            {useEcReal ? `${ecCount}대` : '미운용'}
+            {useEcReal ? `${truckCount}대` : '미운용'}
           </span>
         </div>
         <div className={styles.summaryItem}>
@@ -136,9 +133,11 @@ export default function PreviewFinancialTable({
           <tr>
             <td>에너지캐리어</td>
             <td>100 kW</td>
-            <td>{ecCount} ea</td>
+            {/* [수정] 트럭 수 반영 */}
+            <td>{useEcReal ? truckCount : 0} ea</td>
             <td>{config.price_ec_unit}</td>
-            <td className={styles.textBold}>{ecCost.toFixed(2)}</td>
+            {/* [수정] EC 비용 재계산값 표시 (단가*수량) */}
+            <td className={styles.textBold}>{currentEcCost.toFixed(2)}</td>
           </tr>
           <tr>
             <td>이동트랙터</td>
@@ -158,6 +157,7 @@ export default function PreviewFinancialTable({
             <td colSpan={4} className={styles.textRight}>
               초기 투자비 합계
             </td>
+            {/* 합계는 Step4 등 상위에서 계산된 정확한 값을 사용 (또는 여기서 재합산) */}
             <td>{totalInitialInvestment.toFixed(2)}</td>
           </tr>
           <tr className={styles.bgTotal} style={{ backgroundColor: '#334155' }}>
@@ -251,6 +251,12 @@ export default function PreviewFinancialTable({
             <td className={styles.textBold}>비용</td>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
               (-) 유지보수비 및 인건비
+              {/* [NEW] 인건비 포함 힌트 */}
+              {useEcReal && truckCount > 0 && (
+                <span className="text-xs text-gray-400 ml-1 font-normal">
+                  (EC운영인건비 포함)
+                </span>
+              )}
             </td>
             <td>-</td>
             <td>-</td>

@@ -20,10 +20,11 @@ const round2 = (num: number) => Math.round(num * 100) / 100;
 
 export default function Step4_Simulation() {
   const store = useProposalStore();
-  const { config, rationalization } = store;
+  const { config, rationalization, truckCount } = store; // [수정] truckCount 가져오기
 
   const [showRationalization, setShowRationalization] = useState(false);
 
+  // 시뮬레이션 옵션 변경 시 투자비 재계산
   useEffect(() => {
     store.recalculateInvestment();
   }, [
@@ -31,15 +32,15 @@ export default function Step4_Simulation() {
     store.selectedModel,
     store.moduleTier,
     store.useEc,
+    store.truckCount, // [수정] 트럭 수 변경 시에도 반응
     store.config,
   ]);
 
   // --------------------------------------------------------------------------
-  // [0] 공통 변수 및 합리화 절감액 선행 계산 (수익에 포함하기 위해 위로 이동)
+  // [0] 공통 변수 및 합리화 절감액 선행 계산
   // --------------------------------------------------------------------------
   const isEul = store.contractType.includes('(을)');
 
-  // 합리화 절감액 계산 (을 - 갑)
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
@@ -48,7 +49,6 @@ export default function Step4_Simulation() {
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
 
-  // 총 합리화 절감액
   const totalRationalizationSavings = isEul
     ? rationalization.base_savings_manual +
       saving_light +
@@ -57,19 +57,40 @@ export default function Step4_Simulation() {
     : 0;
 
   // --------------------------------------------------------------------------
-  // [1] 수익 계산 로직
+  // [1] 물량 및 수익 계산 로직
   // --------------------------------------------------------------------------
+
+  // 1. 연간 총 발전량
   const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
   }, 0);
 
+  // 2. 연간 총 자가소비량
   const annualSelfConsumption = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
-  const annualSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
+  // 3. 자가소비 인정 물량 (Min(발전량, 소비량))
+  const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
+
+  // 4. 자가소비 후 잉여전력량 (기초)
+  const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
+
+  // 5. EC 운반 전력량 계산
+  // 식: 트럭수 * 100kW * 4회 * 365일
+  const ecCapacityAnnual = truckCount * 100 * 4 * 365;
+
+  let volume_ec = 0;
+  if (store.useEc && store.selectedModel !== 'KEPCO') {
+    volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
+  }
+
+  // 6. 최종 잉여 전력량 (한전 판매용)
+  const volume_surplus = Math.max(0, rawSurplus - volume_ec);
+
+  // --- 단가 적용 및 수익 계산 ---
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
   let appliedSellPrice = config.unit_price_kepco;
@@ -78,44 +99,43 @@ export default function Step4_Simulation() {
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  let revenue_saving = 0;
-  let revenue_ec = 0;
+  // 수익 1: 자가소비 절감
+  const revenue_saving = volume_self * appliedSavingsPrice;
+
+  // 수익 2: EC 판매
+  const revenue_ec = volume_ec * appliedSellPrice;
+
+  // 수익 3: 잉여 한전 판매
   let revenue_surplus = 0;
-  let volume_ec = 0;
-
-  const volume_self = annualSelfConsumption;
-  const volume_surplus = annualSurplus;
-
   if (store.selectedModel === 'KEPCO') {
-    revenue_surplus = initialAnnualGen * config.unit_price_kepco;
+    revenue_surplus = rawSurplus * config.unit_price_kepco; // EC 미사용
   } else {
-    revenue_saving =
-      Math.min(initialAnnualGen, annualSelfConsumption) * appliedSavingsPrice;
-    const sellPrice = store.useEc ? appliedSellPrice : config.unit_price_kepco;
-
-    if (store.useEc) {
-      revenue_ec = annualSurplus * sellPrice;
-      volume_ec = annualSurplus;
-    } else {
-      revenue_surplus = annualSurplus * sellPrice;
-    }
+    revenue_surplus = volume_surplus * config.unit_price_kepco;
   }
 
-  // [수정] 합리화 절감액을 총 수익에 포함
+  // 총 수익 (합리화 절감액 포함)
   const totalRevenue =
     revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
-  // 비용
-  const maintenanceCost = totalRevenue * (store.maintenanceRate / 100);
-  let fixedLaborCost = 0;
-  if (store.useEc && store.selectedModel !== 'KEPCO') {
-    fixedLaborCost = config.price_labor_ec * 100000000;
-  }
-  const totalAnnualCost = maintenanceCost + fixedLaborCost;
+  // --------------------------------------------------------------------------
+  // [2] 비용 계산 (유지보수비 + 인건비)
+  // --------------------------------------------------------------------------
+
+  // EC 인건비: 트럭 1대 이상일 때 0.4억 (설정값 사용)
+  const laborCostWon =
+    truckCount > 0 && store.useEc && store.selectedModel !== 'KEPCO'
+      ? config.price_labor_ec * 100000000
+      : 0;
+
+  // 유지보수비: (총수익 * 요율) + 인건비
+  const maintenanceBase = totalRevenue * (store.maintenanceRate / 100);
+  const totalAnnualCost = maintenanceBase + laborCostWon;
+
+  // 순수익
   const netProfit = totalRevenue - totalAnnualCost;
 
   // --------------------------------------------------------------------------
-  // [2] 투자비 데이터
+  // [3] 투자비 데이터
   // --------------------------------------------------------------------------
   let solarPrice = config.price_solar_standard;
   if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -124,16 +144,23 @@ export default function Step4_Simulation() {
   const solarCount = store.capacityKw / 100;
   const solarCost = solarCount * solarPrice;
 
-  const rawEcCount = Math.floor(store.capacityKw / 100);
-  const ecCount = Math.min(3, rawEcCount); // Max 3대
+  // EC 관련 투자비 (트럭 수 비례)
+  const ecCost =
+    store.useEc && store.selectedModel !== 'KEPCO'
+      ? truckCount * config.price_ec_unit
+      : 0;
 
-  const useEcReal = store.useEc && store.selectedModel !== 'KEPCO';
+  // 트랙터/플랫폼 (트럭 있으면 1식)
+  const tractorCost =
+    truckCount > 0 && store.useEc && store.selectedModel !== 'KEPCO'
+      ? 1 * config.price_tractor
+      : 0;
+  const platformCost =
+    truckCount > 0 && store.useEc && store.selectedModel !== 'KEPCO'
+      ? 1 * config.price_platform
+      : 0;
 
-  const ecCost = useEcReal ? ecCount * config.price_ec_unit : 0;
-  const tractorCost = useEcReal && ecCount > 0 ? 1 * config.price_tractor : 0;
-  const platformCost = useEcReal && ecCount > 0 ? 1 * config.price_platform : 0;
-
-  const maintenanceTableValue = totalAnnualCost / 100000000;
+  const maintenanceTableValue = totalAnnualCost / 100000000; // 억 단위 표시용
 
   const totalInitialInvestment =
     solarCost + ecCost + tractorCost + platformCost;
@@ -148,7 +175,7 @@ export default function Step4_Simulation() {
     totalInitialInvestment + maintenanceTableValue * 20;
 
   // --------------------------------------------------------------------------
-  // [3] 20년 누적
+  // [4] 20년 누적 시뮬레이션
   // --------------------------------------------------------------------------
   let totalNetProfit20Years = 0;
   let firstYearNetProfit = 0;
@@ -157,8 +184,7 @@ export default function Step4_Simulation() {
   for (let year = 1; year <= 20; year++) {
     const ratio = currentGen / initialAnnualGen;
     const yearRevenue = totalRevenue * ratio;
-    const yearCost =
-      yearRevenue * (store.maintenanceRate / 100) + fixedLaborCost;
+    const yearCost = yearRevenue * (store.maintenanceRate / 100) + laborCostWon;
     const yearNetProfit = yearRevenue - yearCost;
 
     totalNetProfit20Years += yearNetProfit;
@@ -175,26 +201,32 @@ export default function Step4_Simulation() {
   // Advice Message
   let adviceMessage = null;
   let adviceType = 'info';
+
+  const maxTruckCapacity = truckCount * 100 * 4 * 365;
+
   if (store.selectedModel !== 'KEPCO' && store.useEc) {
-    if (rawEcCount > 3) {
+    if (truckCount > 0 && rawSurplus > maxTruckCapacity) {
       adviceType = 'warning';
       adviceMessage = (
         <span>
-          <b>⚠️ 과잉 설비 주의:</b> 잉여전력이 트럭 3대 용량을 초과합니다.
+          <b>⚠️ 설비 부족:</b> 잉여전력이 트럭 용량을 초과합니다. 트럭 추가를
+          고려하세요.
         </span>
       );
-    } else if (rawEcCount < 2) {
+    } else if (truckCount > 0 && rawSurplus < maxTruckCapacity * 0.5) {
       adviceType = 'warning';
       adviceMessage = (
         <span>
-          <b>⚠️ 경제성 주의:</b> 에너지 캐리어 2대 미만 시 효율이 낮습니다.
+          <b>⚠️ 과잉 설비:</b> 트럭 용량이 잉여전력보다 너무 큽니다. 줄이는 것을
+          추천합니다.
         </span>
       );
     } else {
       adviceType = 'success';
       adviceMessage = (
         <span>
-          <b>✅ 최적 설계 구간:</b> 에너지 캐리어 {ecCount}대 운용에 최적입니다.
+          <b>✅ 최적 설계:</b> 잉여전력과 트럭 운용({truckCount}대) 밸런스가
+          양호합니다.
         </span>
       );
     }
@@ -268,14 +300,28 @@ export default function Step4_Simulation() {
             <LucideTruck size={18} className="text-blue-600" />
             <span className={styles.toggleLabel}>에너지 캐리어(EC) 운용</span>
           </div>
-          <input
-            type="checkbox"
-            className="w-5 h-5 text-blue-600 cursor-pointer"
-            checked={store.useEc}
-            onChange={(e) =>
-              store.setSimulationOption('useEc', e.target.checked)
-            }
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="w-5 h-5 text-blue-600 cursor-pointer"
+              checked={store.useEc}
+              onChange={(e) =>
+                store.setSimulationOption('useEc', e.target.checked)
+              }
+            />
+            {/* [수정] 트럭 수량 조절 (EC 사용 시에만 노출) */}
+            {store.useEc && (
+              <select
+                className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                value={truckCount}
+                onChange={(e) => store.setTruckCount(Number(e.target.value))}
+              >
+                <option value={1}>1대 (100kW)</option>
+                <option value={2}>2대 (200kW)</option>
+                <option value={3}>3대 (300kW)</option>
+              </select>
+            )}
+          </div>
         </div>
       )}
 
@@ -283,7 +329,7 @@ export default function Step4_Simulation() {
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
           <span>
-            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소
+            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소{' '}
             <b>-{store.degradationRate}%</b>
           </span>
         </div>
@@ -292,8 +338,7 @@ export default function Step4_Simulation() {
 
       {adviceMessage && (
         <div
-          className={`p-3 rounded-lg border text-sm flex items-start gap-2 
-          ${
+          className={`p-3 rounded-lg border text-sm flex items-start gap-2 ${
             adviceType === 'warning'
               ? 'bg-orange-50 border-orange-200 text-orange-800'
               : 'bg-green-50 border-green-200 text-green-800'
@@ -340,7 +385,13 @@ export default function Step4_Simulation() {
                 <td className="text-blue-600 font-bold">
                   {solarCount.toFixed(2)} ea
                 </td>
-                <td>{useEcReal ? ecCount : 0} ea</td>
+                {/* [수정] 트럭 수 store.truckCount 반영 */}
+                <td>
+                  {store.useEc && store.selectedModel !== 'KEPCO'
+                    ? truckCount
+                    : 0}{' '}
+                  ea
+                </td>
                 <td>{tractorCost > 0 ? 1 : 0} ea</td>
                 <td>{platformCost > 0 ? 1 : 0} set</td>
                 <td>1 set</td>
@@ -482,28 +533,26 @@ export default function Step4_Simulation() {
           </div>
           <div className={styles.row}>
             <span className="text-xs text-gray-500 pl-2">
-              ○ 잉여 한전판매 수익
-            </span>
-            <span className="text-xs">
-              {(revenue_surplus / 100000000).toFixed(2)} 억원
-            </span>
-          </div>
-          <div className={styles.row}>
-            <span className="text-xs text-gray-500 pl-2">
               ○ EC-전력 판매 수익
             </span>
             <span className="text-xs">
               {(revenue_ec / 100000000).toFixed(2)} 억원
             </span>
           </div>
-
-          {/* [수정] 전기요금합리화절감액(갑/을) 동적 텍스트 및 금액 표시 */}
           <div className={styles.row}>
             <span className="text-xs text-gray-500 pl-2">
               ○ 전기요금합리화절감액{isEul ? '(을)' : '(갑)'}
             </span>
             <span className="text-xs">
               {(totalRationalizationSavings / 100000000).toFixed(2)} 억원
+            </span>
+          </div>
+          <div className={styles.row}>
+            <span className="text-xs text-gray-500 pl-2">
+              ○ 잉여 한전판매 수익
+            </span>
+            <span className="text-xs">
+              {(revenue_surplus / 100000000).toFixed(2)} 억원
             </span>
           </div>
 
@@ -517,12 +566,12 @@ export default function Step4_Simulation() {
             </div>
             <div className="flex justify-between text-xs text-red-500 mb-1">
               <span>○ O&M ({store.maintenanceRate}%)</span>
-              <span>-{(maintenanceCost / 100000000).toFixed(2)} 억원</span>
+              <span>-{(maintenanceBase / 100000000).toFixed(2)} 억원</span>
             </div>
-            {fixedLaborCost > 0 && (
+            {laborCostWon > 0 && (
               <div className="flex justify-between text-xs text-red-500">
-                <span>○ EC 운영 인건비</span>
-                <span>-{(fixedLaborCost / 100000000).toFixed(2)} 억원</span>
+                <span>○ EC 운영 인건비 ({truckCount}대)</span>
+                <span>-{(laborCostWon / 100000000).toFixed(2)} 억원</span>
               </div>
             )}
           </div>
@@ -535,13 +584,11 @@ export default function Step4_Simulation() {
           </div>
 
           <div className="bg-yellow-400 text-black font-bold text-center py-2">
-            수익률 (ROI) {roiPercent.toFixed(1)}% (회수
+            수익률 (ROI) {roiPercent.toFixed(1)}% (회수{' '}
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)
           </div>
 
-          {/* ===========================================================================
-              전기요금 합리화 절감액 계산기 (토글)
-          =========================================================================== */}
+          {/* 합리화 절감액 토글 */}
           {isEul ? (
             <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden">
               <button
@@ -557,7 +604,6 @@ export default function Step4_Simulation() {
                   <LucideChevronDown size={16} />
                 )}
               </button>
-
               {showRationalization && (
                 <div className="p-4 bg-white text-xs">
                   <table className="w-full text-center border-collapse">
@@ -637,7 +683,6 @@ export default function Step4_Simulation() {
                           />
                         </td>
                       </tr>
-
                       {/* 2. 경부하 */}
                       <tr>
                         <td className="p-2 font-bold bg-slate-50 border-r">
@@ -695,7 +740,6 @@ export default function Step4_Simulation() {
                           {Math.round(saving_light).toLocaleString()}
                         </td>
                       </tr>
-
                       {/* 3. 중간부하 */}
                       <tr>
                         <td className="p-2 font-bold bg-slate-50 border-r">
@@ -752,7 +796,6 @@ export default function Step4_Simulation() {
                           {Math.round(saving_mid).toLocaleString()}
                         </td>
                       </tr>
-
                       {/* 4. 최대부하 */}
                       <tr>
                         <td className="p-2 font-bold bg-slate-50 border-r">
@@ -809,7 +852,6 @@ export default function Step4_Simulation() {
                           {Math.round(saving_max).toLocaleString()}
                         </td>
                       </tr>
-
                       {/* 총계 */}
                       <tr className="border-t-2 border-slate-300">
                         <td

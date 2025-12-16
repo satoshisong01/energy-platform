@@ -18,7 +18,7 @@ export type MonthlyData = {
   totalBill: number;
   baseBill: number;
   peakKw: number;
-  solarGeneration: number; // [NEW] 발전량 수기 입력 필드 추가
+  solarGeneration: number; // [NEW] 발전량 수기 입력 필드
 };
 
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
@@ -110,6 +110,7 @@ interface ProposalState {
   selectedModel: BusinessModel;
   moduleTier: ModuleTier;
   useEc: boolean;
+  truckCount: number; // [NEW] 트럭 수 (0, 1, 2, 3)
   maintenanceRate: number;
   degradationRate: number;
 
@@ -161,6 +162,9 @@ interface ProposalState {
     value: any
   ) => void;
 
+  // [NEW] 트럭 수 설정 액션
+  setTruckCount: (count: number) => void;
+
   updateConfig: (field: keyof SystemConfig, value: number) => void;
 
   updateTariffPreset: (
@@ -204,7 +208,6 @@ export const useProposalStore = create<ProposalState>(
       baseRate: 8320,
       voltageType: '고압A',
 
-      // [수정] solarGeneration 필드 초기화 (0)
       monthlyData: Array.from({ length: 12 }, (_, i) => ({
         month: i + 1,
         usageKwh: 0,
@@ -212,7 +215,7 @@ export const useProposalStore = create<ProposalState>(
         totalBill: 0,
         baseBill: 0,
         peakKw: 0,
-        solarGeneration: 0, // [NEW]
+        solarGeneration: 0,
       })),
 
       unitPriceSavings: 210.5,
@@ -277,6 +280,7 @@ export const useProposalStore = create<ProposalState>(
       selectedModel: 'RE100',
       moduleTier: 'STANDARD',
       useEc: true,
+      truckCount: 3, // [NEW] 기본값 3대
       maintenanceRate: 25.0,
       degradationRate: 0.5,
       totalInvestment: 0,
@@ -360,7 +364,7 @@ export const useProposalStore = create<ProposalState>(
               totalBill: janData.totalBill,
               baseBill: janData.baseBill,
               peakKw: janData.peakKw,
-              solarGeneration: janData.solarGeneration, // [NEW] 복사 시 발전량도 포함
+              solarGeneration: janData.solarGeneration,
             };
           });
           return { monthlyData: newMonthlyData };
@@ -376,16 +380,24 @@ export const useProposalStore = create<ProposalState>(
           rationalization: { ...state.rationalization, [field]: value },
         })),
 
-      setSimulationOption: (
-        field:
-          | 'selectedModel'
-          | 'moduleTier'
-          | 'useEc'
-          | 'maintenanceRate'
-          | 'degradationRate',
-        value: any
-      ) => {
-        set({ [field]: value });
+      setSimulationOption: (field, value) => {
+        set((state) => {
+          // [NEW] EC 사용 여부에 따라 트럭 수 자동 조정
+          if (field === 'useEc') {
+            return {
+              ...state,
+              useEc: value,
+              truckCount: value ? 3 : 0, // 켜면 3대, 끄면 0대
+            };
+          }
+          return { ...state, [field]: value };
+        });
+        get().recalculateInvestment();
+      },
+
+      // [NEW] 트럭 수 직접 설정
+      setTruckCount: (count: number) => {
+        set({ truckCount: count });
         get().recalculateInvestment();
       },
 
@@ -420,7 +432,14 @@ export const useProposalStore = create<ProposalState>(
 
       recalculateInvestment: () => {
         const state = get();
-        const { config, capacityKw, moduleTier, useEc, selectedModel } = state;
+        const {
+          config,
+          capacityKw,
+          moduleTier,
+          useEc,
+          selectedModel,
+          truckCount,
+        } = state;
 
         let unitPrice = config.price_solar_standard;
         if (moduleTier === 'PREMIUM') unitPrice = config.price_solar_premium;
@@ -434,12 +453,12 @@ export const useProposalStore = create<ProposalState>(
         let platformCost = 0;
 
         if (useEc && selectedModel !== 'KEPCO') {
-          const rawEcCount = Math.floor(capacityKw / 100);
-          const ecCount = Math.min(3, rawEcCount);
+          // [수정] 트럭 수(truckCount) 사용
+          const count = truckCount;
 
-          ecCost = ecCount * config.price_ec_unit;
-          tractorCost = ecCount > 0 ? 1 * config.price_tractor : 0;
-          platformCost = ecCount > 0 ? 1 * config.price_platform : 0;
+          ecCost = count * config.price_ec_unit;
+          tractorCost = count > 0 ? 1 * config.price_tractor : 0;
+          platformCost = count > 0 ? 1 * config.price_platform : 0;
         }
 
         const total = solarCost + ecCost + tractorCost + platformCost;
@@ -494,6 +513,7 @@ export const useProposalStore = create<ProposalState>(
           selectedModel: state.selectedModel,
           moduleTier: state.moduleTier,
           useEc: state.useEc,
+          truckCount: state.truckCount, // [NEW] 저장 시 트럭 수도 포함
           maintenanceRate: state.maintenanceRate,
           degradationRate: state.degradationRate,
           config: state.config,
@@ -642,7 +662,6 @@ export const useProposalStore = create<ProposalState>(
           proposalName: '',
           clientName: '',
           address: '',
-          // [수정] solarGeneration 리셋
           monthlyData: Array.from({ length: 12 }, (_, i) => ({
             month: i + 1,
             usageKwh: 0,
@@ -671,6 +690,8 @@ export const useProposalStore = create<ProposalState>(
             max_gap: 136.5,
             max_usage: 0,
           },
+          useEc: true,
+          truckCount: 3, // [NEW] 초기화 시 3대
           totalInvestment: 0,
         });
       },
