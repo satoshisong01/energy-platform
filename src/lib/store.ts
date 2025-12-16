@@ -18,7 +18,7 @@ export type MonthlyData = {
   totalBill: number;
   baseBill: number;
   peakKw: number;
-  solarGeneration: number; // [NEW] 발전량 수기 입력 필드
+  solarGeneration: number;
 };
 
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
@@ -110,7 +110,7 @@ interface ProposalState {
   selectedModel: BusinessModel;
   moduleTier: ModuleTier;
   useEc: boolean;
-  truckCount: number; // [NEW] 트럭 수 (0, 1, 2, 3)
+  truckCount: number;
   maintenanceRate: number;
   degradationRate: number;
 
@@ -162,7 +162,6 @@ interface ProposalState {
     value: any
   ) => void;
 
-  // [NEW] 트럭 수 설정 액션
   setTruckCount: (count: number) => void;
 
   updateConfig: (field: keyof SystemConfig, value: number) => void;
@@ -280,7 +279,7 @@ export const useProposalStore = create<ProposalState>(
       selectedModel: 'RE100',
       moduleTier: 'STANDARD',
       useEc: true,
-      truckCount: 3, // [NEW] 기본값 3대
+      truckCount: 3,
       maintenanceRate: 25.0,
       degradationRate: 0.5,
       totalInvestment: 0,
@@ -380,14 +379,22 @@ export const useProposalStore = create<ProposalState>(
           rationalization: { ...state.rationalization, [field]: value },
         })),
 
-      setSimulationOption: (field, value) => {
+      // [수정] Vercel Build Error 해결: 매개변수 field, value에 타입 명시
+      setSimulationOption: (
+        field:
+          | 'selectedModel'
+          | 'moduleTier'
+          | 'useEc'
+          | 'maintenanceRate'
+          | 'degradationRate',
+        value: any
+      ) => {
         set((state) => {
-          // [NEW] EC 사용 여부에 따라 트럭 수 자동 조정
           if (field === 'useEc') {
             return {
               ...state,
               useEc: value,
-              truckCount: value ? 3 : 0, // 켜면 3대, 끄면 0대
+              truckCount: value ? 3 : 0,
             };
           }
           return { ...state, [field]: value };
@@ -395,7 +402,6 @@ export const useProposalStore = create<ProposalState>(
         get().recalculateInvestment();
       },
 
-      // [NEW] 트럭 수 직접 설정
       setTruckCount: (count: number) => {
         set({ truckCount: count });
         get().recalculateInvestment();
@@ -453,7 +459,6 @@ export const useProposalStore = create<ProposalState>(
         let platformCost = 0;
 
         if (useEc && selectedModel !== 'KEPCO') {
-          // [수정] 트럭 수(truckCount) 사용
           const count = truckCount;
 
           ecCost = count * config.price_ec_unit;
@@ -513,7 +518,7 @@ export const useProposalStore = create<ProposalState>(
           selectedModel: state.selectedModel,
           moduleTier: state.moduleTier,
           useEc: state.useEc,
-          truckCount: state.truckCount, // [NEW] 저장 시 트럭 수도 포함
+          truckCount: state.truckCount,
           maintenanceRate: state.maintenanceRate,
           degradationRate: state.degradationRate,
           config: state.config,
@@ -691,7 +696,7 @@ export const useProposalStore = create<ProposalState>(
             max_usage: 0,
           },
           useEc: true,
-          truckCount: 3, // [NEW] 초기화 시 3대
+          truckCount: 3,
           totalInvestment: 0,
         });
       },
