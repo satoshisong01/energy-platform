@@ -3,7 +3,7 @@
 import React from 'react';
 import { useProposalStore } from '../../lib/store';
 import styles from '../PreviewPanel.module.css';
-import { LucideBriefcase, LucideTrendingUp } from 'lucide-react';
+import { LucideBriefcase } from 'lucide-react';
 
 type Props = {
   totals: any;
@@ -25,18 +25,52 @@ const round2 = (num: number) => Math.round(num * 100) / 100;
 export default function PreviewFinancialTable({
   totals,
   netProfit,
-  totalRevenue,
+  totalRevenue, // Step4에서 계산된 합리화 포함 수익이 넘어오면 베스트, 아니면 아래 로직으로 보정
   revenueDetails,
   totalAnnualCost,
-  maintenanceCost,
-  fixedLaborCost,
   roiPercent,
-  roiYears,
   totalNetProfit20Years,
   investmentDetails,
 }: Props) {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
+
+  // --------------------------------------------------------------------------
+  // [NEW] 합리화 절감액 계산 (Preview에서도 보여주기 위함)
+  // --------------------------------------------------------------------------
+  const isEul = store.contractType.includes('(을)');
+
+  const diff_light = rationalization.light_eul - rationalization.light_gap;
+  const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
+  const diff_max = rationalization.max_eul - rationalization.max_gap;
+
+  const saving_light = diff_light * rationalization.light_usage;
+  const saving_mid = diff_mid * rationalization.mid_usage;
+  const saving_max = diff_max * rationalization.max_usage;
+
+  // 총 합리화 절감액
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      saving_light +
+      saving_mid +
+      saving_max
+    : 0;
+
+  // [보정] 만약 부모(Step4)에서 넘겨준 totalRevenue에 합리화 금액이 빠져있을 수 있으므로
+  // 여기서 확실하게 합산된 값을 보여주거나, 기존 값에 더해서 보여줍니다.
+  // (일관성을 위해 여기서는 단순 표시용으로 totalRevenue를 그대로 쓰거나,
+  //  만약 Step4의 로직이 스토어 저장값이 아니라면 여기서 다시 더해주는 게 안전합니다.)
+  //  -> Step4 수정본에서 totalRevenue 변수를 스토어에 저장하지 않았다면
+  //     부모 컴포넌트(Page.tsx 등)에서 넘겨줄 때 반영되지 않았을 수 있습니다.
+  //     따라서 화면 표시용으로는 [기존 3개 수익 + 합리화 수익]을 다시 더해서 보여주는 것이 정확합니다.
+
+  const displayTotalRevenue =
+    revenueDetails.revenue_saving +
+    revenueDetails.revenue_ec +
+    revenueDetails.revenue_surplus +
+    totalRationalizationSavings;
+
+  const displayNetProfit = displayTotalRevenue - totalAnnualCost;
 
   // 투자비 계산 데이터 해체
   const {
@@ -48,14 +82,8 @@ export default function PreviewFinancialTable({
     tractorCost,
     platformCost,
     useEcReal,
-    maintenanceTableValue,
     totalInitialInvestment,
     totalInvestment20Years,
-    solarSplit,
-    ecSplit,
-    tractorSplit,
-    platformSplit,
-    maintenanceSplit,
   } = investmentDetails;
 
   return (
@@ -154,7 +182,7 @@ export default function PreviewFinancialTable({
         </thead>
         <tbody>
           <tr>
-            <td rowSpan={3} className={styles.textBold}>
+            <td rowSpan={4} className={styles.textBold}>
               수익
             </td>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
@@ -198,12 +226,25 @@ export default function PreviewFinancialTable({
               {(revenueDetails.revenue_ec / 100000000).toFixed(2)}
             </td>
           </tr>
+          {/* [NEW] ④ 전기요금 합리화 절감액 */}
+          <tr>
+            <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
+              ④ 전기요금합리화절감액{isEul ? '(을)' : '(갑)'}
+            </td>
+            <td className={styles.bgPinkRow}>-</td>
+            <td className={styles.bgYellowRow}>-</td>
+            <td className={styles.textRight}>
+              {(totalRationalizationSavings / 100000000).toFixed(2)}
+            </td>
+          </tr>
+
+          {/* 총계 */}
           <tr className={styles.bgGreenRow} style={{ fontWeight: 'bold' }}>
             <td colSpan={4} className={styles.textRight}>
               연간 수익 총액
             </td>
             <td className={styles.textBlue}>
-              {(totalRevenue / 100000000).toFixed(2)}
+              {(displayTotalRevenue / 100000000).toFixed(2)}
             </td>
           </tr>
           <tr>
@@ -222,7 +263,7 @@ export default function PreviewFinancialTable({
               연간 실제 순수익 (Net Profit)
             </td>
             <td style={{ fontSize: '1.1rem', color: '#fbbf24' }}>
-              {(netProfit / 100000000).toFixed(2)}
+              {(displayNetProfit / 100000000).toFixed(2)}
             </td>
           </tr>
         </tbody>

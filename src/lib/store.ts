@@ -18,6 +18,7 @@ export type MonthlyData = {
   totalBill: number;
   baseBill: number;
   peakKw: number;
+  solarGeneration: number; // [NEW] 발전량 수기 입력 필드 추가
 };
 
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
@@ -38,6 +39,7 @@ export type SystemConfig = {
   loan_rate_rps: number;
   loan_rate_factoring: number;
   rental_price_per_kw: number;
+  subscription_price_per_kw: number;
   sub_price_self: number;
   sub_price_surplus: number;
 };
@@ -47,6 +49,26 @@ export type TariffPreset = {
   name: string;
   baseRate: number;
   savings: number;
+};
+
+// 합리화 데이터
+export type RationalizationData = {
+  base_eul: number;
+  base_gap: number;
+  base_usage: number;
+  base_savings_manual: number;
+
+  light_eul: number;
+  light_gap: number;
+  light_usage: number;
+
+  mid_eul: number;
+  mid_gap: number;
+  mid_usage: number;
+
+  max_eul: number;
+  max_gap: number;
+  max_usage: number;
 };
 
 export type ProposalMeta = {
@@ -77,6 +99,10 @@ interface ProposalState {
   unitPriceSavings: number;
   unitPriceSell: number;
   peakReductionRatio: number;
+
+  energyNote: string;
+
+  rationalization: RationalizationData;
 
   config: SystemConfig;
   tariffPresets: TariffPreset[];
@@ -117,6 +143,13 @@ interface ProposalState {
     value: number
   ) => void;
   copyJanToAll: () => void;
+
+  setEnergyNote: (note: string) => void;
+
+  updateRationalization: (
+    field: keyof RationalizationData,
+    value: number
+  ) => void;
 
   setSimulationOption: (
     field:
@@ -171,6 +204,7 @@ export const useProposalStore = create<ProposalState>(
       baseRate: 8320,
       voltageType: '고압A',
 
+      // [수정] solarGeneration 필드 초기화 (0)
       monthlyData: Array.from({ length: 12 }, (_, i) => ({
         month: i + 1,
         usageKwh: 0,
@@ -178,11 +212,30 @@ export const useProposalStore = create<ProposalState>(
         totalBill: 0,
         baseBill: 0,
         peakKw: 0,
+        solarGeneration: 0, // [NEW]
       })),
 
       unitPriceSavings: 210.5,
       unitPriceSell: 192.79,
       peakReductionRatio: 0.359,
+
+      energyNote: '',
+
+      rationalization: {
+        base_eul: 8320,
+        base_gap: 7470,
+        base_usage: 0,
+        base_savings_manual: 0,
+        light_eul: 113.23,
+        light_gap: 93.27,
+        light_usage: 0,
+        mid_eul: 153.73,
+        mid_gap: 109.43,
+        mid_usage: 0,
+        max_eul: 210.5,
+        max_gap: 136.5,
+        max_usage: 0,
+      },
 
       config: {
         price_solar_premium: 0.97,
@@ -199,6 +252,7 @@ export const useProposalStore = create<ProposalState>(
         loan_rate_rps: 1.75,
         loan_rate_factoring: 5.1,
         rental_price_per_kw: 20000,
+        subscription_price_per_kw: 40000,
         sub_price_self: 150,
         sub_price_surplus: 50,
       },
@@ -227,7 +281,7 @@ export const useProposalStore = create<ProposalState>(
       degradationRate: 0.5,
       totalInvestment: 0,
 
-      // --- Actions Implementation (타입 명시 추가) ---
+      // --- Actions Implementation ---
 
       setClientName: (name: string) => set({ clientName: name }),
       setTargetDate: (date: string) => set({ targetDate: date }),
@@ -306,10 +360,21 @@ export const useProposalStore = create<ProposalState>(
               totalBill: janData.totalBill,
               baseBill: janData.baseBill,
               peakKw: janData.peakKw,
+              solarGeneration: janData.solarGeneration, // [NEW] 복사 시 발전량도 포함
             };
           });
           return { monthlyData: newMonthlyData };
         }),
+
+      setEnergyNote: (note: string) => set({ energyNote: note }),
+
+      updateRationalization: (
+        field: keyof RationalizationData,
+        value: number
+      ) =>
+        set((state) => ({
+          rationalization: { ...state.rationalization, [field]: value },
+        })),
 
       setSimulationOption: (
         field:
@@ -381,7 +446,6 @@ export const useProposalStore = create<ProposalState>(
         set({ totalInvestment: total });
       },
 
-      // --- DB Helper ---
       checkDuplicateName: async (name: string, excludeId?: number) => {
         let query = supabase
           .from('proposals')
@@ -400,13 +464,11 @@ export const useProposalStore = create<ProposalState>(
         return data && data.length > 0;
       },
 
-      // --- DB Actions ---
       saveProposal: async (customName?: string) => {
         const state = get();
         const finalName =
           customName || state.proposalName || `${state.clientName} 견적서`;
 
-        // 중복 체크
         const isDuplicate = await get().checkDuplicateName(
           finalName,
           state.proposalId || undefined
@@ -427,6 +489,8 @@ export const useProposalStore = create<ProposalState>(
           contractType: state.contractType,
           baseRate: state.baseRate,
           unitPriceSavings: state.unitPriceSavings,
+          energyNote: state.energyNote,
+          rationalization: state.rationalization,
           selectedModel: state.selectedModel,
           moduleTier: state.moduleTier,
           useEc: state.useEc,
@@ -437,11 +501,6 @@ export const useProposalStore = create<ProposalState>(
         };
 
         try {
-          console.log('DB 저장 시작...', {
-            proposalId: state.proposalId,
-            name: finalName,
-          });
-
           if (state.proposalId) {
             const { error } = await supabase
               .from('proposals')
@@ -583,6 +642,7 @@ export const useProposalStore = create<ProposalState>(
           proposalName: '',
           clientName: '',
           address: '',
+          // [수정] solarGeneration 리셋
           monthlyData: Array.from({ length: 12 }, (_, i) => ({
             month: i + 1,
             usageKwh: 0,
@@ -590,10 +650,27 @@ export const useProposalStore = create<ProposalState>(
             totalBill: 0,
             baseBill: 0,
             peakKw: 0,
+            solarGeneration: 0,
           })),
           roofAreas: [{ id: '1', name: 'A동 지붕', valueM2: 0 }],
           totalAreaPyeong: 0,
           capacityKw: 0,
+          energyNote: '',
+          rationalization: {
+            base_eul: 8320,
+            base_gap: 7470,
+            base_usage: 0,
+            base_savings_manual: 0,
+            light_eul: 113.23,
+            light_gap: 93.27,
+            light_usage: 0,
+            mid_eul: 153.73,
+            mid_gap: 109.43,
+            mid_usage: 0,
+            max_eul: 210.5,
+            max_gap: 136.5,
+            max_usage: 0,
+          },
           totalInvestment: 0,
         });
       },

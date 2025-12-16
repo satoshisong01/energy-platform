@@ -377,3 +377,64 @@
     border: none;
   }
 }
+
+.comparisonSection {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.compHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.8rem;
+  border-bottom: 2px solid #cbd5e1;
+  padding-bottom: 0.5rem;
+}
+
+.compRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  border-bottom: 1px dashed #e2e8f0;
+  font-size: 0.75rem;
+}
+
+/* [NEW] 강조 행 스타일 */
+
+.compLabel {
+  width: 35%; /* 라벨 너비 조정 */
+  color: #334155;
+}
+
+.compValue {
+  font-weight: 800;
+  color: #0f172a;
+  width: 20%; /* 값 너비 */
+  text-align: right;
+}
+
+/* [NEW] 절감율 표시 스타일 */
+.compSub {
+  font-size: 0.8rem;
+  color: #64748b;
+  flex: 1; /* 남은 공간 차지 */
+  text-align: center;
+}
+
+.compRate {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f1f5f9;
+  color: #64748b;
+  margin-left: 0.5rem;
+}

@@ -12,28 +12,48 @@ const PMT = (rate: number, nper: number, pv: number) => {
   return (rate * pv * pvif) / (pvif - 1);
 };
 
+// [Helper] 윤년 체크
+const isLeapYear = (year: number) => {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+};
+
 export default function Step5_Comparison() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
   // ----------------------------------------------------------------
   // 1. 기초 데이터 및 모델별 계산
   // ----------------------------------------------------------------
   const totalInvestment = store.totalInvestment * 100000000;
 
-  // [발전량/소비량]
-  const initialAnnualGen = store.monthlyData.reduce(
-    (acc, cur) =>
-      acc + store.capacityKw * 3.64 * new Date(2025, cur.month, 0).getDate(),
-    0
-  );
+  // [발전량/소비량] (기준년도 2025 - 365일 기준)
+  const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
+    const days = new Date(2025, cur.month, 0).getDate();
+    const autoGen = store.capacityKw * 3.64 * days;
+    const gen = cur.solarGeneration > 0 ? cur.solarGeneration : autoGen;
+    return acc + gen;
+  }, 0);
+
   const annualSelf = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
+  // 잉여전력 (수익 계산용이므로 Max(0) 유지)
   const annualSurplus = Math.max(0, initialAnnualGen - annualSelf);
 
-  // 매출(Gross) 계산
+  // [합리화 절감액] (고정 수익)
+  const isEul = store.contractType.includes('(을)');
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      (rationalization.light_eul - rationalization.light_gap) *
+        rationalization.light_usage +
+      (rationalization.mid_eul - rationalization.mid_gap) *
+        rationalization.mid_usage +
+      (rationalization.max_eul - rationalization.max_gap) *
+        rationalization.max_usage
+    : 0;
+
+  // [발전 기반 수익] (윤년에 따라 변동되는 수익)
   const unitPriceSavings = store.unitPriceSavings || config.unit_price_savings;
   const sellPrice = config.unit_price_ec_1_5;
   const revenue_saving =
@@ -46,30 +66,45 @@ export default function Step5_Comparison() {
   } else {
     revenue_sales = annualSurplus * config.unit_price_kepco;
   }
-  const annualGrossRevenue = revenue_saving + revenue_sales;
 
-  // O&M 및 영업이익
+  // 발전량에 따라 변하는 연간 기본 수익 (365일 기준)
+  const baseGenRevenue = revenue_saving + revenue_sales;
+
+  // 1차년도 총 영업이익 (Gross - O&M) 계산용
+  const annualGrossRevenue = baseGenRevenue + totalRationalizationSavings;
   const annualMaintenanceCost =
     (annualGrossRevenue * store.maintenanceRate) / 100 +
     (useEcReal ? config.price_labor_ec * 100000000 : 0);
-
   const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
   // ==========================================================================
-  // [A] 자가자본
+  // [A] 자가자본 (20년 시뮬레이션 - 윤년 반영)
   // ==========================================================================
   const self_equity = totalInvestment;
   let self_total_20y = 0;
-  let currentGen = initialAnnualGen;
+
+  let currentGenRatio = 1; // 발전효율
 
   for (let i = 0; i < 20; i++) {
-    const ratio = currentGen / initialAnnualGen;
-    const yrRev = annualGrossRevenue * ratio;
+    const currentYear = 2025 + i;
+    const isLeap = isLeapYear(currentYear); // 윤년 확인
+
+    // 1. 발전 기반 수익 (윤년이면 366/365 만큼 증가)
+    const leapFactor = isLeap ? 366 / 365 : 1;
+    const yearGenRevenue = baseGenRevenue * currentGenRatio * leapFactor;
+
+    // 2. 전체 매출 (발전수익 + 합리화절감액)
+    const yrRev = yearGenRevenue + totalRationalizationSavings;
+
+    // 3. 비용 차감
     const yrCost =
       (yrRev * store.maintenanceRate) / 100 +
       (useEcReal ? config.price_labor_ec * 100000000 : 0);
+
     self_total_20y += yrRev - yrCost;
-    currentGen *= 1 - store.degradationRate / 100;
+
+    // 다음 해 효율 감소
+    currentGenRatio *= 1 - store.degradationRate / 100;
   }
   const self_final_profit = self_total_20y;
 
@@ -86,6 +121,7 @@ export default function Step5_Comparison() {
   const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
   const rps_net_6_15 = annualOperatingProfit + rps_pmt;
 
+  // RPS 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const rps_final_profit =
     self_final_profit - rps_interest_only * 5 - Math.abs(rps_pmt) * 10;
 
@@ -102,13 +138,18 @@ export default function Step5_Comparison() {
   const fac_net_1 = annualOperatingProfit - fac_interest_only;
   const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
+  // 팩토링 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const fac_final_profit =
     self_final_profit - fac_interest_only * 1 - Math.abs(fac_pmt) * 9;
 
   // ==========================================================================
-  // [D] 임대형
+  // [D] 임대형 (수정됨)
   // ==========================================================================
-  const rental_revenue_part1 = store.capacityKw * 0.2 * 192.79 * 3.6 * 365;
+  // 1. 한국전력 판매 (20%): 3.64 및 config 단가 적용
+  const rental_revenue_part1 =
+    store.capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365;
+
+  // 2. 임대료 (80%): config 단가 적용
   const rental_revenue_part2 =
     store.capacityKw * 0.8 * config.rental_price_per_kw;
 
@@ -116,25 +157,25 @@ export default function Step5_Comparison() {
   const rental_final_profit = rental_revenue_yr * 20;
 
   // ==========================================================================
-  // [E] 구독형 (Sheet 4 논리 완벽 반영)
+  // [E] 구독형 (수정됨)
   // ==========================================================================
-  // 1. 기존 단가 (엑셀 D28: 210.5)
   const price_standard = 210.5;
+  const price_sub_self = config.sub_price_self;
+  const price_sub_surplus = config.sub_price_surplus;
 
-  // 2. 구독 단가 (엑셀 E28: 150 / F28: 50)
-  const price_sub_self = config.sub_price_self; // 150
-  const price_sub_surplus = config.sub_price_surplus; // 50
-
-  // 3. 자가소비 절감 이득 (Savings Benefit) = 자가소비량 * (210.5 - 150)
   const sub_benefit_savings = annualSelf * (price_standard - price_sub_self);
-
-  // 4. 잉여전력 판매 수익 (Surplus Revenue) = 잉여전력량 * 50
   const sub_revenue_surplus = annualSurplus * price_sub_surplus;
-
-  // 5. 연간 총 경제적 이득 (Total Benefit)
   const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
 
   const sub_final_profit = sub_revenue_yr * 20;
+
+  // ==========================================================================
+  // [F] 1 REC (1000kW 기준) - 영업이익 기준
+  // ==========================================================================
+  const CONST_H18 = 80;
+  const rec_1000_common = annualOperatingProfit / CONST_H18 / 1000;
+  const rec_1000_rent = (initialAnnualGen * 0.2) / 1000;
+  const rec_1000_sub = sub_revenue_yr / CONST_H18 / 1000;
 
   // ----------------------------------------------------------------
   // AI 추천 멘트
@@ -198,27 +239,29 @@ export default function Step5_Comparison() {
               <th className={styles.colSelf}>
                 자가자본
                 <br />
-                <span className={styles.subText}>(잉여전력 판매)</span>
+                <span className={styles.subText}>(전액투자)</span>
               </th>
               <th className={styles.colRps}>
-                RPS ({config.loan_rate_rps}%)
+                RPS 정책자금
                 <br />
-                <span className={styles.subText}>5년거치 10년상환</span>
+                <span className={styles.subText}>{config.loan_rate_rps}%</span>
               </th>
               <th className={styles.colFac}>
-                팩토링 ({config.loan_rate_factoring}%)
+                팩토링
                 <br />
-                <span className={styles.subText}>1년거치 9년상환</span>
+                <span className={styles.subText}>
+                  {config.loan_rate_factoring}%
+                </span>
               </th>
               <th className={styles.colRental}>
-                RE100 임대형
+                임대형
                 <br />
-                <span className={styles.subText}>{store.capacityKw}kW</span>
+                <span className={styles.subText}>부지임대</span>
               </th>
               <th className={styles.colSub}>
-                구독 서비스
+                구독형
                 <br />
-                <span className={styles.subText}>{store.capacityKw}kW</span>
+                <span className={styles.subText}>서비스</span>
               </th>
             </tr>
           </thead>
@@ -391,6 +434,16 @@ export default function Step5_Comparison() {
               </td>
               <td>-</td>
               <td>-</td>
+            </tr>
+
+            {/* 1 REC */}
+            <tr className="bg-yellow-50 font-bold">
+              <td className={styles.rowHeader}>1 REC (1000kW)</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_rent.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_sub.toFixed(2)}</td>
             </tr>
 
             {/* 5. 최종 결과 (20년 누적) */}

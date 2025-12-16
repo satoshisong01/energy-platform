@@ -3,40 +3,60 @@
 import React from 'react';
 import { useProposalStore } from '../../lib/store';
 import styles from './PreviewComparisonTable.module.css';
-import { LucideBriefcase } from 'lucide-react';
+import { LucideBriefcase, LucideCheckCircle2 } from 'lucide-react';
 
-// [Helper] PMT 함수
+// [Helper] PMT 함수 (대출 상환금 계산)
 const PMT = (rate: number, nper: number, pv: number) => {
   if (rate === 0) return -pv / nper;
   const pvif = Math.pow(1 + rate, nper);
   return (rate * pv * pvif) / (pvif - 1);
 };
 
-// [Helper] 천원 단위 변환 + 콤마 (수정됨: 10000 -> 1000)
+// [Helper] 윤년 체크 함수
+const isLeapYear = (year: number) => {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+};
+
+// [Helper] 천원 단위 변환 + 콤마
 const toCheon = (val: number) => Math.round(val / 1000).toLocaleString();
 
 export default function PreviewComparisonTable() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
   // ----------------------------------------------------------------
-  // 1. 기초 데이터 및 모델별 계산 (Step5와 동일 로직)
+  // 1. 기초 데이터 및 모델별 계산
   // ----------------------------------------------------------------
   const totalInvestment = store.totalInvestment * 100000000;
 
-  // [발전량/소비량]
-  const initialAnnualGen = store.monthlyData.reduce(
-    (acc, cur) =>
-      acc + store.capacityKw * 3.64 * new Date(2025, cur.month, 0).getDate(),
-    0
-  );
+  // [발전량/소비량] (기준년도 2025 - 365일 기준)
+  const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
+    const days = new Date(2025, cur.month, 0).getDate();
+    const autoGen = store.capacityKw * 3.64 * days;
+    // 수기 입력값이 있으면 사용, 없으면 자동 계산
+    const gen = cur.solarGeneration > 0 ? cur.solarGeneration : autoGen;
+    return acc + gen;
+  }, 0);
+
   const annualSelf = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
   const annualSurplus = Math.max(0, initialAnnualGen - annualSelf);
 
-  // 매출(Gross) 계산
+  // [합리화 절감액] (고정 수익)
+  const isEul = store.contractType.includes('(을)');
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      (rationalization.light_eul - rationalization.light_gap) *
+        rationalization.light_usage +
+      (rationalization.mid_eul - rationalization.mid_gap) *
+        rationalization.mid_usage +
+      (rationalization.max_eul - rationalization.max_gap) *
+        rationalization.max_usage
+    : 0;
+
+  // [발전 기반 수익] (윤년에 따라 변동되는 수익)
   const unitPriceSavings = store.unitPriceSavings || config.unit_price_savings;
   const sellPrice = config.unit_price_ec_1_5;
   const revenue_saving =
@@ -49,9 +69,12 @@ export default function PreviewComparisonTable() {
   } else {
     revenue_sales = annualSurplus * config.unit_price_kepco;
   }
-  const annualGrossRevenue = revenue_saving + revenue_sales;
 
-  // O&M 비용 및 영업이익
+  // 발전량에 따라 변하는 연간 기본 수익 (365일 기준)
+  const baseGenRevenue = revenue_saving + revenue_sales;
+
+  // 1차년도 총 영업이익 (Gross - O&M) 계산용
+  const annualGrossRevenue = baseGenRevenue + totalRationalizationSavings;
   const annualMaintenanceCost =
     (annualGrossRevenue * store.maintenanceRate) / 100 +
     (useEcReal ? config.price_labor_ec * 100000000 : 0);
@@ -59,20 +82,32 @@ export default function PreviewComparisonTable() {
   const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
   // ==========================================================================
-  // [A] 자가자본
+  // [A] 자가자본 (20년 시뮬레이션 - 윤년 반영)
   // ==========================================================================
   const self_equity = totalInvestment;
   let self_total_20y = 0;
-  let currentGen = initialAnnualGen;
+  let currentGenRatio = 1;
 
   for (let i = 0; i < 20; i++) {
-    const ratio = currentGen / initialAnnualGen;
-    const yrRev = annualGrossRevenue * ratio;
+    const currentYear = 2025 + i;
+    const isLeap = isLeapYear(currentYear); // 윤년 확인
+
+    // 1. 발전 기반 수익 (윤년이면 366/365 만큼 증가)
+    const leapFactor = isLeap ? 366 / 365 : 1;
+    const yearGenRevenue = baseGenRevenue * currentGenRatio * leapFactor;
+
+    // 2. 전체 매출 (발전수익 + 합리화절감액)
+    const yrRev = yearGenRevenue + totalRationalizationSavings;
+
+    // 3. 비용 차감
     const yrCost =
       (yrRev * store.maintenanceRate) / 100 +
       (useEcReal ? config.price_labor_ec * 100000000 : 0);
+
     self_total_20y += yrRev - yrCost;
-    currentGen *= 1 - store.degradationRate / 100;
+
+    // 다음 해 효율 감소
+    currentGenRatio *= 1 - store.degradationRate / 100;
   }
   const self_final_profit = self_total_20y;
 
@@ -83,12 +118,13 @@ export default function PreviewComparisonTable() {
   const rps_loan = totalInvestment * 0.8;
   const rps_equity = totalInvestment * 0.2;
 
-  const rps_interest_only = rps_loan * rps_rate; // 1~5년차 이자
-  const rps_pmt = PMT(rps_rate, 10, -rps_loan); // 6~15년차 상환액
+  const rps_interest_only = rps_loan * rps_rate;
+  const rps_pmt = PMT(rps_rate, 10, -rps_loan);
 
   const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
   const rps_net_6_15 = annualOperatingProfit + rps_pmt;
 
+  // RPS 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const rps_final_profit =
     self_final_profit - rps_interest_only * 5 - Math.abs(rps_pmt) * 10;
 
@@ -99,26 +135,30 @@ export default function PreviewComparisonTable() {
   const fac_loan = totalInvestment;
   const fac_equity = 0;
 
-  const fac_interest_only = fac_loan * fac_rate; // 1년차 이자
-  const fac_pmt = PMT(fac_rate, 9, -fac_loan); // 2~10년차 상환액
+  const fac_interest_only = fac_loan * fac_rate;
+  const fac_pmt = PMT(fac_rate, 9, -fac_loan);
 
   const fac_net_1 = annualOperatingProfit - fac_interest_only;
   const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
+  // 팩토링 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const fac_final_profit =
     self_final_profit - fac_interest_only * 1 - Math.abs(fac_pmt) * 9;
 
   // ==========================================================================
-  // [D] 임대형
+  // [D] 임대형 (수정됨: 설정값 적용)
   // ==========================================================================
-  const rental_revenue_part1 = store.capacityKw * 0.2 * 192.79 * 3.64 * 365;
+  const rental_revenue_part1 =
+    store.capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365;
+
   const rental_revenue_part2 =
     store.capacityKw * 0.8 * config.rental_price_per_kw;
+
   const rental_revenue_yr = rental_revenue_part1 + rental_revenue_part2;
   const rental_final_profit = rental_revenue_yr * 20;
 
   // ==========================================================================
-  // [E] 구독형
+  // [E] 구독형 (수정됨: 설정값 적용)
   // ==========================================================================
   const price_standard = 210.5;
   const price_sub_self = config.sub_price_self;
@@ -127,10 +167,35 @@ export default function PreviewComparisonTable() {
   const sub_benefit_savings = annualSelf * (price_standard - price_sub_self);
   const sub_revenue_surplus = annualSurplus * price_sub_surplus;
   const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
+
   const sub_final_profit = sub_revenue_yr * 20;
 
+  // ==========================================================================
+  // [F] 1 REC (1000kW 기준) - 영업이익 기준
+  // ==========================================================================
+  const CONST_H18 = 80;
+  const rec_1000_common = annualOperatingProfit / CONST_H18 / 1000;
+  const rec_1000_rent = (initialAnnualGen * 0.2) / 1000;
+  const rec_1000_sub = sub_revenue_yr / CONST_H18 / 1000;
+
+  // ==========================================================================
+  // [G] 20년 수익 평균치 및 ROI (회수기간)
+  // ==========================================================================
+
+  // 1. 자가자본: 평균치 = 연간 영업이익(Net)
+  const self_avg = annualOperatingProfit;
+  const self_roi_years = self_avg > 0 ? totalInvestment / self_avg : 0;
+
+  // 2. RPS: 평균치 = 20년 총수익 / 20
+  const rps_avg = rps_final_profit / 20;
+  const rps_roi_years = rps_avg > 0 ? totalInvestment / rps_avg : 0;
+
+  // 3. 팩토링: 평균치 = 20년 총수익 / 20
+  const fac_avg = fac_final_profit / 20;
+  const fac_roi_years = fac_avg > 0 ? totalInvestment / fac_avg : 0;
+
   // ----------------------------------------------------------------
-  // AI 추천 멘트 생성
+  // AI 추천 멘트
   // ----------------------------------------------------------------
   const models = [
     {
@@ -281,9 +346,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.val}>{toCheon(sub_revenue_yr)} 천원</td>
             </tr>
 
-            {/* 4. 금융 비용 및 구간별 수익 상세 (좌측 화면 그대로 반영) */}
-
-            {/* RPS 이자 (1~5년) */}
+            {/* 4. 금융 비용 및 구간별 수익 상세 */}
             <tr>
               <td className={styles.rowLabel}>RPS / 연 이자 (1~5년)</td>
               <td>-</td>
@@ -292,8 +355,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* RPS 상환 (6~15년) */}
             <tr>
               <td className={styles.rowLabel}>RPS / 연 상환액 (6~15년)</td>
               <td>-</td>
@@ -302,8 +363,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* 팩토링 이자 (1년) */}
             <tr>
               <td className={styles.rowLabel}>팩토링 / 연 이자 (1년)</td>
               <td>-</td>
@@ -312,8 +371,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* 팩토링 상환 (2~10년) */}
             <tr>
               <td className={styles.rowLabel}>팩토링 / 연 상환액 (2~10년)</td>
               <td>-</td>
@@ -323,9 +380,7 @@ export default function PreviewComparisonTable() {
               <td>-</td>
             </tr>
 
-            {/* --- 순수익 구간 --- */}
-
-            {/* RPS 순수익 1~5년 */}
+            {/* 순수익 구간 */}
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowLabel}>RPS / 순수익 (1~5년)</td>
               <td>-</td>
@@ -334,8 +389,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* RPS 순수익 6~15년 */}
             <tr>
               <td className={styles.rowLabel}>RPS / 순수익 (6~15년)</td>
               <td>-</td>
@@ -344,8 +397,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* 팩토링 순수익 1년 */}
             <tr>
               <td className={styles.rowLabel}>팩토링 / 순수익 (1년)</td>
               <td>-</td>
@@ -354,8 +405,6 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
             </tr>
-
-            {/* 팩토링 순수익 2~10년 */}
             <tr>
               <td className={styles.rowLabel}>팩토링 / 순수익 (2~10년)</td>
               <td>-</td>
@@ -365,7 +414,17 @@ export default function PreviewComparisonTable() {
               <td>-</td>
             </tr>
 
-            {/* 5. 최종 결과 (20년 누적) - 억원은 유지 */}
+            {/* 1 REC (1000kW 기준) */}
+            <tr className="bg-yellow-50 font-bold">
+              <td className={styles.rowHeader}>1 REC (1000kW)</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_common.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_rent.toFixed(2)}</td>
+              <td className={styles.val}>{rec_1000_sub.toFixed(2)}</td>
+            </tr>
+
+            {/* 5. 최종 결과 (20년 누적) */}
             <tr className={styles.rowTotal}>
               <td>실제 수익 (20년)</td>
               <td>{(self_final_profit / 100000000).toFixed(2)} 억원</td>
@@ -374,18 +433,43 @@ export default function PreviewComparisonTable() {
               <td>{(rental_final_profit / 100000000).toFixed(2)} 억원</td>
               <td>{(sub_final_profit / 100000000).toFixed(2)} 억원</td>
             </tr>
+
+            {/* [추가] 20년 수익 평균치 */}
+            <tr className="bg-slate-100 text-sm">
+              <td className={styles.rowLabel}>20년 수익 평균치</td>
+              <td className={styles.val}>{toCheon(self_avg)} 천원</td>
+              <td className={styles.val}>{toCheon(rps_avg)} 천원</td>
+              <td className={styles.val}>{toCheon(fac_avg)} 천원</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
+
+            {/* [추가] ROI (회수기간) */}
+            <tr className="bg-slate-200 font-bold text-slate-800 text-sm">
+              <td className={styles.rowLabel}>ROI (회수기간)</td>
+              <td className={styles.val}>{self_roi_years.toFixed(2)} 년</td>
+              <td className={styles.val}>{rps_roi_years.toFixed(2)} 년</td>
+              <td className={styles.val}>{fac_roi_years.toFixed(2)} 년</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <div className={styles.recommendBox}>
-        <div className={styles.recommendTitle}>
-          <LucideBriefcase size={16} /> AI 최적 투자 분석
+      <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-lg flex items-start gap-3 shadow-sm">
+        <LucideCheckCircle2 className="text-indigo-600 mt-1" size={24} />
+        <div>
+          <h4 className="font-bold text-indigo-900 text-sm mb-1 flex items-center gap-2">
+            <LucideBriefcase size={16} /> AI 투자 분석 리포트
+          </h4>
+          <p className="text-sm text-indigo-800 leading-relaxed">
+            {aiRecommendation}{' '}
+            <span className="text-xs text-indigo-500 block mt-1">
+              {comparisonText}
+            </span>
+          </p>
         </div>
-        <p className={styles.recommendText}>
-          {aiRecommendation}{' '}
-          <span className={styles.comparisonText}>{comparisonText}</span>
-        </p>
       </div>
     </div>
   );

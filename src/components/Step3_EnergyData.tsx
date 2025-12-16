@@ -24,6 +24,28 @@ export default function Step3_EnergyData() {
 
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
+  // [Helper] 콤마 제거 후 스토어 업데이트
+  const handleInputChange = (
+    month: number,
+    field:
+      | 'usageKwh'
+      | 'selfConsumption'
+      | 'peakKw'
+      | 'solarGeneration'
+      | 'totalBill'
+      | 'baseBill',
+    value: string
+  ) => {
+    // 콤마(,)를 모두 제거하고 숫자로 변환
+    const rawValue = value.replace(/,/g, '');
+    const numValue = Number(rawValue);
+
+    // 숫자가 아니면(NaN) 무시, 맞으면 업데이트
+    if (!isNaN(numValue)) {
+      store.updateMonthlyData(month, field, numValue);
+    }
+  };
+
   // 1. 비율 계산
   const totalUsageInput = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -40,9 +62,17 @@ export default function Step3_EnergyData() {
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
-    const solarGeneration = store.capacityKw * dailyGenHours * days;
 
-    const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
+    // 자동 계산값
+    const autoSolarGen = store.capacityKw * dailyGenHours * days;
+
+    // 수기 입력값이 있으면 그것을 사용, 없으면(0이면) 자동 계산값 사용
+    const solarGeneration =
+      data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
+
+    // 잉여전력 계산: 마이너스 허용
+    const surplusPower = solarGeneration - data.selfConsumption;
+
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
@@ -61,11 +91,14 @@ export default function Step3_EnergyData() {
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
     const unitPriceSell = store.unitPriceSell || 192.79;
+
+    // 잉여 수익
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {
       ...data,
-      solarGeneration,
+      solarGeneration, // 최종 계산된(또는 입력된) 발전량
+      autoSolarGen, // UI 표시용
       surplusPower,
       maxLoadSavings,
       baseBillSavings,
@@ -105,11 +138,11 @@ export default function Step3_EnergyData() {
     }
   );
 
-  // (1) 기존 전기요금 절감율 (금액 기준)
+  // (1) 기존 전기요금 절감율
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
 
-  // ✅ (2) [New] 최대부하비율 (물량 기준: 자가소비 / 사용량)
+  // (2) 최대부하비율
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
 
@@ -267,92 +300,121 @@ export default function Step3_EnergyData() {
               {computedData.map((row) => (
                 <tr key={row.month} className={styles.tableRow}>
                   <td className={styles.stickyCol}>{row.month}</td>
-                  {/* 입력 */}
+
+                  {/* --- 입력 필드들 (type="text", value에 toLocaleString 적용) --- */}
+
+                  {/* 사용량 */}
                   <td>
                     <input
-                      type="number"
+                      type="text"
                       className={styles.cellInput}
-                      value={row.usageKwh || ''}
+                      value={row.usageKwh ? row.usageKwh.toLocaleString() : ''}
                       onChange={(e) =>
-                        store.updateMonthlyData(
-                          row.month,
-                          'usageKwh',
-                          Number(e.target.value)
-                        )
+                        handleInputChange(row.month, 'usageKwh', e.target.value)
                       }
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 자가소비 */}
                   <td className={styles.bgBlueLight}>
                     <input
-                      type="number"
+                      type="text"
                       className={styles.cellInput}
-                      value={row.selfConsumption || ''}
+                      value={
+                        row.selfConsumption
+                          ? row.selfConsumption.toLocaleString()
+                          : ''
+                      }
                       onChange={(e) =>
-                        store.updateMonthlyData(
+                        handleInputChange(
                           row.month,
                           'selfConsumption',
-                          Number(e.target.value)
-                        )
-                      }
-                      placeholder="0"
-                    />
-                  </td>
-                  <td style={{ background: '#fffbeb' }}>
-                    <input
-                      type="number"
-                      className={styles.cellInput}
-                      value={row.peakKw || ''}
-                      onChange={(e) =>
-                        store.updateMonthlyData(
-                          row.month,
-                          'peakKw',
-                          Number(e.target.value)
+                          e.target.value
                         )
                       }
                       placeholder="0"
                     />
                   </td>
 
-                  {/* 결과 */}
+                  {/* 피크치 */}
+                  <td style={{ background: '#fffbeb' }}>
+                    <input
+                      type="text"
+                      className={styles.cellInput}
+                      value={row.peakKw ? row.peakKw.toLocaleString() : ''}
+                      onChange={(e) =>
+                        handleInputChange(row.month, 'peakKw', e.target.value)
+                      }
+                      placeholder="0"
+                    />
+                  </td>
+
+                  {/* 발전량 (자동/수기) */}
                   <td
                     className={`${styles.resultCell} ${styles.textBlue} ${styles.bold}`}
                   >
-                    {Math.round(row.solarGeneration).toLocaleString()}
+                    <input
+                      type="text"
+                      className={styles.cellInput}
+                      style={{
+                        color: '#2563eb',
+                        fontWeight: 'bold',
+                        textAlign: 'right',
+                      }}
+                      value={
+                        row.solarGeneration > 0
+                          ? row.solarGeneration.toLocaleString()
+                          : Math.round(row.autoSolarGen).toLocaleString()
+                      }
+                      onChange={(e) =>
+                        handleInputChange(
+                          row.month,
+                          'solarGeneration',
+                          e.target.value
+                        )
+                      }
+                    />
                   </td>
+
+                  {/* 결과: 잉여전력 */}
                   <td className={styles.resultCell}>
                     {Math.round(row.surplusPower).toLocaleString()}
                   </td>
+
+                  {/* 전체요금 */}
                   <td>
                     <input
-                      type="number"
+                      type="text"
                       className={styles.cellInput}
-                      value={row.totalBill || ''}
+                      value={
+                        row.totalBill ? row.totalBill.toLocaleString() : ''
+                      }
                       onChange={(e) =>
-                        store.updateMonthlyData(
+                        handleInputChange(
                           row.month,
                           'totalBill',
-                          Number(e.target.value)
+                          e.target.value
                         )
                       }
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 기본요금 */}
                   <td className={styles.bgOrangeLight}>
                     <input
-                      type="number"
+                      type="text"
                       className={styles.cellInput}
-                      value={row.baseBill || ''}
+                      value={row.baseBill ? row.baseBill.toLocaleString() : ''}
                       onChange={(e) =>
-                        store.updateMonthlyData(
-                          row.month,
-                          'baseBill',
-                          Number(e.target.value)
-                        )
+                        handleInputChange(row.month, 'baseBill', e.target.value)
                       }
                       placeholder="0"
                     />
                   </td>
+
+                  {/* --- 계산 결과 필드들 --- */}
                   <td className={`${styles.resultCell} ${styles.textOrange}`}>
                     {Math.round(row.maxLoadSavings).toLocaleString()}
                   </td>
@@ -436,7 +498,7 @@ export default function Step3_EnergyData() {
           </table>
         </div>
 
-        {/* ✅ [수정] 배지 영역 (2개 나란히 배치) */}
+        {/* 배지 영역 */}
         <div
           style={{
             display: 'flex',
@@ -463,6 +525,28 @@ export default function Step3_EnergyData() {
               {savingRate.toFixed(1)}%
             </span>
           </div>
+        </div>
+
+        {/* 비고란 */}
+        <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
+          <label
+            className={styles.label}
+            style={{
+              marginBottom: '0.5rem',
+              display: 'block',
+              fontWeight: 'bold',
+              color: '#475569',
+            }}
+          >
+            비고 (특이사항)
+          </label>
+          <textarea
+            className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ minHeight: '80px', resize: 'vertical' }}
+            value={store.energyNote || ''}
+            onChange={(e) => store.setEnergyNote(e.target.value)}
+            placeholder="전력 데이터 관련 특이사항이나 메모를 입력하세요. (예: 8월 휴가로 인한 전력소비 감소 등)"
+          />
         </div>
 
         <div className={styles.footerNote}>

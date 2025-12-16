@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { LucideTable, LucideZap } from 'lucide-react';
+import { LucideTable, LucideZap, LucideFileText } from 'lucide-react';
+import { useProposalStore } from '../../lib/store'; // [NEW] 스토어 임포트
 import styles from '../PreviewPanel.module.css';
 
 type Props = {
@@ -19,6 +20,9 @@ export default function PreviewDetailTable({
   maxLoadRatio,
   totalBenefit,
 }: Props) {
+  // [NEW] 스토어에서 비고(energyNote) 가져오기
+  const { energyNote } = useProposalStore();
+
   return (
     <div>
       <div className={styles.tableHeader}>
@@ -142,6 +146,37 @@ export default function PreviewDetailTable({
           </tr>
         </tbody>
       </table>
+
+      {/* ✅ [NEW] 비고 출력 섹션 */}
+      {energyNote && (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '0.5rem',
+            border: '1px solid #e2e8f0',
+            fontSize: '0.875rem',
+            color: '#475569',
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              marginBottom: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#334155',
+            }}
+          >
+            <LucideFileText size={16} /> <span>비고 (특이사항)</span>
+          </div>
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+            {energyNote}
+          </div>
+        </div>
+      )}
 
       <div className={styles.badgeWrapper}>
         <div style={{ textAlign: 'right', marginRight: '2rem' }}>

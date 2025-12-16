@@ -16,9 +16,25 @@ import PreviewSummary from './preview/PreviewSummary';
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
+// ============================================================================
+// [NEW] 페이지 하단 Footer 컴포넌트 (페이지번호 + 프로젝트명)
+// ============================================================================
+const PageFooter = ({ page }: { page: number }) => {
+  const { proposalName, clientName } = useProposalStore();
+  // 프로젝트명이 없으면 '고객사명 + 견적서'로 표시
+  const displayName = proposalName || `${clientName} 태양광 발전 제안서`;
+
+  return (
+    <div className={styles.pageFooter}>
+      <span className={styles.pageNumber}>- {page} -</span>
+      <span className={styles.projectName}>{displayName}</span>
+    </div>
+  );
+};
+
 export default function PreviewPanel() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
   // 프린트 핸들러
   const handlePrint = () => {
@@ -28,12 +44,17 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산 (기존 로직 유지)
+  // [1] 월별 데이터 계산
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
-    const solarGeneration = store.capacityKw * 3.64 * days;
-    const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
+    const dailyGenHours = 3.64;
+
+    const autoSolarGen = store.capacityKw * dailyGenHours * days;
+    const solarGeneration =
+      data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
+
+    const surplusPower = solarGeneration - data.selfConsumption;
 
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
@@ -116,7 +137,27 @@ export default function PreviewPanel() {
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
 
   // ----------------------------------------------------------------
-  // [2] 투자비 및 수익 계산 (기존 로직 유지)
+  // [NEW] 합리화 절감액 계산
+  // ----------------------------------------------------------------
+  const isEul = store.contractType.includes('(을)');
+
+  const diff_light = rationalization.light_eul - rationalization.light_gap;
+  const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
+  const diff_max = rationalization.max_eul - rationalization.max_gap;
+
+  const saving_light = diff_light * rationalization.light_usage;
+  const saving_mid = diff_mid * rationalization.mid_usage;
+  const saving_max = diff_max * rationalization.max_usage;
+
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      saving_light +
+      saving_mid +
+      saving_max
+    : 0;
+
+  // ----------------------------------------------------------------
+  // [2] 투자비 및 수익 계산
   // ----------------------------------------------------------------
   const initialAnnualGen = totals.solarGeneration;
   const annualSelfConsumption = totals.selfConsumption;
@@ -160,7 +201,10 @@ export default function PreviewPanel() {
       volume_surplus_final = annualSurplus;
     }
   }
-  const totalRevenue = revenue_saving + revenue_ec + revenue_surplus;
+
+  const totalRevenue =
+    revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
+
   const maintenanceCost = totalRevenue * (store.maintenanceRate / 100);
   let fixedLaborCost = 0;
   if (store.useEc && store.selectedModel !== 'KEPCO') {
@@ -239,22 +283,18 @@ export default function PreviewPanel() {
   };
 
   // ----------------------------------------------------------------
-  // UI 렌더링
+  // UI 렌더링 (PageFooter 추가)
   // ----------------------------------------------------------------
   return (
     <div className={styles.a4Page} id="print-area">
-      {/* [페이지 1] 표지 + 요약 (중앙 정렬)
-          Header와 Title, Summary를 묶어서 한 페이지의 중앙에 오게 함
-      */}
-      <div className="print-page-center">
-        {/* Header */}
+      {/* [페이지 1] 표지 + 요약 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div className={styles.header} style={{ width: '100%' }}>
           <div className={styles.logoBox}>FIRST C&D</div>
           <div className={styles.companyInfo}>
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
             <p className={styles.companySub}>FIRST C&D Inc.</p>
           </div>
-          {/* 프린트 버튼 (화면에만 보임) */}
           <button
             onClick={handlePrint}
             className={`${styles.printButton} no-print`}
@@ -264,7 +304,6 @@ export default function PreviewPanel() {
           </button>
         </div>
 
-        {/* Title */}
         <div className={styles.titleSection} style={{ width: '100%' }}>
           <div>
             <h1 className={styles.mainTitle}>
@@ -282,15 +321,16 @@ export default function PreviewPanel() {
           </div>
         </div>
 
-        {/* Summary Component */}
         <div style={{ width: '100%', marginTop: '20px' }}>
           <PreviewSummary />
         </div>
+
+        {/* ✅ Page 1 Footer */}
+        <PageFooter page={1} />
       </div>
 
-      {/* [페이지 2] 차트 (중앙 정렬)
-       */}
-      <div className="print-page-center">
+      {/* [페이지 2] 차트 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewChart
             data={computedData}
@@ -299,11 +339,12 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
+        {/* ✅ Page 2 Footer */}
+        <PageFooter page={2} />
       </div>
 
-      {/* [페이지 3] 상세 데이터 테이블 (중앙 정렬)
-       */}
-      <div className="print-page-center">
+      {/* [페이지 3] 상세 데이터 테이블 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewDetailTable
             data={computedData}
@@ -313,11 +354,12 @@ export default function PreviewPanel() {
             totalBenefit={totalBenefit}
           />
         </div>
+        {/* ✅ Page 3 Footer */}
+        <PageFooter page={3} />
       </div>
 
-      {/* [페이지 4] 투자 및 수익 분석 (중앙 정렬)
-       */}
-      <div className="print-page-center">
+      {/* [페이지 4] 투자 및 수익 분석 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewFinancialTable
             totals={totals}
@@ -333,19 +375,21 @@ export default function PreviewPanel() {
             investmentDetails={investmentDetails}
           />
         </div>
+        {/* ✅ Page 4 Footer */}
+        <PageFooter page={4} />
       </div>
 
-      {/* [페이지 5] 모델 비주얼 (중앙 정렬)
-       */}
-      <div className="print-page-center">
+      {/* [페이지 5] 모델 비주얼 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
+        {/* ✅ Page 5 Footer */}
+        <PageFooter page={5} />
       </div>
 
-      {/* [페이지 6] 비교 테이블 및 푸터 (중앙 정렬)
-       */}
-      <div className="print-page-center">
+      {/* [페이지 6] 비교 테이블 및 푸터 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
           <div className={styles.footer} style={{ marginTop: '40px' }}>
@@ -356,6 +400,8 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
+        {/* ✅ Page 6 Footer */}
+        <PageFooter page={6} />
       </div>
     </div>
   );

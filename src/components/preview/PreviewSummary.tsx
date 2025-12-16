@@ -11,38 +11,46 @@ import {
 
 export default function PreviewSummary() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
-  // [Toggle State] false: 기본만 보기, true: 확장플랜 함께 보기
   const [showExpansion, setShowExpansion] = useState(false);
 
   // ----------------------------------------------------------------
   // 1. 공통 기본 데이터 계산
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
-  const daysInYear = 365;
+  const daysInYear = 365; // 기본 365일 (단순 계산용)
+
+  // 연간 발전량 (단순 계산)
   const annualGen = capacity * 3.64 * daysInYear;
+
+  // 연간 자가소비량 합계
   const annualSelf = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
+
+  // 연간 잉여전력
   const annualSurplus = Math.max(0, annualGen - annualSelf);
   const unitPriceSavings = store.unitPriceSavings || config.unit_price_savings;
 
-  // ----------------------------------------------------------------
-  // 2. 시나리오별 데이터 준비 Function
-  // ----------------------------------------------------------------
+  // [중요] 태양광 설치 전 연간 총 전기요금 (B24)
+  const totalBillBefore = store.monthlyData.reduce(
+    (acc, cur) => acc + cur.totalBill,
+    0
+  );
 
+  // ----------------------------------------------------------------
+  // 2. 시나리오별 데이터 준비 (표준/확장 플랜) - 기존 로직 유지
+  // ----------------------------------------------------------------
   // (A) Standard Data (REC 1.5)
   const getStandardData = () => {
-    // 투자비 (억원)
     const invest = store.totalInvestment;
     const ecCount =
       store.useEc && store.selectedModel !== 'KEPCO'
         ? Math.min(3, Math.floor(capacity / 100))
         : 0;
 
-    // 연간 수익 (1차년도)
     const revenue_saving = Math.min(annualGen, annualSelf) * unitPriceSavings;
     let revenue_sales = 0;
     if (store.useEc && store.selectedModel !== 'KEPCO') {
@@ -50,34 +58,41 @@ export default function PreviewSummary() {
     } else {
       revenue_sales = annualSurplus * config.unit_price_kepco;
     }
-    const grossRevenue = revenue_saving + revenue_sales;
 
-    // 비용 (1차년도 기준)
+    // 합리화 절감액 추가 (수익에 포함)
+    const isEul = store.contractType.includes('(을)');
+    const totalRationalization = isEul
+      ? rationalization.base_savings_manual +
+        (rationalization.light_eul - rationalization.light_gap) *
+          rationalization.light_usage +
+        (rationalization.mid_eul - rationalization.mid_gap) *
+          rationalization.mid_usage +
+        (rationalization.max_eul - rationalization.max_gap) *
+          rationalization.max_usage
+      : 0;
+
+    const grossRevenue = revenue_saving + revenue_sales + totalRationalization;
+
     const laborCost =
       store.useEc && ecCount > 0
         ? (config.price_labor_ec || 0.24) * 100000000
         : 0;
     const initialAnnualCost =
       (grossRevenue * store.maintenanceRate) / 100 + laborCost;
-
-    // [수정] 20년 총 투자비 (초기비 + 20년 운영비) - 분모용 (원 단위)
     const totalInvest20YearsWon = invest * 100000000 + initialAnnualCost * 20;
-
     const netProfit = grossRevenue - initialAnnualCost;
 
-    // 20년 누적 순수익
     let totalNet20 = 0;
     let currentGen = annualGen;
     for (let i = 0; i < 20; i++) {
       const ratio = currentGen / annualGen;
-      const yrRev = grossRevenue * ratio;
-      // 매년 줄어드는 매출에 따라 유지보수비도 줄어듦 (인건비는 고정)
+      const yrRev =
+        (revenue_saving + revenue_sales) * ratio + totalRationalization;
       const yrCost = (yrRev * store.maintenanceRate) / 100 + laborCost;
       totalNet20 += yrRev - yrCost;
       currentGen *= 1 - store.degradationRate / 100;
     }
 
-    // [수정] ROI 계산: 분모를 '20년 총 투자비'로 적용하여 보수적으로 산출
     const roiPercent =
       totalInvest20YearsWon > 0
         ? (totalNet20 / totalInvest20YearsWon) * 100
@@ -95,13 +110,10 @@ export default function PreviewSummary() {
     };
   };
 
-  // (B) Expansion Data (REC 5.0)
+  // (B) Expansion Data (REC 5.0) - 로직 동일 (단가만 변경)
   const getExpansionData = () => {
-    // 추가 설비 가정
     const rawEcCount = Math.floor(capacity / 100);
-    const ecCount = Math.min(3, rawEcCount); // 확장 시 강제 적용
-
-    // 투자비 증가분 (Standard에 EC가 없을 경우 추가)
+    const ecCount = Math.min(3, rawEcCount);
     let invest = store.totalInvestment;
     if (!store.useEc) {
       const addedCost =
@@ -111,34 +123,40 @@ export default function PreviewSummary() {
       invest += addedCost;
     }
 
-    // 연간 수익 (REC 5.0 단가 적용)
     const revenue_saving = Math.min(annualGen, annualSelf) * unitPriceSavings;
     const unitPriceEc5 = config.unit_price_ec_5_0 || 441.15;
-    const revenue_sales = annualSurplus * unitPriceEc5; // 잉여 전체에 5.0 적용 가정
-    const grossRevenue = revenue_saving + revenue_sales;
+    const revenue_sales = annualSurplus * unitPriceEc5;
 
-    // 비용 (EC 인건비 필수로 포함)
+    // 합리화 절감액
+    const isEul = store.contractType.includes('(을)');
+    const totalRationalization = isEul
+      ? rationalization.base_savings_manual +
+        (rationalization.light_eul - rationalization.light_gap) *
+          rationalization.light_usage +
+        (rationalization.mid_eul - rationalization.mid_gap) *
+          rationalization.mid_usage +
+        (rationalization.max_eul - rationalization.max_gap) *
+          rationalization.max_usage
+      : 0;
+
+    const grossRevenue = revenue_saving + revenue_sales + totalRationalization;
     const laborCost = (config.price_labor_ec || 0.24) * 100000000;
     const initialAnnualCost =
       (grossRevenue * store.maintenanceRate) / 100 + laborCost;
-
-    // [수정] 20년 총 투자비 (초기비 + 20년 운영비) - 분모용 (원 단위)
     const totalInvest20YearsWon = invest * 100000000 + initialAnnualCost * 20;
-
     const netProfit = grossRevenue - initialAnnualCost;
 
-    // 20년 누적
     let totalNet20 = 0;
     let currentGen = annualGen;
     for (let i = 0; i < 20; i++) {
       const ratio = currentGen / annualGen;
-      const yrRev = grossRevenue * ratio;
+      const yrRev =
+        (revenue_saving + revenue_sales) * ratio + totalRationalization;
       const yrCost = (yrRev * store.maintenanceRate) / 100 + laborCost;
       totalNet20 += yrRev - yrCost;
       currentGen *= 1 - store.degradationRate / 100;
     }
 
-    // [수정] ROI 계산: 분모를 '20년 총 투자비'로 적용
     const roiPercent =
       totalInvest20YearsWon > 0
         ? (totalNet20 / totalInvest20YearsWon) * 100
@@ -160,7 +178,43 @@ export default function PreviewSummary() {
   const expData = getExpansionData();
 
   // ----------------------------------------------------------------
-  // 3. UI 헬퍼 & 렌더링
+  // 3. 하단 비교 데이터 (무투자 모델) 계산 [수정됨]
+  // ----------------------------------------------------------------
+
+  // (1) 단순 지붕 임대형
+  // 식: 용량(kW) * 0.4 / 1000 (억 원 단위)
+  const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
+  // 절감율: (수익 억원 * 1억) / 설치전 총 전기요금
+  const simpleRentalSavingRate =
+    totalBillBefore > 0
+      ? ((simpleRentalRevenueUk * 100000000) / totalBillBefore) * 100
+      : 0;
+
+  // (2) RE100 연계 임대형 (Step5의 rental_revenue_yr 로직 사용)
+  // 식: (용량 * 0.2 * 한전단가 * 3.64 * 365) + (용량 * 0.8 * 임대단가)
+  const rental_revenue_part1 =
+    capacity * 0.2 * config.unit_price_kepco * 3.64 * 365;
+  const rental_revenue_part2 = capacity * 0.8 * config.rental_price_per_kw;
+  const re100RentalRevenue = rental_revenue_part1 + rental_revenue_part2;
+  const re100RentalRevenueUk = re100RentalRevenue / 100000000;
+  // 절감율
+  const re100RentalSavingRate =
+    totalBillBefore > 0 ? (re100RentalRevenue / totalBillBefore) * 100 : 0;
+
+  // (3) 구독 서비스형 (Step5의 sub_revenue_yr 로직 사용)
+  // 식: (자가소비량 * (210.5 - 구독자가단가)) + (잉여전력 * 구독잉여단가)
+  const price_standard = 210.5;
+  const sub_benefit_savings =
+    annualSelf * (price_standard - config.sub_price_self);
+  const sub_revenue_surplus = annualSurplus * config.sub_price_surplus;
+  const subRevenue = sub_benefit_savings + sub_revenue_surplus;
+  const subRevenueUk = subRevenue / 100000000;
+  // 절감율
+  const subSavingRate =
+    totalBillBefore > 0 ? (subRevenue / totalBillBefore) * 100 : 0;
+
+  // ----------------------------------------------------------------
+  // UI 렌더링
   // ----------------------------------------------------------------
   const toUk = (val: number) => val.toFixed(2);
   const toUkFromWon = (val: number) => (val / 100000000).toFixed(2);
@@ -269,15 +323,6 @@ export default function PreviewSummary() {
     </div>
   );
 
-  // 비교군 데이터 (지붕임대 / 구독형) - 변동 없음
-  const rentalProfit20y =
-    capacity * 0.8 * config.rental_price_per_kw * 20 +
-    capacity * 0.2 * 192.79 * 3.6 * 365 * 20;
-  const subProfit20y =
-    (annualSelf * (210.5 - config.sub_price_self) +
-      annualSurplus * config.sub_price_surplus) *
-    20;
-
   return (
     <div className={styles.container}>
       {/* 상단 헤더 & 컨트롤 */}
@@ -285,8 +330,6 @@ export default function PreviewSummary() {
         <div className={styles.headerTitle}>
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
-
-        {/* 버튼: 토글 형태지만 '추가' 개념 */}
         <button
           className={`${styles.expandBtn} ${
             showExpansion ? styles.active : ''
@@ -297,7 +340,7 @@ export default function PreviewSummary() {
         </button>
       </div>
 
-      {/* 1. 기본 플랜 (항상 보임) */}
+      {/* 1. 기본 플랜 */}
       <div className={styles.planSection}>
         <div className={styles.sectionTitle}>
           TYPE A. Standard Plan (안정형)
@@ -305,10 +348,9 @@ export default function PreviewSummary() {
         {renderRow(stdData)}
       </div>
 
-      {/* 2. 확장 플랜 (버튼 누르면 아래에 추가됨) */}
+      {/* 2. 확장 플랜 */}
       {showExpansion && (
         <div className={`${styles.planSection} ${styles.fadeIn}`}>
-          {/* 구분선 및 연결 고리 */}
           <div className={styles.connector}>
             <div className={styles.connectorLine}></div>
             <div className={styles.connectorIcon}>
@@ -316,7 +358,6 @@ export default function PreviewSummary() {
             </div>
             <div className={styles.connectorLine}></div>
           </div>
-
           <div className={styles.sectionTitle} style={{ color: '#d97706' }}>
             TYPE B. Premium Plan (수익 극대화형)
           </div>
@@ -324,24 +365,56 @@ export default function PreviewSummary() {
         </div>
       )}
 
-      {/* 하단 비교 섹션 */}
+      {/* [수정] 하단 비교 섹션 (3가지 모델 표시) */}
       <div className={styles.comparisonSection}>
         <div className={styles.compHeader}>
-          <LucideWallet size={16} /> 초기 투자가 없는 모델 비교 (20년 누적)
+          <LucideWallet size={16} /> 초기 투자가 없는 모델 비교 (연간 수익 /
+          전기요금 절감율)
         </div>
+
+        {/* 1. 단순 지붕 임대형 */}
         <div className={styles.compRow}>
           <span className={styles.compLabel}>1. 단순 지붕 임대형</span>
           <span className={styles.compValue}>
-            {(rentalProfit20y / 100000000).toFixed(2)} 억원
+            {simpleRentalRevenueUk.toFixed(3)} 억원
           </span>
-          <span className={styles.compRate}>Low</span>
+          <span className={styles.compSub}>
+            (전기요금 절감율{' '}
+            <span className="font-bold text-blue-600">
+              {simpleRentalSavingRate.toFixed(1)}%
+            </span>
+            )
+          </span>
         </div>
-        <div className={styles.compRow}>
-          <span className={styles.compLabel}>2. 구독 서비스형</span>
+
+        {/* 2. RE100 연계 임대형 (Highlight) */}
+        <div className={`${styles.compRow}`}>
+          <span className={styles.compLabel}>2. RE100 연계 임대형</span>
           <span className={styles.compValue}>
-            {(subProfit20y / 100000000).toFixed(2)} 억원
+            {re100RentalRevenueUk.toFixed(3)} 억원
           </span>
-          <span className={styles.compRate}>High</span>
+          <span className={styles.compSub}>
+            (전기요금 절감율{' '}
+            <span className="font-bold text-blue-600">
+              {re100RentalSavingRate.toFixed(1)}%
+            </span>
+            )
+          </span>
+        </div>
+
+        {/* 3. 구독 서비스형 */}
+        <div className={styles.compRow}>
+          <span className={styles.compLabel}>3. 구독 서비스형</span>
+          <span className={styles.compValue}>
+            {subRevenueUk.toFixed(3)} 억원
+          </span>
+          <span className={styles.compSub}>
+            (전기요금 절감율{' '}
+            <span className="font-bold text-blue-600">
+              {subSavingRate.toFixed(1)}%
+            </span>
+            )
+          </span>
         </div>
       </div>
     </div>

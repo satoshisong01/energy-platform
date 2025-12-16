@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useProposalStore, ModuleTier } from '../lib/store';
 import styles from './Step4_Simulation.module.css';
 import {
@@ -11,6 +11,8 @@ import {
   LucideCheckCircle2,
   LucideTable,
   LucideTrendingUp,
+  LucideChevronDown,
+  LucideChevronUp,
 } from 'lucide-react';
 
 // [Helper] 반올림 함수
@@ -18,7 +20,9 @@ const round2 = (num: number) => Math.round(num * 100) / 100;
 
 export default function Step4_Simulation() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
+
+  const [showRationalization, setShowRationalization] = useState(false);
 
   useEffect(() => {
     store.recalculateInvestment();
@@ -29,6 +33,28 @@ export default function Step4_Simulation() {
     store.useEc,
     store.config,
   ]);
+
+  // --------------------------------------------------------------------------
+  // [0] 공통 변수 및 합리화 절감액 선행 계산 (수익에 포함하기 위해 위로 이동)
+  // --------------------------------------------------------------------------
+  const isEul = store.contractType.includes('(을)');
+
+  // 합리화 절감액 계산 (을 - 갑)
+  const diff_light = rationalization.light_eul - rationalization.light_gap;
+  const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
+  const diff_max = rationalization.max_eul - rationalization.max_gap;
+
+  const saving_light = diff_light * rationalization.light_usage;
+  const saving_mid = diff_mid * rationalization.mid_usage;
+  const saving_max = diff_max * rationalization.max_usage;
+
+  // 총 합리화 절감액
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      saving_light +
+      saving_mid +
+      saving_max
+    : 0;
 
   // --------------------------------------------------------------------------
   // [1] 수익 계산 로직
@@ -44,7 +70,6 @@ export default function Step4_Simulation() {
   );
   const annualSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
-  // 단가 결정
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
   let appliedSellPrice = config.unit_price_kepco;
@@ -53,15 +78,13 @@ export default function Step4_Simulation() {
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  // 수익 상세
   let revenue_saving = 0;
   let revenue_ec = 0;
   let revenue_surplus = 0;
+  let volume_ec = 0;
 
-  // 엑셀 물량 표시용 변수
   const volume_self = annualSelfConsumption;
   const volume_surplus = annualSurplus;
-  let volume_ec = 0;
 
   if (store.selectedModel === 'KEPCO') {
     revenue_surplus = initialAnnualGen * config.unit_price_kepco;
@@ -72,13 +95,15 @@ export default function Step4_Simulation() {
 
     if (store.useEc) {
       revenue_ec = annualSurplus * sellPrice;
-      volume_ec = annualSurplus; // EC 모드면 잉여전력 = EC물량
+      volume_ec = annualSurplus;
     } else {
       revenue_surplus = annualSurplus * sellPrice;
     }
   }
 
-  const totalRevenue = revenue_saving + revenue_ec + revenue_surplus;
+  // [수정] 합리화 절감액을 총 수익에 포함
+  const totalRevenue =
+    revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
   // 비용
   const maintenanceCost = totalRevenue * (store.maintenanceRate / 100);
@@ -108,13 +133,11 @@ export default function Step4_Simulation() {
   const tractorCost = useEcReal && ecCount > 0 ? 1 * config.price_tractor : 0;
   const platformCost = useEcReal && ecCount > 0 ? 1 * config.price_platform : 0;
 
-  // 유지보수비 (초기 견적서 표시용, 1년치 예비비 성격)
   const maintenanceTableValue = totalAnnualCost / 100000000;
 
   const totalInitialInvestment =
     solarCost + ecCost + tractorCost + platformCost;
 
-  // 20년 분할 및 총액
   const solarSplit = round2(solarCost / 20);
   const ecSplit = round2(ecCost / 20);
   const tractorSplit = round2(tractorCost / 20);
@@ -285,9 +308,7 @@ export default function Step4_Simulation() {
         </div>
       )}
 
-      {/* =====================================================================================
-          [1. 상세 견적서 테이블]
-      ===================================================================================== */}
+      {/* 투자비 상세 테이블 */}
       <div className="mt-4">
         <div className="flex items-center gap-2 mb-2 text-blue-800">
           <LucideTable size={16} />
@@ -319,7 +340,6 @@ export default function Step4_Simulation() {
                 <td className="text-blue-600 font-bold">
                   {solarCount.toFixed(2)} ea
                 </td>
-                {/* [수정] useEcReal 조건에 따라 수량 표시 */}
                 <td>{useEcReal ? ecCount : 0} ea</td>
                 <td>{tractorCost > 0 ? 1 : 0} ea</td>
                 <td>{platformCost > 0 ? 1 : 0} set</td>
@@ -369,9 +389,7 @@ export default function Step4_Simulation() {
         </div>
       </div>
 
-      {/* =====================================================================================
-          ✅ [2. 연간 수익 상세 분석] (엑셀 스타일 완벽 재현)
-      ===================================================================================== */}
+      {/* 수익 상세 분석 */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2 text-green-800">
           <LucideTrendingUp size={16} />
@@ -379,7 +397,6 @@ export default function Step4_Simulation() {
         </div>
 
         <div className={styles.detailBox}>
-          {/* 1. 물량 분석 (핑크색 영역) */}
           <div className={styles.row}>
             <span className={styles.dLabel}>자가소비 / 최대부하 (년)</span>
             <span>
@@ -408,7 +425,6 @@ export default function Step4_Simulation() {
             </span>
           </div>
 
-          {/* 2. 단가 분석 (헤더 뱃지 + 노란색 강조) */}
           <div className={styles.detailHeader}>
             {store.selectedModel === 'KEPCO'
               ? '한전 판매 기준'
@@ -447,7 +463,6 @@ export default function Step4_Simulation() {
 
           <div className="border-t border-slate-200 my-1"></div>
 
-          {/* 3. 수익 금액 (하단부) */}
           <div className={`${styles.row} font-bold text-slate-800`}>
             <span>연간 수익총액</span>
             <span>
@@ -482,7 +497,16 @@ export default function Step4_Simulation() {
             </span>
           </div>
 
-          {/* 최종 결론 (강조) */}
+          {/* [수정] 전기요금합리화절감액(갑/을) 동적 텍스트 및 금액 표시 */}
+          <div className={styles.row}>
+            <span className="text-xs text-gray-500 pl-2">
+              ○ 전기요금합리화절감액{isEul ? '(을)' : '(갑)'}
+            </span>
+            <span className="text-xs">
+              {(totalRationalizationSavings / 100000000).toFixed(2)} 억원
+            </span>
+          </div>
+
           <div className={styles.finalResult}>
             <div className="flex justify-between items-center mb-2">
               <span className="font-bold text-slate-800">연간 실제 수익</span>
@@ -514,6 +538,298 @@ export default function Step4_Simulation() {
             수익률 (ROI) {roiPercent.toFixed(1)}% (회수
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)
           </div>
+
+          {/* ===========================================================================
+              전기요금 합리화 절감액 계산기 (토글)
+          =========================================================================== */}
+          {isEul ? (
+            <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between p-3 bg-slate-100 hover:bg-slate-200 transition"
+                onClick={() => setShowRationalization(!showRationalization)}
+              >
+                <span className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                  ⚡ 전기요금 합리화 절감액 계산 (을 ↔ 갑 비교)
+                </span>
+                {showRationalization ? (
+                  <LucideChevronUp size={16} />
+                ) : (
+                  <LucideChevronDown size={16} />
+                )}
+              </button>
+
+              {showRationalization && (
+                <div className="p-4 bg-white text-xs">
+                  <table className="w-full text-center border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 border-b">
+                        <th className="p-2 border-r">구분</th>
+                        <th className="p-2 border-r">을 (원)</th>
+                        <th className="p-2 border-r">갑 (원)</th>
+                        <th className="p-2 border-r bg-yellow-50">차이</th>
+                        <th className="p-2 border-r">연간사용량 (kW)</th>
+                        <th className="p-2 bg-blue-50">절감액 (원)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {/* 1. 기본료 */}
+                      <tr>
+                        <td className="p-2 font-bold bg-slate-50 border-r">
+                          기본료
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.base_eul}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'base_eul',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.base_gap}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'base_gap',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 border-r font-bold text-red-500 bg-yellow-50">
+                          {(
+                            rationalization.base_eul - rationalization.base_gap
+                          ).toLocaleString()}
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.base_usage ?? 0}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'base_usage',
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="0"
+                          />
+                        </td>
+                        <td className="p-1 bg-blue-50">
+                          <input
+                            type="number"
+                            className="w-full text-center border border-blue-200 rounded p-1 bg-white text-blue-600 font-bold"
+                            value={rationalization.base_savings_manual}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'base_savings_manual',
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="직접입력"
+                          />
+                        </td>
+                      </tr>
+
+                      {/* 2. 경부하 */}
+                      <tr>
+                        <td className="p-2 font-bold bg-slate-50 border-r">
+                          경부하
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.light_eul}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'light_eul',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.light_gap}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'light_gap',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 border-r font-bold bg-yellow-50">
+                          {(
+                            rationalization.light_eul -
+                            rationalization.light_gap
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.light_usage}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'light_usage',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                          {Math.round(saving_light).toLocaleString()}
+                        </td>
+                      </tr>
+
+                      {/* 3. 중간부하 */}
+                      <tr>
+                        <td className="p-2 font-bold bg-slate-50 border-r">
+                          중간부하
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.mid_eul}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'mid_eul',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.mid_gap}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'mid_gap',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 border-r font-bold bg-yellow-50">
+                          {(
+                            rationalization.mid_eul - rationalization.mid_gap
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.mid_usage}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'mid_usage',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                          {Math.round(saving_mid).toLocaleString()}
+                        </td>
+                      </tr>
+
+                      {/* 4. 최대부하 */}
+                      <tr>
+                        <td className="p-2 font-bold bg-slate-50 border-r">
+                          최대부하
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.max_eul}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'max_eul',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.max_gap}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'max_gap',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 border-r font-bold bg-yellow-50">
+                          {(
+                            rationalization.max_eul - rationalization.max_gap
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}
+                        </td>
+                        <td className="p-1 border-r">
+                          <input
+                            type="number"
+                            className="w-full text-center border rounded p-1"
+                            value={rationalization.max_usage}
+                            onChange={(e) =>
+                              store.updateRationalization(
+                                'max_usage',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                          {Math.round(saving_max).toLocaleString()}
+                        </td>
+                      </tr>
+
+                      {/* 총계 */}
+                      <tr className="border-t-2 border-slate-300">
+                        <td
+                          colSpan={5}
+                          className="p-2 font-bold text-right bg-slate-100"
+                        >
+                          합계 (절감액)
+                        </td>
+                        <td className="p-2 font-extrabold text-blue-700 bg-blue-100">
+                          {Math.round(
+                            totalRationalizationSavings
+                          ).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

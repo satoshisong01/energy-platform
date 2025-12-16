@@ -10,11 +10,10 @@ import {
   LucideSettings,
 } from 'lucide-react';
 
-// [NEW] 새로 만든 목록 팝업 및 기존 단계별 컴포넌트 임포트
 import ProposalListModal from './ProposalListModal';
 import Step1_BasicInfo from './Step1_BasicInfo';
 import Step2_SiteInfo from './Step2_SiteInfo';
-// import Step3_EnergyData from './Step3_EnergyData'; // 파일 있으면 주석 해제
+import Step3_EnergyData from './Step3_EnergyData'; // Step3가 있다면 주석 해제
 
 interface Props {
   isOpen: boolean;
@@ -23,12 +22,11 @@ interface Props {
 
 export default function ConfigModal({ isOpen, onClose }: Props) {
   const store = useProposalStore();
-  const [activeTab, setActiveTab] = useState(0); // 탭 관리
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false); // 불러오기 팝업 관리
+  const [activeTab, setActiveTab] = useState(0);
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
-  // --- 버튼 핸들러 ---
   const handleSave = async () => {
     const defaultName = store.proposalName || `${store.clientName} 견적서`;
     const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
@@ -50,7 +48,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
     <>
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
         <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-[1200px] h-[90vh] flex flex-col overflow-hidden">
-          {/* --- Header (Top Bar) --- */}
+          {/* --- Header --- */}
           <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-50">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
@@ -119,14 +117,9 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
           <div className="flex-1 overflow-y-auto p-8 bg-white">
             {activeTab === 0 && <Step1_BasicInfo />}
             {activeTab === 1 && <Step2_SiteInfo />}
-            {activeTab === 2 && (
-              <div className="p-10 text-center text-gray-500">
-                {/* Step3 컴포넌트가 있다면 여기에 <Step3_EnergyData /> 추가 */}
-                <p>에너지 데이터 입력 화면 (Step3 컴포넌트 연결 필요)</p>
-              </div>
-            )}
-
-            {/* ✅ 기존에 작성하신 상세 단가 설정 UI는 4번 탭으로 통합 */}
+            {activeTab === 2 && <Step3_EnergyData />}{' '}
+            {/* Step3 컴포넌트 연결 */}
+            {/* ✅ 4번 탭: 상세 단가 설정 */}
             {activeTab === 3 && (
               <div className="space-y-8 max-w-4xl mx-auto">
                 {/* 1. 장비 투자비 단가 */}
@@ -173,17 +166,29 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                   </div>
                 </div>
 
-                {/* 2. 수익 분석 단가 */}
+                {/* 2. 수익 분석 단가 (수정됨) */}
                 <div>
                   <h3 className="text-sm font-bold text-green-600 mb-4 uppercase tracking-wider border-b pb-2 border-green-100">
                     2. 수익 분석 단가 (단위: 원)
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
+                    {/* [NEW] 전력 판매 및 임대/구독 단가 */}
                     <ConfigInput
-                      label="한전 판매 단가"
+                      label="한전 판매 단가 (SMP+REC)"
                       field="unit_price_kepco"
                       store={store}
                     />
+                    <ConfigInput
+                      label="임대형 단가 (연간/kW)"
+                      field="rental_price_per_kw"
+                      store={store}
+                    />
+                    <ConfigInput
+                      label="구독형 단가 (연간/kW)"
+                      field="subscription_price_per_kw"
+                      store={store}
+                    />
+
                     <ConfigInput
                       label="자가소비 절감 단가"
                       field="unit_price_savings"
@@ -341,7 +346,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
         </div>
       </div>
 
-      {/* 불러오기 팝업 */}
       <ProposalListModal
         isOpen={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
