@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useProposalStore, ModuleTier } from '../lib/store';
+import {
+  useProposalStore,
+  ModuleTier,
+  RationalizationData,
+} from '../lib/store';
 import styles from './Step4_Simulation.module.css';
 import {
   LucideTruck,
@@ -20,7 +24,7 @@ const round2 = (num: number) => Math.round(num * 100) / 100;
 
 export default function Step4_Simulation() {
   const store = useProposalStore();
-  const { config, rationalization, truckCount } = store; // [수정] truckCount 가져오기
+  const { config, rationalization, truckCount } = store;
 
   const [showRationalization, setShowRationalization] = useState(false);
 
@@ -32,9 +36,40 @@ export default function Step4_Simulation() {
     store.selectedModel,
     store.moduleTier,
     store.useEc,
-    store.truckCount, // [수정] 트럭 수 변경 시에도 반응
+    store.truckCount,
     store.config,
   ]);
+
+  // --------------------------------------------------------------------------
+  // [Helper] 합리화 계산기 Input 렌더링 함수 (콤마, 포커스 처리 적용)
+  // --------------------------------------------------------------------------
+  const renderRationalizationInput = (
+    field: keyof RationalizationData,
+    placeholder: string = '0',
+    extraClass: string = ''
+  ) => {
+    const value = rationalization[field];
+
+    return (
+      <input
+        type="text" // 콤마 표시를 위해 text 사용
+        className={`w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none ${extraClass}`}
+        // 0일 때도 '0'을 보여주되, 포커스 시 전체선택되어 덮어쓰기 편하게 함
+        value={value !== undefined ? value.toLocaleString() : ''}
+        onChange={(e) => {
+          // 콤마 제거 후 숫자로 변환
+          const rawValue = e.target.value.replace(/,/g, '');
+          const numValue = Number(rawValue);
+          if (!isNaN(numValue)) {
+            store.updateRationalization(field, numValue);
+          }
+        }}
+        // [핵심] 클릭 시 기존 값 전체 선택 -> 바로 덮어쓰기 가능
+        onFocus={(e) => e.target.select()}
+        placeholder={placeholder}
+      />
+    );
+  };
 
   // --------------------------------------------------------------------------
   // [0] 공통 변수 및 합리화 절감액 선행 계산
@@ -72,14 +107,13 @@ export default function Step4_Simulation() {
     0
   );
 
-  // 3. 자가소비 인정 물량 (Min(발전량, 소비량))
+  // 3. 자가소비 인정 물량
   const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
 
-  // 4. 자가소비 후 잉여전력량 (기초)
+  // 4. 자가소비 후 잉여전력량
   const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
   // 5. EC 운반 전력량 계산
-  // 식: 트럭수 * 100kW * 4회 * 365일
   const ecCapacityAnnual = truckCount * 100 * 4 * 365;
 
   let volume_ec = 0;
@@ -87,7 +121,7 @@ export default function Step4_Simulation() {
     volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
   }
 
-  // 6. 최종 잉여 전력량 (한전 판매용)
+  // 6. 최종 잉여 전력량
   const volume_surplus = Math.max(0, rawSurplus - volume_ec);
 
   // --- 단가 적용 및 수익 계산 ---
@@ -99,39 +133,31 @@ export default function Step4_Simulation() {
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  // 수익 1: 자가소비 절감
+  // 수익 1, 2, 3
   const revenue_saving = volume_self * appliedSavingsPrice;
-
-  // 수익 2: EC 판매
   const revenue_ec = volume_ec * appliedSellPrice;
 
-  // 수익 3: 잉여 한전 판매
   let revenue_surplus = 0;
   if (store.selectedModel === 'KEPCO') {
-    revenue_surplus = rawSurplus * config.unit_price_kepco; // EC 미사용
+    revenue_surplus = rawSurplus * config.unit_price_kepco;
   } else {
     revenue_surplus = volume_surplus * config.unit_price_kepco;
   }
 
-  // 총 수익 (합리화 절감액 포함)
+  // 총 수익
   const totalRevenue =
     revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
   // --------------------------------------------------------------------------
-  // [2] 비용 계산 (유지보수비 + 인건비)
+  // [2] 비용 계산
   // --------------------------------------------------------------------------
-
-  // EC 인건비: 트럭 1대 이상일 때 0.4억 (설정값 사용)
   const laborCostWon =
     truckCount > 0 && store.useEc && store.selectedModel !== 'KEPCO'
       ? config.price_labor_ec * 100000000
       : 0;
 
-  // 유지보수비: (총수익 * 요율) + 인건비
   const maintenanceBase = totalRevenue * (store.maintenanceRate / 100);
   const totalAnnualCost = maintenanceBase + laborCostWon;
-
-  // 순수익
   const netProfit = totalRevenue - totalAnnualCost;
 
   // --------------------------------------------------------------------------
@@ -144,13 +170,11 @@ export default function Step4_Simulation() {
   const solarCount = store.capacityKw / 100;
   const solarCost = solarCount * solarPrice;
 
-  // EC 관련 투자비 (트럭 수 비례)
   const ecCost =
     store.useEc && store.selectedModel !== 'KEPCO'
       ? truckCount * config.price_ec_unit
       : 0;
 
-  // 트랙터/플랫폼 (트럭 있으면 1식)
   const tractorCost =
     truckCount > 0 && store.useEc && store.selectedModel !== 'KEPCO'
       ? 1 * config.price_tractor
@@ -160,7 +184,7 @@ export default function Step4_Simulation() {
       ? 1 * config.price_platform
       : 0;
 
-  const maintenanceTableValue = totalAnnualCost / 100000000; // 억 단위 표시용
+  const maintenanceTableValue = totalAnnualCost / 100000000;
 
   const totalInitialInvestment =
     solarCost + ecCost + tractorCost + platformCost;
@@ -309,7 +333,6 @@ export default function Step4_Simulation() {
                 store.setSimulationOption('useEc', e.target.checked)
               }
             />
-            {/* [수정] 트럭 수량 조절 (EC 사용 시에만 노출) */}
             {store.useEc && (
               <select
                 className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -385,7 +408,6 @@ export default function Step4_Simulation() {
                 <td className="text-blue-600 font-bold">
                   {solarCount.toFixed(2)} ea
                 </td>
-                {/* [수정] 트럭 수 store.truckCount 반영 */}
                 <td>
                   {store.useEc && store.selectedModel !== 'KEPCO'
                     ? truckCount
@@ -588,7 +610,7 @@ export default function Step4_Simulation() {
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)
           </div>
 
-          {/* 합리화 절감액 토글 */}
+          {/* 합리화 절감액 토글 (Input 헬퍼 함수 적용) */}
           {isEul ? (
             <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden">
               <button
@@ -604,6 +626,7 @@ export default function Step4_Simulation() {
                   <LucideChevronDown size={16} />
                 )}
               </button>
+
               {showRationalization && (
                 <div className="p-4 bg-white text-xs">
                   <table className="w-full text-center border-collapse">
@@ -624,30 +647,10 @@ export default function Step4_Simulation() {
                           기본료
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.base_eul}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'base_eul',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('base_eul')}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.base_gap}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'base_gap',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('base_gap')}
                         </td>
                         <td className="p-2 border-r font-bold text-red-500 bg-yellow-50">
                           {(
@@ -655,32 +658,14 @@ export default function Step4_Simulation() {
                           ).toLocaleString()}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.base_usage ?? 0}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'base_usage',
-                                Number(e.target.value)
-                              )
-                            }
-                            placeholder="0"
-                          />
+                          {renderRationalizationInput('base_usage', '0')}
                         </td>
                         <td className="p-1 bg-blue-50">
-                          <input
-                            type="number"
-                            className="w-full text-center border border-blue-200 rounded p-1 bg-white text-blue-600 font-bold"
-                            value={rationalization.base_savings_manual}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'base_savings_manual',
-                                Number(e.target.value)
-                              )
-                            }
-                            placeholder="직접입력"
-                          />
+                          {renderRationalizationInput(
+                            'base_savings_manual',
+                            '직접입력',
+                            'text-blue-600 font-bold border-blue-200'
+                          )}
                         </td>
                       </tr>
                       {/* 2. 경부하 */}
@@ -689,30 +674,10 @@ export default function Step4_Simulation() {
                           경부하
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.light_eul}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'light_eul',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('light_eul')}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.light_gap}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'light_gap',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('light_gap')}
                         </td>
                         <td className="p-2 border-r font-bold bg-yellow-50">
                           {(
@@ -724,17 +689,7 @@ export default function Step4_Simulation() {
                           })}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.light_usage}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'light_usage',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('light_usage')}
                         </td>
                         <td className="p-2 bg-blue-50 font-bold text-blue-600">
                           {Math.round(saving_light).toLocaleString()}
@@ -746,30 +701,10 @@ export default function Step4_Simulation() {
                           중간부하
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.mid_eul}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'mid_eul',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('mid_eul')}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.mid_gap}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'mid_gap',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('mid_gap')}
                         </td>
                         <td className="p-2 border-r font-bold bg-yellow-50">
                           {(
@@ -780,17 +715,7 @@ export default function Step4_Simulation() {
                           })}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.mid_usage}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'mid_usage',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('mid_usage')}
                         </td>
                         <td className="p-2 bg-blue-50 font-bold text-blue-600">
                           {Math.round(saving_mid).toLocaleString()}
@@ -802,30 +727,10 @@ export default function Step4_Simulation() {
                           최대부하
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.max_eul}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'max_eul',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('max_eul')}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.max_gap}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'max_gap',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('max_gap')}
                         </td>
                         <td className="p-2 border-r font-bold bg-yellow-50">
                           {(
@@ -836,17 +741,7 @@ export default function Step4_Simulation() {
                           })}
                         </td>
                         <td className="p-1 border-r">
-                          <input
-                            type="number"
-                            className="w-full text-center border rounded p-1"
-                            value={rationalization.max_usage}
-                            onChange={(e) =>
-                              store.updateRationalization(
-                                'max_usage',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
+                          {renderRationalizationInput('max_usage')}
                         </td>
                         <td className="p-2 bg-blue-50 font-bold text-blue-600">
                           {Math.round(saving_max).toLocaleString()}
