@@ -278,3 +278,232 @@
   background-color: #e0f2fe;
   box-shadow: inset 0 0 0 2px #3b82f6;
 }
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stepBadge {
+  background-color: #2563eb;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.card {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.select,
+.inputReadOnly {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  background-color: #f8fafc;
+  color: #334155;
+  height: 38px;
+}
+
+.select {
+  background-color: white;
+  cursor: pointer;
+}
+.select:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.8rem;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.copyButton:hover {
+  background-color: #e2e8f0;
+  color: #1e293b;
+}
+
+/* 테이블 래퍼 (가로 스크롤) */
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+/* 복합 테이블 스타일 */
+.complexTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  text-align: center;
+  table-layout: fixed; /* 고정 너비 사용 */
+}
+
+.complexTable th,
+.complexTable td {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.2rem;
+  white-space: nowrap;
+}
+
+/* [핵심 수정] 입력 필드 스타일 */
+.cellInput {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: transparent;
+
+  /* 텍스트 정렬 및 폰트 */
+  text-align: right;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: #334155;
+
+  /* [중요] 오른쪽 여백을 넉넉하게 주어 숫자 잘림 방지 */
+  padding: 4px 12px 4px 4px !important;
+  box-sizing: border-box; /* 패딩이 너비에 포함되도록 */
+}
+
+.cellInput:focus {
+  background-color: white;
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.cellInput:hover {
+  background-color: #f8fafc;
+}
+
+/* Sticky Column (첫 번째 열: 월) */
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: #f8fafc; /* 헤더 배경색과 일치 */
+  border-right: 2px solid #e2e8f0;
+}
+
+/* 헤더 스타일 */
+.headerGray {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+}
+.headerBlue {
+  background-color: #eff6ff;
+  color: #1e40af;
+  font-weight: 700;
+}
+.headerOrange {
+  background-color: #fff7ed;
+  color: #c2410c;
+  font-weight: 700;
+}
+
+/* 텍스트 색상 유틸 */
+.textBlue {
+  color: #2563eb;
+}
+.textOrange {
+  color: #f97316;
+}
+.textGreen {
+  color: #16a34a;
+}
+.bold {
+  font-weight: 700;
+}
+
+/* 배경색 유틸 */
+.bgBlueLight {
+  background-color: #eff6ff;
+}
+.bgOrangeLight {
+  background-color: #fff7ed;
+}
+.bgTotalSavings {
+  background-color: #fffbeb;
+  font-weight: 700;
+}
+.bgAfterBill {
+  background-color: #f0f9ff;
+  font-weight: 700;
+}
+
+/* 행 호버 효과 */
+.tableRow:hover td {
+  background-color: #f8fafc;
+}
+/* Sticky 컬럼은 호버 배경색 덮어쓰기 방지 (선택 사항) */
+.tableRow:hover .stickyCol {
+  background-color: #f1f5f9;
+}
+
+/* 배지 스타일 */
+.savingRateBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.footerNote {
+  margin-top: 1rem;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
