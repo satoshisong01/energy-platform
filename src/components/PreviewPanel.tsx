@@ -16,7 +16,7 @@ import PreviewSummary from './preview/PreviewSummary';
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
-// [NEW] 페이지 하단 Footer 컴포넌트
+// 페이지 하단 Footer 컴포넌트
 const PageFooter = ({ page }: { page: number }) => {
   const { proposalName, clientName } = useProposalStore();
   const displayName = proposalName || `${clientName} 태양광 발전 제안서`;
@@ -31,7 +31,7 @@ const PageFooter = ({ page }: { page: number }) => {
 
 export default function PreviewPanel() {
   const store = useProposalStore();
-  const { config, rationalization, truckCount } = store; // [수정] truckCount 추가
+  const { config, rationalization, truckCount } = store;
 
   // 프린트 핸들러
   const handlePrint = () => {
@@ -41,8 +41,10 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산
+  // [1] 월별 데이터 계산 (PreviewChart, PreviewDetailTable 용으로 유지)
   // ----------------------------------------------------------------
+  // * 주의: FinancialTable이나 Summary 등은 이제 스토어 중앙 로직을 쓰지만,
+  //         차트나 상세 테이블은 여전히 이 로컬 계산 데이터를 props로 받아야 합니다.
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
@@ -51,8 +53,6 @@ export default function PreviewPanel() {
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
 
-    // [수정] 잉여전력: 생산 - 소비 (마이너스 허용 시 로직 주의, 여기선 0 이상으로 가정)
-    // *단, 여기서 잉여전력은 '자가소비 후 남은 전력'을 의미함 (EC 이동 전)
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
 
     const unitPriceSavings = store.unitPriceSavings || 136.47;
@@ -138,171 +138,6 @@ export default function PreviewPanel() {
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
 
   // ----------------------------------------------------------------
-  // [NEW] 합리화 절감액 계산
-  // ----------------------------------------------------------------
-  const isEul = store.contractType.includes('(을)');
-
-  const diff_light = rationalization.light_eul - rationalization.light_gap;
-  const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
-  const diff_max = rationalization.max_eul - rationalization.max_gap;
-
-  const saving_light = diff_light * rationalization.light_usage;
-  const saving_mid = diff_mid * rationalization.mid_usage;
-  const saving_max = diff_max * rationalization.max_usage;
-
-  const totalRationalizationSavings = isEul
-    ? rationalization.base_savings_manual +
-      saving_light +
-      saving_mid +
-      saving_max
-    : 0;
-
-  // ----------------------------------------------------------------
-  // [2] 투자비 및 수익 계산 (핵심 수정 부분)
-  // ----------------------------------------------------------------
-  const initialAnnualGen = totals.solarGeneration;
-  const annualSelfConsumption = totals.selfConsumption;
-
-  // 1. 자가소비 후 잉여전력 (기초)
-  const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
-
-  const appliedSavingsPrice =
-    store.unitPriceSavings || config.unit_price_savings;
-  let appliedSellPrice = config.unit_price_kepco;
-  if (store.selectedModel === 'RE100')
-    appliedSellPrice = config.unit_price_ec_1_5;
-  if (store.selectedModel === 'REC5')
-    appliedSellPrice = config.unit_price_ec_5_0;
-
-  let revenue_saving = 0,
-    revenue_ec = 0,
-    revenue_surplus = 0;
-
-  // 자가소비 인정 물량
-  const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-
-  // EC 운용 가능 물량 (트럭 수 기반)
-  const ec_capacity_annual = truckCount * 100 * 4 * 365;
-
-  let volume_ec = 0;
-  let volume_surplus_final = 0; // 최종 한전 판매 물량
-
-  if (store.selectedModel === 'KEPCO') {
-    // EC 미사용 모델
-    revenue_surplus = rawSurplus * config.unit_price_kepco;
-    volume_surplus_final = rawSurplus;
-    revenue_saving = volume_self * appliedSavingsPrice; // KEPCO 모델도 자가소비 절감은 있음
-  } else {
-    revenue_saving = volume_self * appliedSavingsPrice;
-
-    // EC 사용 여부 확인
-    if (store.useEc) {
-      volume_ec = Math.min(rawSurplus, ec_capacity_annual);
-      const volume_real_surplus = rawSurplus - volume_ec;
-
-      revenue_ec = volume_ec * appliedSellPrice;
-      revenue_surplus = volume_real_surplus * config.unit_price_kepco;
-      volume_surplus_final = volume_real_surplus;
-    } else {
-      // EC 미사용 (일반 판매)
-      const sellPrice = config.unit_price_kepco;
-      revenue_surplus = rawSurplus * sellPrice;
-      volume_surplus_final = rawSurplus;
-    }
-  }
-
-  // 총 수익 (합리화 절감액 포함)
-  const totalRevenue =
-    revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
-
-  // 비용 (EC 인건비 + O&M)
-  const maintenanceCost = totalRevenue * (store.maintenanceRate / 100);
-
-  // [수정] 인건비: EC 사용하고 트럭이 1대 이상일 때만
-  let fixedLaborCost = 0;
-  if (store.useEc && store.selectedModel !== 'KEPCO' && truckCount > 0) {
-    fixedLaborCost = config.price_labor_ec * 100000000;
-  }
-
-  const totalAnnualCost = maintenanceCost + fixedLaborCost;
-  const netProfit = totalRevenue - totalAnnualCost;
-
-  // 투자비 계산
-  let solarPrice = config.price_solar_standard;
-  if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
-  if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
-
-  const solarCount = store.capacityKw / 100;
-  const solarCost = solarCount * solarPrice;
-
-  const useEcReal = store.useEc && store.selectedModel !== 'KEPCO';
-
-  // [수정] EC 투자비: 트럭 수 * 단가
-  const ecCost = useEcReal ? truckCount * config.price_ec_unit : 0;
-  const tractorCost =
-    useEcReal && truckCount > 0 ? 1 * config.price_tractor : 0;
-  const platformCost =
-    useEcReal && truckCount > 0 ? 1 * config.price_platform : 0;
-
-  const maintenanceTableValue = totalAnnualCost / 100000000;
-
-  const totalInitialInvestment =
-    solarCost + ecCost + tractorCost + platformCost;
-  const totalInvestment20Years =
-    totalInitialInvestment + maintenanceTableValue * 20;
-
-  // 20년 누적
-  let totalNetProfit20Years = 0;
-  let firstYearNetProfit = 0;
-  let currentGen = initialAnnualGen;
-  for (let year = 1; year <= 20; year++) {
-    const ratio = currentGen / initialAnnualGen;
-    const yearRevenue = totalRevenue * ratio;
-    const yearCost =
-      yearRevenue * (store.maintenanceRate / 100) + fixedLaborCost;
-    const yearNetProfit = yearRevenue - yearCost;
-    totalNetProfit20Years += yearNetProfit;
-    if (year === 1) firstYearNetProfit = yearNetProfit;
-    currentGen = currentGen * (1 - store.degradationRate / 100);
-  }
-  const roiPercent =
-    totalInvestment20Years > 0
-      ? (totalNetProfit20Years / 100000000 / totalInvestment20Years) * 100
-      : 0;
-  const roiYears = totalInitialInvestment / (firstYearNetProfit / 100000000);
-
-  // 데이터 패키징
-  const revenueDetails = {
-    volume_self,
-    volume_ec,
-    volume_surplus_final,
-    appliedSavingsPrice,
-    appliedSellPrice,
-    revenue_saving,
-    revenue_ec,
-    revenue_surplus,
-  };
-
-  const investmentDetails = {
-    solarCount,
-    solarPrice,
-    solarCost,
-    ecCount: truckCount, // [수정] store.truckCount 전달
-    ecCost,
-    tractorCost,
-    platformCost,
-    useEcReal,
-    maintenanceTableValue,
-    totalInitialInvestment,
-    totalInvestment20Years,
-    solarSplit: round2(solarCost / 20),
-    ecSplit: round2(ecCost / 20),
-    tractorSplit: round2(tractorCost / 20),
-    platformSplit: round2(platformCost / 20),
-    maintenanceSplit: round2(maintenanceTableValue),
-  };
-
-  // ----------------------------------------------------------------
   // UI 렌더링
   // ----------------------------------------------------------------
   return (
@@ -342,6 +177,7 @@ export default function PreviewPanel() {
         </div>
 
         <div style={{ width: '100%', marginTop: '20px' }}>
+          {/* Summary는 이제 내부에서 store 데이터를 직접 가져옵니다 */}
           <PreviewSummary />
         </div>
 
@@ -379,19 +215,8 @@ export default function PreviewPanel() {
       {/* [페이지 4] 투자 및 수익 분석 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
-          <PreviewFinancialTable
-            totals={totals}
-            netProfit={netProfit}
-            totalRevenue={totalRevenue}
-            revenueDetails={revenueDetails}
-            totalAnnualCost={totalAnnualCost}
-            maintenanceCost={maintenanceCost}
-            fixedLaborCost={fixedLaborCost}
-            roiPercent={roiPercent}
-            roiYears={roiYears}
-            totalNetProfit20Years={totalNetProfit20Years}
-            investmentDetails={investmentDetails}
-          />
+          {/* [수정] props 제거 (내부에서 store.getSimulationResults 사용) */}
+          <PreviewFinancialTable />
         </div>
         <PageFooter page={4} />
       </div>
@@ -407,7 +232,9 @@ export default function PreviewPanel() {
       {/* [페이지 6] 비교 테이블 및 푸터 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
+          {/* [수정] props 제거 (내부에서 store.getSimulationResults 사용) */}
           <PreviewComparisonTable />
+
           <div className={styles.footer} style={{ marginTop: '40px' }}>
             <div className={styles.contactInfo}>
               <div>김 종 우 &nbsp;|&nbsp; 010.5617.9500</div>

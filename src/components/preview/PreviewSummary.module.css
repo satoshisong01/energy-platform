@@ -438,3 +438,120 @@
   color: #64748b;
   margin-left: 0.5rem;
 }
+
+/* 중간 연결부 (Annual -> 20Year 사이) */
+.middleConnect {
+  display: flex;
+  flex-direction: column; /* 변경: 세로 정렬이 아닌 가로 흐름 속 요소지만 여기선 가로 배치 */
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  position: relative;
+  margin: 0 10px;
+}
+
+/* 화살표 라인 흉내 */
+.connectArrowLine {
+  height: 2px;
+  width: 100%;
+  background-color: #cbd5e1; /* 화살표 색상 */
+  position: relative;
+  margin: 5px 0;
+}
+
+.arrowHead {
+  position: absolute;
+  right: 0;
+  top: -4px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 8px solid #cbd5e1;
+}
+
+.connectContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background-color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  z-index: 2;
+  text-align: left;
+}
+
+.connectItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.connectValueRed {
+  color: #ef4444; /* RE100 빨강 */
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.connectValueBlue {
+  color: #3b82f6; /* 절감율 파랑 */
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.connectLabel {
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* 20년 수익 카드 내부 수정 */
+.totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.profitRateBadge {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.roiBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background-color: #fdf2f8; /* 핑크 배경 (ROI 강조) */
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #db2777;
+}
+
+.roiLabel {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.roiValue {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* 기존 arrowWrapper는 숨기거나 middleConnect로 대체 */
+.arrowWrapper {
+  display: none; /* 중간 섹션이 화살표 역할 대체 */
+}
+
+/* 첫 번째 화살표(투자->연간)는 유지 */
+.flowContainer > .arrowWrapper:first-of-type {
+  display: flex;
+}

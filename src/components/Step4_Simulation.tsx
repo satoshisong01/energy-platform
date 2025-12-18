@@ -40,31 +40,25 @@ export default function Step4_Simulation() {
     store.config,
   ]);
 
-  // --------------------------------------------------------------------------
-  // [Helper] 합리화 계산기 Input 렌더링 함수 (콤마, 포커스 처리 적용)
-  // --------------------------------------------------------------------------
+  // [Helper] 합리화 계산기 Input 렌더링 함수
   const renderRationalizationInput = (
     field: keyof RationalizationData,
     placeholder: string = '0',
     extraClass: string = ''
   ) => {
     const value = rationalization[field];
-
     return (
       <input
-        type="text" // 콤마 표시를 위해 text 사용
+        type="text"
         className={`w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none ${extraClass}`}
-        // 0일 때도 '0'을 보여주되, 포커스 시 전체선택되어 덮어쓰기 편하게 함
         value={value !== undefined ? value.toLocaleString() : ''}
         onChange={(e) => {
-          // 콤마 제거 후 숫자로 변환
           const rawValue = e.target.value.replace(/,/g, '');
           const numValue = Number(rawValue);
           if (!isNaN(numValue)) {
             store.updateRationalization(field, numValue);
           }
         }}
-        // [핵심] 클릭 시 기존 값 전체 선택 -> 바로 덮어쓰기 가능
         onFocus={(e) => e.target.select()}
         placeholder={placeholder}
       />
@@ -95,25 +89,18 @@ export default function Step4_Simulation() {
   // [1] 물량 및 수익 계산 로직
   // --------------------------------------------------------------------------
 
-  // 1. 연간 총 발전량
   const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
   }, 0);
 
-  // 2. 연간 총 자가소비량
   const annualSelfConsumption = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
 
-  // 3. 자가소비 인정 물량
   const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-
-  // 4. 자가소비 후 잉여전력량
   const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
-
-  // 5. EC 운반 전력량 계산
   const ecCapacityAnnual = truckCount * 100 * 4 * 365;
 
   let volume_ec = 0;
@@ -121,7 +108,6 @@ export default function Step4_Simulation() {
     volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
   }
 
-  // 6. 최종 잉여 전력량
   const volume_surplus = Math.max(0, rawSurplus - volume_ec);
 
   // --- 단가 적용 및 수익 계산 ---
@@ -133,7 +119,6 @@ export default function Step4_Simulation() {
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  // 수익 1, 2, 3
   const revenue_saving = volume_self * appliedSavingsPrice;
   const revenue_ec = volume_ec * appliedSellPrice;
 
@@ -144,7 +129,6 @@ export default function Step4_Simulation() {
     revenue_surplus = volume_surplus * config.unit_price_kepco;
   }
 
-  // 총 수익
   const totalRevenue =
     revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
@@ -158,6 +142,8 @@ export default function Step4_Simulation() {
 
   const maintenanceBase = totalRevenue * (store.maintenanceRate / 100);
   const totalAnnualCost = maintenanceBase + laborCostWon;
+
+  // [1차년도 순수익]
   const netProfit = totalRevenue - totalAnnualCost;
 
   // --------------------------------------------------------------------------
@@ -199,24 +185,25 @@ export default function Step4_Simulation() {
     totalInitialInvestment + maintenanceTableValue * 20;
 
   // --------------------------------------------------------------------------
-  // [4] 20년 누적 시뮬레이션
+  // [4] 20년 누적 시뮬레이션 (엑셀 수식 적용) [수정됨]
   // --------------------------------------------------------------------------
-  let totalNetProfit20Years = 0;
-  let firstYearNetProfit = 0;
-  let currentGen = initialAnnualGen;
+  // 엑셀 수식: =J21*(1-(1+K24/100)^20)/(1-(1+K24/100))
+  // J21: 1차년도 순수익 (netProfit)
+  // K24: 발전감소율 (degradationRate), 보통 양수로 입력되므로 식에서는 마이너스 처리 필요
 
-  for (let year = 1; year <= 20; year++) {
-    const ratio = currentGen / initialAnnualGen;
-    const yearRevenue = totalRevenue * ratio;
-    const yearCost = yearRevenue * (store.maintenanceRate / 100) + laborCostWon;
-    const yearNetProfit = yearRevenue - yearCost;
+  // 공비 (R) = 1 + (감소율/100) -> 감소율이 양수(0.5)면 실제로는 -0.5% 이므로 R = 1 - 0.005
+  const degradationRateDecimal = -(store.degradationRate / 100);
+  const R = 1 + degradationRateDecimal;
+  const n = 20;
 
-    totalNetProfit20Years += yearNetProfit;
-    if (year === 1) firstYearNetProfit = yearNetProfit;
-    currentGen = currentGen * (1 - store.degradationRate / 100);
-  }
+  // 등비수열의 합 공식: S = a * (1 - r^n) / (1 - r)
+  // 여기서 a = netProfit
+  const totalNetProfit20Years = (netProfit * (1 - Math.pow(R, n))) / (1 - R);
 
+  // ROI 계산 (회수기간은 기존 로직 유지: 초기투자 / 1차년수익)
+  const firstYearNetProfit = netProfit;
   const roiYears = totalInitialInvestment / (firstYearNetProfit / 100000000);
+
   const roiPercent =
     totalInvestment20Years > 0
       ? (totalNetProfit20Years / 100000000 / totalInvestment20Years) * 100
@@ -225,7 +212,6 @@ export default function Step4_Simulation() {
   // Advice Message
   let adviceMessage = null;
   let adviceType = 'info';
-
   const maxTruckCapacity = truckCount * 100 * 4 * 365;
 
   if (store.selectedModel !== 'KEPCO' && store.useEc) {
@@ -262,7 +248,7 @@ export default function Step4_Simulation() {
         <span className={styles.stepBadge}>4</span> 투자비 및 수익 분석 상세
       </h3>
 
-      {/* --- 옵션 선택 UI --- */}
+      {/* ... (이하 UI 코드는 기존과 동일하므로 그대로 유지) ... */}
       <div className="space-y-2">
         <div className={styles.grid3}>
           <div
