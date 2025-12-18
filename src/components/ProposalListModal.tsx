@@ -145,7 +145,7 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
               color: '#1e293b',
             }}
           >
-            📂 견적서 불러오기
+            📂 분석자료 불러오기
           </h3>
           <button
             onClick={onClose}
