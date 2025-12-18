@@ -1,37 +1,64 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProposalStore } from '../../lib/store';
 import styles from './PreviewSummary.module.css';
 import {
   LucideArrowRight,
   LucideWallet,
   LucideChevronsDown,
+  LucideTruck,
 } from 'lucide-react';
 
 export default function PreviewSummary() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
-  // 스토어에서 "물량 데이터"를 가져오기 위해 호출 (단가는 무시하고 물량만 씀)
   const results = store.getSimulationResults();
 
   const [showExpansion, setShowExpansion] = useState(false);
 
+  // [NEW] EC 적용 여부 토글 상태 (초기값: 현재 설정이 EC 사용 중이면 true)
+  const [applyEc, setApplyEc] = useState(
+    store.useEc && store.selectedModel !== 'KEPCO'
+  );
+
+  // store 설정이 바뀌면 토글 상태도 동기화 (선택 사항)
+  useEffect(() => {
+    setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
+  }, [store.useEc, store.selectedModel]);
+
   // ----------------------------------------------------------------
-  // 1. 공통 지표 (RE100 충족률, 절감률) - 시나리오와 무관하게 동일
+  // 1. 기본 물량 재계산 (RE100 가정)
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
 
-  // (1) RE100 충족률
+  // 1) 연간 발전량
+  const annualGen = store.monthlyData.reduce((acc, cur) => {
+    const days = new Date(2025, cur.month, 0).getDate();
+    return acc + capacity * 3.64 * days;
+  }, 0);
+
+  // 2) 연간 자가소비량
+  const annualSelf = store.monthlyData.reduce(
+    (acc, cur) => acc + cur.selfConsumption,
+    0
+  );
+
+  // 3) 연간 총 사용량
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
-  const re100Rate =
-    totalUsage > 0 ? (results.initialAnnualGen / totalUsage) * 100 : 0;
 
-  // (2) 전기요금 절감률 (Step3 방식 정밀 계산)
+  // 4) 잉여 전력
+  const rawSurplus = Math.max(0, annualGen - annualSelf);
+
+  // ----------------------------------------------------------------
+  // 2. 공통 지표 계산
+  // ----------------------------------------------------------------
+  const re100Rate = totalUsage > 0 ? (annualGen / totalUsage) * 100 : 0;
+
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
     0
@@ -44,12 +71,10 @@ export default function PreviewSummary() {
     const solarGen = data.solarGeneration > 0 ? data.solarGeneration : autoGen;
     const selfConsum = data.selfConsumption;
 
-    // 전력량 요금 절감
     const usageSaving =
       Math.min(solarGen, selfConsum) *
       (store.unitPriceSavings || config.unit_price_savings);
 
-    // 기본요금 절감
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -76,67 +101,84 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
+  const isEul = store.contractType.includes('(을)');
+  const totalRationalizationSavings = isEul
+    ? rationalization.base_savings_manual +
+      (rationalization.light_eul - rationalization.light_gap) *
+        rationalization.light_usage +
+      (rationalization.mid_eul - rationalization.mid_gap) *
+        rationalization.mid_usage +
+      (rationalization.max_eul - rationalization.max_gap) *
+        rationalization.max_usage
+    : 0;
+
   // ----------------------------------------------------------------
-  // 2. 시나리오별 계산 함수 (1.5 vs 5.0 강제 적용)
+  // 3. 시나리오별 계산 함수 (체크박스 상태 applyEc 반영)
   // ----------------------------------------------------------------
   const calculateScenario = (isPremium: boolean) => {
-    // 1. 단가 설정 (핵심: 여기서 강제로 갈라짐)
-    // Premium이면 5.0 단가, 아니면 1.5 단가 사용
     const targetEcPrice = isPremium
       ? config.unit_price_ec_5_0
       : config.unit_price_ec_1_5;
     const modelName = isPremium ? 'REC 5.0' : 'REC 1.5';
 
-    // 2. 수익 재계산
-    // results에 있는 물량(volume_ec, volume_self 등)은 이미 트럭 수 등이 반영된 값임
-    // 단, "설비 확장" 개념이라면 트럭 수를 늘려야 하지만,
-    // 여기서는 "현재 설정 기준"에서 단가 차이를 보여주는 것이 1차 목표
-    // (사용자가 5.0을 보고 싶으면 트럭을 늘려서 볼 것이므로 현재 설정을 따름)
+    // [핵심] 체크박스(applyEc)가 켜져 있으면 설정된 트럭 수 사용, 꺼져 있으면 0대
+    // 만약 설정된 트럭이 0대인데 체크를 켰다면, 기본 3대로 가정해서 보여줌
+    const activeTruckCount = applyEc
+      ? store.truckCount > 0
+        ? store.truckCount
+        : 3
+      : 0;
 
-    const revenue_saving = results.revenue_saving; // 자가소비 수익 (동일)
-    const revenue_ec = results.volume_ec * targetEcPrice; // EC 수익 (단가 적용)
+    // -----------------------------------
+    // [계산 로직]
+    // -----------------------------------
 
-    // 잉여 한전 판매 (EC로 못 간 나머지)
-    // KEPCO 모델일 경우 volume_ec가 0이므로 전체가 한전 판매로 잡힘 -> 비교를 위해 EC 모델 가정
-    // *만약 사용자가 KEPCO 모델을 선택했더라도 비교표에서는 EC 가능 물량을 가정해서 보여줄지 여부 결정 필요
-    // *여기서는 store.useEc가 true일 때의 물량을 그대로 쓴다고 가정 (results.volume_ec)
-    const revenue_surplus =
-      results.volume_surplus_final * config.unit_price_kepco;
+    const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
+    const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
+    const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-    // 합리화 절감액
-    const totalRationalization = results.totalRationalizationSavings;
+    const revenue_saving =
+      Math.min(annualGen, annualSelf) *
+      (store.unitPriceSavings || config.unit_price_savings);
+    const revenue_ec = volume_ec * targetEcPrice;
+    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
-    // 총 수익 (Gross)
     const grossRevenue =
-      revenue_saving + revenue_ec + revenue_surplus + totalRationalization;
+      revenue_saving +
+      revenue_ec +
+      revenue_surplus +
+      totalRationalizationSavings;
 
-    // 3. 비용 계산
-    const laborCostWon = results.laborCostWon; // 인건비 (동일)
+    const laborCostWon =
+      activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
     const maintenanceCost =
       (grossRevenue * store.maintenanceRate) / 100 + laborCostWon;
 
-    // 4. 순수익 (Net)
     const annualNetProfitWon = grossRevenue - maintenanceCost;
     const annualNetProfitUk = annualNetProfitWon / 100000000;
 
-    // 5. 20년 누적 (등비수열 합)
+    // 투자비
+    let solarPrice = config.price_solar_standard;
+    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
+    if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
+
+    const solarCost = (capacity / 100) * solarPrice;
+    const ecCost = activeTruckCount * config.price_ec_unit;
+    const infraCost =
+      activeTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
+
+    const investUk = solarCost + ecCost + infraCost;
+    const investWon = investUk * 100000000;
+
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const totalNet20Won = (annualNetProfitWon * (1 - Math.pow(R, n))) / (1 - R);
     const totalNet20Uk = totalNet20Won / 100000000;
 
-    // 6. 투자비 (동일)
-    const investUk = results.totalInvestmentUk;
-    const investWon = results.totalInvestment;
-
-    // ROI (년)
+    const totalCost20 = investWon + maintenanceCost * 20;
     const roiYears =
       annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0;
-
-    // 수익률 (%)
-    // 20년 총 비용 = 초기투자 + (연간비용 * 20)
-    const totalCost20 = investWon + maintenanceCost * 20;
     const profitRate =
       totalCost20 > 0 ? (totalNet20Won / totalCost20) * 100 : 0;
 
@@ -145,7 +187,7 @@ export default function PreviewSummary() {
         ? 'TYPE B. Premium Plan (수익 극대화형)'
         : 'TYPE A. Standard Plan (안정형)',
       invest: investUk,
-      ecCount: store.truckCount,
+      ecCount: activeTruckCount,
       annualProfit: annualNetProfitUk,
       totalProfit20: totalNet20Uk,
       roiYears,
@@ -155,11 +197,11 @@ export default function PreviewSummary() {
     };
   };
 
-  const stdData = calculateScenario(false); // REC 1.5 계산
-  const expData = calculateScenario(true); // REC 5.0 계산
+  const stdData = calculateScenario(false);
+  const expData = calculateScenario(true);
 
   // ----------------------------------------------------------------
-  // 3. 하단 무투자 모델 데이터 (기존 로직)
+  // 3. 하단 무투자 모델 데이터
   // ----------------------------------------------------------------
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
@@ -167,15 +209,20 @@ export default function PreviewSummary() {
       ? ((simpleRentalRevenueUk * 100000000) / totalBillBefore) * 100
       : 0;
 
-  const re100RentalRevenueUk = results.rental_revenue_yr / 100000000;
+  const rental_revenue_won =
+    capacity * 0.2 * config.unit_price_kepco * 3.64 * 365 +
+    capacity * 0.8 * config.rental_price_per_kw;
+  const re100RentalRevenueUk = rental_revenue_won / 100000000;
   const re100RentalSavingRate =
-    totalBillBefore > 0
-      ? (results.rental_revenue_yr / totalBillBefore) * 100
-      : 0;
+    totalBillBefore > 0 ? (rental_revenue_won / totalBillBefore) * 100 : 0;
 
-  const subRevenueUk = results.sub_revenue_yr / 100000000;
+  const price_standard = 210.5;
+  const sub_revenue_won =
+    annualSelf * (price_standard - config.sub_price_self) +
+    rawSurplus * config.sub_price_surplus;
+  const subRevenueUk = sub_revenue_won / 100000000;
   const subSavingRate =
-    totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
+    totalBillBefore > 0 ? (sub_revenue_won / totalBillBefore) * 100 : 0;
 
   // ----------------------------------------------------------------
   // UI Helper
@@ -202,7 +249,15 @@ export default function PreviewSummary() {
             </div>
             <div className={styles.detailItem}>
               <span>EC설비</span>
-              <span>{d.ecCount} 대</span>
+              {/* EC 여부에 따라 텍스트 표시 */}
+              <span
+                style={{
+                  color: d.ecCount > 0 ? '#2563eb' : '#94a3b8',
+                  fontWeight: d.ecCount > 0 ? 'bold' : 'normal',
+                }}
+              >
+                {d.ecCount > 0 ? `${d.ecCount} 대` : '미적용'}
+              </span>
             </div>
           </div>
         </div>
@@ -243,7 +298,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* [NEW] 중간 연결부 (RE100% / 절감%) - 카드 사이에 배치 */}
+      {/* 중간 연결부 */}
       <div className={styles.middleConnect}>
         <div className={styles.connectArrowLine}></div>
         <div className={styles.connectContent}>
@@ -311,14 +366,35 @@ export default function PreviewSummary() {
         <div className={styles.headerTitle}>
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
-        <button
-          className={`${styles.expandBtn} ${
-            showExpansion ? styles.active : ''
-          }`}
-          onClick={() => setShowExpansion(!showExpansion)}
-        >
-          {showExpansion ? '➖ 비교 닫기' : '➕ REC 5.0 확장 플랜 비교'}
-        </button>
+
+        {/* [NEW] 우측 컨트롤 영역 */}
+        <div className="flex items-center gap-3 no-print">
+          {/* EC 토글 체크박스 */}
+          <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition shadow-sm select-none">
+            <input
+              type="checkbox"
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              checked={applyEc}
+              onChange={(e) => setApplyEc(e.target.checked)}
+            />
+            <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+              <LucideTruck
+                size={16}
+                className={applyEc ? 'text-blue-600' : 'text-slate-400'}
+              />
+              <span>에너지 캐리어(EC) 적용 비교</span>
+            </div>
+          </label>
+
+          <button
+            className={`${styles.expandBtn} ${
+              showExpansion ? styles.active : ''
+            }`}
+            onClick={() => setShowExpansion(!showExpansion)}
+          >
+            {showExpansion ? '➖ 비교 닫기' : '➕ REC 5.0 확장 플랜 비교'}
+          </button>
+        </div>
       </div>
 
       {/* 1. 기본 플랜 (REC 1.5) */}

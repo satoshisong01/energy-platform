@@ -1,9 +1,84 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProposalStore } from '../lib/store';
 import styles from './Step3_EnergyData.module.css';
-import { LucideCopy } from 'lucide-react';
+import { LucideCopy, LucideTable } from 'lucide-react';
+
+// -------------------------------------------------------------------------
+// [Helper Component] 소수점 입력 및 포맷팅을 위한 커스텀 인풋
+// -------------------------------------------------------------------------
+interface NumberInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string; // 추가 스타일용
+}
+
+const NumberInput = ({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+}: NumberInputProps) => {
+  const [tempValue, setTempValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      // 0보다 클 때만 포맷팅, 0이면 빈값 처리 (placeholder 보이게) or '0'
+      // 기존 로직상 0이어도 보여야 하는 필드가 있고 아닌 게 있어서, 여기서는 값 그대로 표시
+      setTempValue(
+        value !== undefined && value !== null
+          ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+          : ''
+      );
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setTempValue(value !== undefined && value !== null ? value.toString() : '');
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/,/g, ''); // 콤마 제거
+
+    // 숫자와 점(.)만 허용
+    if (/^\d*\.?\d*$/.test(raw)) {
+      setTempValue(raw);
+      const num = parseFloat(raw);
+      if (!isNaN(num)) {
+        onChange(num);
+      } else if (raw === '') {
+        onChange(0);
+      }
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      className={`${styles.cellInput} ${className || ''}`} // 기존 스타일 클래스 유지
+      value={tempValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      disabled={disabled}
+      placeholder={placeholder}
+    />
+  );
+};
+
+// -------------------------------------------------------------------------
+// [Main Component] Step3_EnergyData
+// -------------------------------------------------------------------------
 
 const TARIFF_OPTIONS = [
   { name: '산업용(을) 고압A - 선택2', rate: 8320, savings: 210.5 },
@@ -22,26 +97,11 @@ export default function Step3_EnergyData() {
     }
   };
 
-  // [수정] 2025년(평년) 기준으로 1년 365일 고정 (2월 28일)
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
-  // [Helper] 콤마 제거 후 스토어 업데이트
-  const handleInputChange = (
-    month: number,
-    field:
-      | 'usageKwh'
-      | 'selfConsumption'
-      | 'peakKw'
-      | 'solarGeneration'
-      | 'totalBill'
-      | 'baseBill',
-    value: string
-  ) => {
-    const rawValue = value.replace(/,/g, '');
-    const numValue = Number(rawValue);
-    if (!isNaN(numValue)) {
-      store.updateMonthlyData(month, field, numValue);
-    }
+  // store update helper
+  const updateStore = (month: number, field: any, value: number) => {
+    store.updateMonthlyData(month, field, value);
   };
 
   // 1. 비율 계산
@@ -56,18 +116,14 @@ export default function Step3_EnergyData() {
   const dynamicPeakRatio =
     totalUsageInput > 0 ? totalSelfConsumptionInput / totalUsageInput : 0;
 
-  // 2. 데이터 계산 (365일 기준)
+  // 2. 데이터 계산
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
-
-    // 자동 계산값
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
-
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
-
-    const surplusPower = solarGeneration - data.selfConsumption;
+    const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
 
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
@@ -86,7 +142,6 @@ export default function Step3_EnergyData() {
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
     const unitPriceSell = store.unitPriceSell || 192.79;
-
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {
@@ -102,7 +157,7 @@ export default function Step3_EnergyData() {
     };
   });
 
-  // 3. 합계(소계) 계산
+  // 3. 합계 계산
   const totals = computedData.reduce(
     (acc, cur) => ({
       usageKwh: acc.usageKwh + cur.usageKwh,
@@ -134,7 +189,6 @@ export default function Step3_EnergyData() {
 
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
-
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
 
@@ -201,9 +255,9 @@ export default function Step3_EnergyData() {
           </button>
         </div>
 
-        {/* 테이블 */}
+        {/* 테이블 (minWidth 조정으로 잘림 방지) */}
         <div className={styles.tableWrapper}>
-          <table className={styles.complexTable} style={{ minWidth: '1400px' }}>
+          <table className={styles.complexTable} style={{ minWidth: '1500px' }}>
             <thead>
               <tr>
                 <th
@@ -252,7 +306,7 @@ export default function Step3_EnergyData() {
                   (F열)
                 </th>
                 <th className={styles.headerOrange}>
-                  전체요금
+                  전기요금
                   <br />
                   (A)
                 </th>
@@ -293,124 +347,81 @@ export default function Step3_EnergyData() {
                 <tr key={row.month} className={styles.tableRow}>
                   <td className={styles.stickyCol}>{row.month}</td>
 
-                  {/* 사용량 */}
+                  {/* 사용량 (NumberInput 적용) */}
                   <td>
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      value={row.usageKwh ? row.usageKwh.toLocaleString() : ''}
-                      onChange={(e) =>
-                        handleInputChange(row.month, 'usageKwh', e.target.value)
+                    <NumberInput
+                      value={row.usageKwh}
+                      onChange={(val) =>
+                        updateStore(row.month, 'usageKwh', val)
                       }
-                      onFocus={(e) => e.target.select()} // 전체 선택
                       placeholder="0"
                     />
                   </td>
 
-                  {/* 자가소비 */}
+                  {/* 자가소비 (NumberInput 적용) */}
                   <td className={styles.bgBlueLight}>
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      value={
-                        row.selfConsumption
-                          ? row.selfConsumption.toLocaleString()
-                          : ''
+                    <NumberInput
+                      value={row.selfConsumption}
+                      onChange={(val) =>
+                        updateStore(row.month, 'selfConsumption', val)
                       }
-                      onChange={(e) =>
-                        handleInputChange(
-                          row.month,
-                          'selfConsumption',
-                          e.target.value
-                        )
-                      }
-                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
 
-                  {/* 피크치 */}
+                  {/* 피크치 (NumberInput 적용) */}
                   <td style={{ background: '#fffbeb' }}>
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      value={row.peakKw ? row.peakKw.toLocaleString() : ''}
-                      onChange={(e) =>
-                        handleInputChange(row.month, 'peakKw', e.target.value)
-                      }
-                      onFocus={(e) => e.target.select()}
+                    <NumberInput
+                      value={row.peakKw}
+                      onChange={(val) => updateStore(row.month, 'peakKw', val)}
                       placeholder="0"
                     />
                   </td>
 
-                  {/* 발전량 (자동/수기) */}
+                  {/* 발전량 (NumberInput 적용 - 자동값 placeholder) */}
                   <td
                     className={`${styles.resultCell} ${styles.textBlue} ${styles.bold}`}
                   >
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      style={{
-                        color: '#2563eb',
-                        fontWeight: 'bold',
-                        textAlign: 'right',
-                      }}
-                      value={
-                        row.solarGeneration > 0
-                          ? row.solarGeneration.toLocaleString()
-                          : Math.round(row.autoSolarGen).toLocaleString()
+                    <NumberInput
+                      value={row.solarGeneration}
+                      onChange={(val) =>
+                        updateStore(row.month, 'solarGeneration', val)
                       }
-                      onChange={(e) =>
-                        handleInputChange(
-                          row.month,
-                          'solarGeneration',
-                          e.target.value
-                        )
-                      }
-                      onFocus={(e) => e.target.select()}
+                      placeholder={Math.round(
+                        row.autoSolarGen
+                      ).toLocaleString()}
+                      className={styles.textBlue} // 파란색 텍스트 유지
                     />
                   </td>
 
-                  {/* 결과: 잉여전력 */}
+                  {/* 결과: 잉여전력 (ReadOnly) */}
                   <td className={styles.resultCell}>
                     {Math.round(row.surplusPower).toLocaleString()}
                   </td>
 
-                  {/* 전체요금 */}
+                  {/* 전체요금 (NumberInput 적용) */}
                   <td>
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      value={
-                        row.totalBill ? row.totalBill.toLocaleString() : ''
+                    <NumberInput
+                      value={row.totalBill}
+                      onChange={(val) =>
+                        updateStore(row.month, 'totalBill', val)
                       }
-                      onChange={(e) =>
-                        handleInputChange(
-                          row.month,
-                          'totalBill',
-                          e.target.value
-                        )
-                      }
-                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
 
-                  {/* 기본요금 */}
+                  {/* 기본요금 (NumberInput 적용) */}
                   <td className={styles.bgOrangeLight}>
-                    <input
-                      type="text"
-                      className={styles.cellInput}
-                      value={row.baseBill ? row.baseBill.toLocaleString() : ''}
-                      onChange={(e) =>
-                        handleInputChange(row.month, 'baseBill', e.target.value)
+                    <NumberInput
+                      value={row.baseBill}
+                      onChange={(val) =>
+                        updateStore(row.month, 'baseBill', val)
                       }
-                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
 
-                  {/* --- 계산 결과 필드들 --- */}
+                  {/* --- 계산 결과 필드들 (ReadOnly) --- */}
                   <td className={`${styles.resultCell} ${styles.textOrange}`}>
                     {Math.round(row.maxLoadSavings).toLocaleString()}
                   </td>
@@ -512,7 +523,6 @@ export default function Step3_EnergyData() {
               {maxLoadRatio.toFixed(1)}%
             </span>
           </div>
-
           <div className={styles.savingRateBadge}>
             기존 전기요금 절감율{' '}
             <span style={{ marginLeft: '0.5rem' }}>
@@ -539,7 +549,7 @@ export default function Step3_EnergyData() {
             style={{ minHeight: '80px', resize: 'vertical' }}
             value={store.energyNote || ''}
             onChange={(e) => store.setEnergyNote(e.target.value)}
-            placeholder="전력 데이터 관련 특이사항이나 메모를 입력하세요. (예: 8월 휴가로 인한 전력소비 감소 등)"
+            placeholder="전력 데이터 관련 특이사항이나 메모를 입력하세요."
           />
         </div>
 

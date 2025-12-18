@@ -75,7 +75,7 @@ export type ProposalMeta = {
   updated_at: string;
 };
 
-// [NEW] 계산 결과 반환 타입 (volume_self 추가됨)
+// [NEW] 계산 결과 반환 타입
 type SimulationResult = {
   totalInvestment: number;
   totalInvestmentUk: number;
@@ -83,7 +83,7 @@ type SimulationResult = {
   initialAnnualGen: number;
   annualSelfConsumption: number;
   annualSurplus: number;
-  volume_self: number; // [수정] 누락된 타입 추가
+  volume_self: number;
   volume_ec: number;
   volume_surplus_final: number;
 
@@ -395,6 +395,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     let ecCost = 0,
       tractorCost = 0,
       platformCost = 0;
+    // KEPCO가 아닐 때만 EC 비용 추가
     if (useEc && selectedModel !== 'KEPCO') {
       ecCost = truckCount * config.price_ec_unit;
       tractorCost = truckCount > 0 ? config.price_tractor : 0;
@@ -608,7 +609,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
 
   // =================================================================
-  // [핵심] 중앙 계산 로직
+  // [핵심] 중앙 계산 로직 (KEPCO 조건 분기 추가)
   // =================================================================
   getSimulationResults: () => {
     const state = get();
@@ -623,6 +624,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     } = state;
 
     // 1. 투자비 (원 단위)
+    // [중요] KEPCO 모델이면, EC 및 트랙터 등 비용은 제외된 상태여야 함 (recalculateInvestment에서 처리됨)
+    // 하지만 여기서도 안전을 위해 체크 가능
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
@@ -633,49 +636,67 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return acc + (cur.solarGeneration > 0 ? cur.solarGeneration : autoGen);
     }, 0);
 
-    const annualSelfConsumption = monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0
-    );
-    const volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-    const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
-
-    // 3. EC 운반량
-    const ecCapacityAnnual = truckCount * 100 * 4 * 365;
+    // [KEPCO 분기] 자가소비 및 잉여량 계산
+    let volume_self = 0;
+    let rawSurplus = 0;
     let volume_ec = 0;
-    if (useEc && selectedModel !== 'KEPCO') {
-      volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
+    let volume_surplus_final = 0;
+    let revenue_saving = 0;
+    let totalRationalizationSavings = 0;
+
+    if (selectedModel === 'KEPCO') {
+      // 한전 판매형: 전량 판매
+      volume_self = 0;
+      rawSurplus = initialAnnualGen;
+      volume_ec = 0; // EC 미사용
+      volume_surplus_final = initialAnnualGen; // 전량이 한전 판매
+      revenue_saving = 0; // 자가소비 절감 0
+      totalRationalizationSavings = 0; // 합리화 절감액 미포함
+    } else {
+      // RE100, REC5: 자가소비 인정
+      const annualSelfConsumption = monthlyData.reduce(
+        (acc, cur) => acc + cur.selfConsumption,
+        0
+      );
+      volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
+      rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
+
+      // EC 운반량
+      const ecCapacityAnnual = truckCount * 100 * 4 * 365;
+      if (useEc) {
+        volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
+      }
+      volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
+
+      // 자가소비 수익
+      const appliedSavingsPrice =
+        state.unitPriceSavings || config.unit_price_savings;
+      revenue_saving = volume_self * appliedSavingsPrice;
+
+      // 합리화 절감액
+      const isEul = state.contractType.includes('(을)');
+      totalRationalizationSavings = isEul
+        ? rationalization.base_savings_manual +
+          (rationalization.light_eul - rationalization.light_gap) *
+            rationalization.light_usage +
+          (rationalization.mid_eul - rationalization.mid_gap) *
+            rationalization.mid_usage +
+          (rationalization.max_eul - rationalization.max_gap) *
+            rationalization.max_usage
+        : 0;
     }
-    const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-    // 4. 합리화 절감액
-    const isEul = state.contractType.includes('(을)');
-    const totalRationalizationSavings = isEul
-      ? rationalization.base_savings_manual +
-        (rationalization.light_eul - rationalization.light_gap) *
-          rationalization.light_usage +
-        (rationalization.mid_eul - rationalization.mid_gap) *
-          rationalization.mid_usage +
-        (rationalization.max_eul - rationalization.max_gap) *
-          rationalization.max_usage
-      : 0;
-
-    // 5. 수익 계산
-    const appliedSavingsPrice =
-      state.unitPriceSavings || config.unit_price_savings;
+    // 5. 판매 수익 계산
     let appliedSellPrice = config.unit_price_kepco;
     if (selectedModel === 'RE100') appliedSellPrice = config.unit_price_ec_1_5;
     if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
 
-    const revenue_saving = volume_self * appliedSavingsPrice;
     const revenue_ec = volume_ec * appliedSellPrice;
 
-    let revenue_surplus = 0;
-    if (selectedModel === 'KEPCO') {
-      revenue_surplus = rawSurplus * config.unit_price_kepco;
-    } else {
-      revenue_surplus = volume_surplus_final * config.unit_price_kepco;
-    }
+    // 한전 판매 수익
+    // KEPCO 모델은 (전체물량 * 한전단가)
+    // RE100/REC5 모델은 (잉여 중 EC 제외 물량 * 한전단가)
+    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
     // [Gross Revenue]
     const annualGrossRevenue =
@@ -729,9 +750,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const rental_final_profit = rental_revenue_yr * 20;
 
     const price_standard = 210.5;
+    const annualSelfConsumptionForSub = monthlyData.reduce(
+      (acc, cur) => acc + cur.selfConsumption,
+      0
+    );
     const sub_benefit_savings =
-      annualSelfConsumption * (price_standard - config.sub_price_self);
-    const sub_revenue_surplus = rawSurplus * config.sub_price_surplus;
+      annualSelfConsumptionForSub * (price_standard - config.sub_price_self);
+    // 구독형 잉여 수익은 '순수 잉여 전력' 기준 (EC 여부 무관)
+    const rawSurplusForSub = Math.max(
+      0,
+      initialAnnualGen - annualSelfConsumptionForSub
+    );
+    const sub_revenue_surplus = rawSurplusForSub * config.sub_price_surplus;
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
@@ -742,9 +772,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const rec_1000_sub = sub_revenue_yr / CONST_H18 / 1000;
 
     const self_roi_years =
-      self_final_profit / 20 > 0
-        ? totalInvestment / (self_final_profit / 20)
-        : 0;
+      annualOperatingProfit > 0 ? totalInvestment / annualOperatingProfit : 0;
     const rps_roi_years =
       rps_final_profit / 20 > 0 ? totalInvestment / (rps_final_profit / 20) : 0;
     const fac_roi_years =
@@ -754,7 +782,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestment,
       totalInvestmentUk,
       initialAnnualGen,
-      annualSelfConsumption,
+      annualSelfConsumption:
+        selectedModel === 'KEPCO'
+          ? 0
+          : monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0),
       annualSurplus: rawSurplus,
       volume_self,
       volume_ec,
