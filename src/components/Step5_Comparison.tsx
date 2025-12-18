@@ -12,10 +12,8 @@ const PMT = (rate: number, nper: number, pv: number) => {
   return (rate * pv * pvif) / (pvif - 1);
 };
 
-// [Helper] 윤년 체크
-const isLeapYear = (year: number) => {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-};
+// [Helper] 천원 단위 변환 + 콤마
+const toCheon = (val: number) => Math.round(val / 1000).toLocaleString();
 
 export default function Step5_Comparison() {
   const store = useProposalStore();
@@ -26,8 +24,10 @@ export default function Step5_Comparison() {
   // ----------------------------------------------------------------
   const totalInvestment = store.totalInvestment * 100000000;
 
-  // [발전량/소비량] (기준년도 2025 - 365일 기준)
+  // [발전량/소비량] (365일 기준)
+  // Step3에서 이미 2025년(평년) 기준으로 계산된 데이터를 사용합니다.
   const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
+    // 혹시 모를 오차 방지를 위해 여기서도 2025년(평년) 기준 일수 사용
     const days = new Date(2025, cur.month, 0).getDate();
     const autoGen = store.capacityKw * 3.64 * days;
     const gen = cur.solarGeneration > 0 ? cur.solarGeneration : autoGen;
@@ -38,22 +38,26 @@ export default function Step5_Comparison() {
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
-  // 잉여전력 (수익 계산용이므로 Max(0) 유지)
+  // 잉여전력
   const annualSurplus = Math.max(0, initialAnnualGen - annualSelf);
 
-  // [합리화 절감액] (고정 수익)
+  // [합리화 절감액]
   const isEul = store.contractType.includes('(을)');
+  const diff_light = rationalization.light_eul - rationalization.light_gap;
+  const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
+  const diff_max = rationalization.max_eul - rationalization.max_gap;
+  const saving_light = diff_light * rationalization.light_usage;
+  const saving_mid = diff_mid * rationalization.mid_usage;
+  const saving_max = diff_max * rationalization.max_usage;
+
   const totalRationalizationSavings = isEul
     ? rationalization.base_savings_manual +
-      (rationalization.light_eul - rationalization.light_gap) *
-        rationalization.light_usage +
-      (rationalization.mid_eul - rationalization.mid_gap) *
-        rationalization.mid_usage +
-      (rationalization.max_eul - rationalization.max_gap) *
-        rationalization.max_usage
+      saving_light +
+      saving_mid +
+      saving_max
     : 0;
 
-  // [발전 기반 수익] (윤년에 따라 변동되는 수익)
+  // [발전 기반 수익]
   const unitPriceSavings = store.unitPriceSavings || config.unit_price_savings;
   const sellPrice = config.unit_price_ec_1_5;
   const revenue_saving =
@@ -67,10 +71,10 @@ export default function Step5_Comparison() {
     revenue_sales = annualSurplus * config.unit_price_kepco;
   }
 
-  // 발전량에 따라 변하는 연간 기본 수익 (365일 기준)
+  // 기본 연간 매출 (365일 기준 고정)
   const baseGenRevenue = revenue_saving + revenue_sales;
 
-  // 1차년도 총 영업이익 (Gross - O&M) 계산용
+  // 1차년도 총 영업이익
   const annualGrossRevenue = baseGenRevenue + totalRationalizationSavings;
   const annualMaintenanceCost =
     (annualGrossRevenue * store.maintenanceRate) / 100 +
@@ -78,7 +82,7 @@ export default function Step5_Comparison() {
   const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
   // ==========================================================================
-  // [A] 자가자본 (20년 시뮬레이션 - 윤년 반영)
+  // [A] 자가자본 (20년 시뮬레이션 - 윤년 로직 제거, 365일 고정)
   // ==========================================================================
   const self_equity = totalInvestment;
   let self_total_20y = 0;
@@ -86,17 +90,13 @@ export default function Step5_Comparison() {
   let currentGenRatio = 1; // 발전효율
 
   for (let i = 0; i < 20; i++) {
-    const currentYear = 2025 + i;
-    const isLeap = isLeapYear(currentYear); // 윤년 확인
+    // [수정] 윤년 보정(leapFactor) 제거 -> 매년 365일 기준 동일 적용
+    const yearGenRevenue = baseGenRevenue * currentGenRatio;
 
-    // 1. 발전 기반 수익 (윤년이면 366/365 만큼 증가)
-    const leapFactor = isLeap ? 366 / 365 : 1;
-    const yearGenRevenue = baseGenRevenue * currentGenRatio * leapFactor;
-
-    // 2. 전체 매출 (발전수익 + 합리화절감액)
+    // 전체 매출
     const yrRev = yearGenRevenue + totalRationalizationSavings;
 
-    // 3. 비용 차감
+    // 비용 차감
     const yrCost =
       (yrRev * store.maintenanceRate) / 100 +
       (useEcReal ? config.price_labor_ec * 100000000 : 0);
@@ -121,7 +121,6 @@ export default function Step5_Comparison() {
   const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
   const rps_net_6_15 = annualOperatingProfit + rps_pmt;
 
-  // RPS 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const rps_final_profit =
     self_final_profit - rps_interest_only * 5 - Math.abs(rps_pmt) * 10;
 
@@ -138,18 +137,16 @@ export default function Step5_Comparison() {
   const fac_net_1 = annualOperatingProfit - fac_interest_only;
   const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
-  // 팩토링 최종 수익 (자가자본 20년 누적에서 대출금 상환액 차감)
   const fac_final_profit =
     self_final_profit - fac_interest_only * 1 - Math.abs(fac_pmt) * 9;
 
   // ==========================================================================
-  // [D] 임대형 (수정됨)
+  // [D] 임대형
   // ==========================================================================
-  // 1. 한국전력 판매 (20%): 3.64 및 config 단가 적용
+  // [수정] 365일 고정 공식 적용
   const rental_revenue_part1 =
     store.capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365;
 
-  // 2. 임대료 (80%): config 단가 적용
   const rental_revenue_part2 =
     store.capacityKw * 0.8 * config.rental_price_per_kw;
 
@@ -157,7 +154,7 @@ export default function Step5_Comparison() {
   const rental_final_profit = rental_revenue_yr * 20;
 
   // ==========================================================================
-  // [E] 구독형 (수정됨)
+  // [E] 구독형
   // ==========================================================================
   const price_standard = 210.5;
   const price_sub_self = config.sub_price_self;
@@ -170,11 +167,12 @@ export default function Step5_Comparison() {
   const sub_final_profit = sub_revenue_yr * 20;
 
   // ==========================================================================
-  // [F] 1 REC (1000kW 기준) - 영업이익 기준
+  // [F] 1 REC (1000kW 기준)
   // ==========================================================================
   const CONST_H18 = 80;
   const rec_1000_common = annualOperatingProfit / CONST_H18 / 1000;
-  const rec_1000_rent = (initialAnnualGen * 0.2) / 1000;
+  // 임대형 1 REC: (용량 * 0.2 * 3.64 * 365) / 1000 (365일 고정)
+  const rec_1000_rent = (store.capacityKw * 0.2 * 3.64 * 365) / 1000;
   const rec_1000_sub = sub_revenue_yr / CONST_H18 / 1000;
 
   // ----------------------------------------------------------------
@@ -208,7 +206,7 @@ export default function Step5_Comparison() {
 
   let aiRecommendation = '';
   if (bestProfitModel.id === 'self') {
-    aiRecommendation = `사장님의 경우 [자가자본 투자] 시 20년 기준 가장 높은 수익(${(
+    aiRecommendation = `[자가자본 투자] 시 20년 기준 가장 높은 수익(${(
       bestProfitModel.profit / 100000000
     ).toFixed(1)}억원)이 예상됩니다.`;
   } else if (bestProfitModel.invest === 0) {
@@ -218,9 +216,9 @@ export default function Step5_Comparison() {
       bestProfitModel.profit / 100000000
     ).toFixed(1)}억원으로 가장 높은 수익률을 보입니다.`;
   }
-  const comparisonText = `(투자비 없는 모델 대비 +${(
-    profitDiff / 100000000
-  ).toFixed(1)}억 이득)`;
+  const comparisonText = `(무투자 모델 대비 +${(profitDiff / 100000000).toFixed(
+    1
+  )}억 이득)`;
 
   return (
     <div className="mt-8">
@@ -270,20 +268,19 @@ export default function Step5_Comparison() {
             <tr>
               <td className={styles.rowHeader}>초기 투자비</td>
               <td className={styles.valBold}>
-                {Math.round(totalInvestment / 1000).toLocaleString()} 천원
+                {toCheon(totalInvestment)} 천원
                 <br />
                 <span className="text-[10px] text-blue-300">(자부담 100%)</span>
               </td>
               <td className={styles.val}>
-                {Math.round(totalInvestment / 1000).toLocaleString()} 천원
+                {toCheon(totalInvestment)} 천원
                 <br />
                 <span className="text-[10px] text-blue-600">
-                  (자부담 20% : {Math.round(rps_equity / 1000).toLocaleString()}
-                  )
+                  (자부담 20% : {toCheon(rps_equity)})
                 </span>
               </td>
               <td className={styles.val}>
-                {Math.round(totalInvestment / 1000).toLocaleString()} 천원
+                {toCheon(totalInvestment)} 천원
                 <br />
                 <span className="text-[10px] text-blue-600">(자부담 0%)</span>
               </td>
@@ -294,37 +291,24 @@ export default function Step5_Comparison() {
             {/* 2. 연간 수입 (Gross) */}
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowHeader}>연간 수입 (Gross)</td>
-              <td className={styles.val}>
-                {Math.round(annualGrossRevenue / 1000).toLocaleString()} 천원
-              </td>
-              <td className={styles.val}>
-                {Math.round(annualGrossRevenue / 1000).toLocaleString()} 천원
-              </td>
-              <td className={styles.val}>
-                {Math.round(annualGrossRevenue / 1000).toLocaleString()} 천원
-              </td>
-              <td className={styles.val}>
-                {Math.round(rental_revenue_yr / 1000).toLocaleString()} 천원
-              </td>
-              <td className={styles.val}>
-                {Math.round(sub_revenue_yr / 1000).toLocaleString()} 천원
-              </td>
+              <td className={styles.val}>{toCheon(annualGrossRevenue)} 천원</td>
+              <td className={styles.val}>{toCheon(annualGrossRevenue)} 천원</td>
+              <td className={styles.val}>{toCheon(annualGrossRevenue)} 천원</td>
+              <td className={styles.val}>{toCheon(rental_revenue_yr)} 천원</td>
+              <td className={styles.val}>{toCheon(sub_revenue_yr)} 천원</td>
             </tr>
 
             {/* 2-1. O&M 비용 */}
             <tr className={styles.rowDetail}>
               <td className={styles.rowLabel}>O&M (유지보수비)</td>
               <td className={styles.valRed}>
-                -{Math.round(annualMaintenanceCost / 1000).toLocaleString()}{' '}
-                천원
+                -{toCheon(annualMaintenanceCost)} 천원
               </td>
               <td className={styles.valRed}>
-                -{Math.round(annualMaintenanceCost / 1000).toLocaleString()}{' '}
-                천원
+                -{toCheon(annualMaintenanceCost)} 천원
               </td>
               <td className={styles.valRed}>
-                -{Math.round(annualMaintenanceCost / 1000).toLocaleString()}{' '}
-                천원
+                -{toCheon(annualMaintenanceCost)} 천원
               </td>
               <td className={styles.val}>-</td>
               <td className={styles.val}>-</td>
@@ -336,29 +320,23 @@ export default function Step5_Comparison() {
                 연간 영업이익 (Net)
               </td>
               <td className={styles.valBlue}>
-                {Math.round(annualOperatingProfit / 1000).toLocaleString()} 천원
+                {toCheon(annualOperatingProfit)} 천원
               </td>
               <td className={styles.valBlue}>
-                {Math.round(annualOperatingProfit / 1000).toLocaleString()} 천원
+                {toCheon(annualOperatingProfit)} 천원
               </td>
               <td className={styles.valBlue}>
-                {Math.round(annualOperatingProfit / 1000).toLocaleString()} 천원
+                {toCheon(annualOperatingProfit)} 천원
               </td>
-              <td className={styles.val}>
-                {Math.round(rental_revenue_yr / 1000).toLocaleString()} 천원
-              </td>
-              <td className={styles.val}>
-                {Math.round(sub_revenue_yr / 1000).toLocaleString()} 천원
-              </td>
+              <td className={styles.val}>{toCheon(rental_revenue_yr)} 천원</td>
+              <td className={styles.val}>{toCheon(sub_revenue_yr)} 천원</td>
             </tr>
 
             {/* 3. 금융 비용 */}
             <tr className={styles.rowDetail}>
               <td className={styles.rowLabel}>RPS / 연 이자 (1~5년)</td>
               <td>-</td>
-              <td className={styles.valRed}>
-                -{Math.round(rps_interest_only / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valRed}>-{toCheon(rps_interest_only)}</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -366,9 +344,7 @@ export default function Step5_Comparison() {
             <tr className={styles.rowDetail}>
               <td className={styles.rowLabel}>RPS / 연 상환액 (6~15년)</td>
               <td>-</td>
-              <td className={styles.valRed}>
-                -{Math.abs(Math.round(rps_pmt / 1000)).toLocaleString()}
-              </td>
+              <td className={styles.valRed}>-{toCheon(Math.abs(rps_pmt))}</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -377,9 +353,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>팩토링 / 연 이자 (1년)</td>
               <td>-</td>
               <td>-</td>
-              <td className={styles.valRed}>
-                -{Math.round(fac_interest_only / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valRed}>-{toCheon(fac_interest_only)}</td>
               <td>-</td>
               <td>-</td>
             </tr>
@@ -387,9 +361,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>팩토링 / 연 상환액 (2~10년)</td>
               <td>-</td>
               <td>-</td>
-              <td className={styles.valRed}>
-                -{Math.abs(Math.round(fac_pmt / 1000)).toLocaleString()}
-              </td>
+              <td className={styles.valRed}>-{toCheon(Math.abs(fac_pmt))}</td>
               <td>-</td>
               <td>-</td>
             </tr>
@@ -398,9 +370,7 @@ export default function Step5_Comparison() {
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowLabel}>RPS / 순수익 (1~5년)</td>
               <td className={styles.val}>-</td>
-              <td className={styles.valBlue}>
-                {Math.round(rps_net_1_5 / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valBlue}>{toCheon(rps_net_1_5)}</td>
               <td className={styles.val}>-</td>
               <td>-</td>
               <td>-</td>
@@ -408,9 +378,7 @@ export default function Step5_Comparison() {
             <tr className={styles.rowDetail}>
               <td className={styles.rowLabel}>RPS / 순수익 (6~15년)</td>
               <td className={styles.val}>-</td>
-              <td className={styles.valBlue}>
-                {Math.round(rps_net_6_15 / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valBlue}>{toCheon(rps_net_6_15)}</td>
               <td className={styles.val}>-</td>
               <td>-</td>
               <td>-</td>
@@ -419,9 +387,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>팩토링 / 순수익 (1년)</td>
               <td className={styles.val}>-</td>
               <td className={styles.val}>-</td>
-              <td className={styles.valBlue}>
-                {Math.round(fac_net_1 / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valBlue}>{toCheon(fac_net_1)}</td>
               <td>-</td>
               <td>-</td>
             </tr>
@@ -429,9 +395,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>팩토링 / 순수익 (2~10년)</td>
               <td className={styles.val}>-</td>
               <td className={styles.val}>-</td>
-              <td className={styles.valBlue}>
-                {Math.round(fac_net_2_10 / 1000).toLocaleString()}
-              </td>
+              <td className={styles.valBlue}>{toCheon(fac_net_2_10)}</td>
               <td>-</td>
               <td>-</td>
             </tr>

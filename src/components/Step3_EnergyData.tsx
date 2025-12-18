@@ -22,6 +22,7 @@ export default function Step3_EnergyData() {
     }
   };
 
+  // [수정] 2025년(평년) 기준으로 1년 365일 고정 (2월 28일)
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // [Helper] 콤마 제거 후 스토어 업데이트
@@ -36,11 +37,8 @@ export default function Step3_EnergyData() {
       | 'baseBill',
     value: string
   ) => {
-    // 콤마(,)를 모두 제거하고 숫자로 변환
     const rawValue = value.replace(/,/g, '');
     const numValue = Number(rawValue);
-
-    // 숫자가 아니면(NaN) 무시, 맞으면 업데이트
     if (!isNaN(numValue)) {
       store.updateMonthlyData(month, field, numValue);
     }
@@ -58,7 +56,7 @@ export default function Step3_EnergyData() {
   const dynamicPeakRatio =
     totalUsageInput > 0 ? totalSelfConsumptionInput / totalUsageInput : 0;
 
-  // 2. 데이터 계산
+  // 2. 데이터 계산 (365일 기준)
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
@@ -66,18 +64,15 @@ export default function Step3_EnergyData() {
     // 자동 계산값
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
 
-    // 수기 입력값이 있으면 그것을 사용, 없으면(0이면) 자동 계산값 사용
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
 
-    // 잉여전력 계산: 마이너스 허용
     const surplusPower = solarGeneration - data.selfConsumption;
 
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
 
-    // 피크치 입력 여부에 따른 기본요금 절감
     let baseBillSavings = 0;
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
@@ -92,13 +87,12 @@ export default function Step3_EnergyData() {
     const afterBill = Math.max(0, data.totalBill - totalSavings);
     const unitPriceSell = store.unitPriceSell || 192.79;
 
-    // 잉여 수익
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {
       ...data,
-      solarGeneration, // 최종 계산된(또는 입력된) 발전량
-      autoSolarGen, // UI 표시용
+      solarGeneration,
+      autoSolarGen,
       surplusPower,
       maxLoadSavings,
       baseBillSavings,
@@ -138,11 +132,9 @@ export default function Step3_EnergyData() {
     }
   );
 
-  // (1) 기존 전기요금 절감율
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
 
-  // (2) 최대부하비율
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
 
@@ -301,8 +293,6 @@ export default function Step3_EnergyData() {
                 <tr key={row.month} className={styles.tableRow}>
                   <td className={styles.stickyCol}>{row.month}</td>
 
-                  {/* --- 입력 필드들 (type="text", value에 toLocaleString 적용) --- */}
-
                   {/* 사용량 */}
                   <td>
                     <input
@@ -312,6 +302,7 @@ export default function Step3_EnergyData() {
                       onChange={(e) =>
                         handleInputChange(row.month, 'usageKwh', e.target.value)
                       }
+                      onFocus={(e) => e.target.select()} // 전체 선택
                       placeholder="0"
                     />
                   </td>
@@ -333,6 +324,7 @@ export default function Step3_EnergyData() {
                           e.target.value
                         )
                       }
+                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
@@ -346,6 +338,7 @@ export default function Step3_EnergyData() {
                       onChange={(e) =>
                         handleInputChange(row.month, 'peakKw', e.target.value)
                       }
+                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
@@ -374,6 +367,7 @@ export default function Step3_EnergyData() {
                           e.target.value
                         )
                       }
+                      onFocus={(e) => e.target.select()}
                     />
                   </td>
 
@@ -397,6 +391,7 @@ export default function Step3_EnergyData() {
                           e.target.value
                         )
                       }
+                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
@@ -410,6 +405,7 @@ export default function Step3_EnergyData() {
                       onChange={(e) =>
                         handleInputChange(row.month, 'baseBill', e.target.value)
                       }
+                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                     />
                   </td>
@@ -507,7 +503,6 @@ export default function Step3_EnergyData() {
             marginTop: '1rem',
           }}
         >
-          {/* 1. 최대부하 비율 (Blue) */}
           <div
             className={styles.savingRateBadge}
             style={{ backgroundColor: '#e0f2fe', color: '#0284c7' }}
@@ -518,7 +513,6 @@ export default function Step3_EnergyData() {
             </span>
           </div>
 
-          {/* 2. 기존 전기요금 절감율 (Pink) */}
           <div className={styles.savingRateBadge}>
             기존 전기요금 절감율{' '}
             <span style={{ marginLeft: '0.5rem' }}>
