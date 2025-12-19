@@ -102,7 +102,7 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
   // Actions
   const handleLoad = async (id: number) => {
     if (
-      confirm('이 견적서를 불러오시겠습니까? \n(작성 중인 내용은 사라집니다)')
+      confirm('이 분석자료를 불러오시겠습니까? \n(작성 중인 내용은 사라집니다)')
     ) {
       await loadProposal(id);
       onClose();
@@ -402,7 +402,7 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
             <div
               style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}
             >
-              <p>저장된 견적서가 없습니다.</p>
+              <p>저장된 분석자료가 없습니다.</p>
             </div>
           ) : (
             renderTree(tree)

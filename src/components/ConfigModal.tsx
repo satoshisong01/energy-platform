@@ -28,8 +28,8 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   const handleSave = async () => {
-    const defaultName = store.proposalName || `${store.clientName} 견적서`;
-    const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
+    const defaultName = store.proposalName || `${store.clientName} 분석자료`;
+    const name = window.prompt('분석자료 저장 이름을 입력해주세요:', defaultName);
 
     if (name !== null) {
       const finalName = name.trim() === '' ? defaultName : name;

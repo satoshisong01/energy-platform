@@ -495,7 +495,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       state.proposalId || undefined
     );
     if (isDuplicate) {
-      alert('❌ 이미 같은 이름의 견적서가 존재합니다.');
+      alert('❌ 이미 같은 이름의 분석자료가 존재합니다.');
       return false;
     }
 
@@ -570,7 +570,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const isDuplicate = await get().checkDuplicateName(customName);
     if (isDuplicate) {
       alert(
-        '❌ 이미 같은 이름의 견적서가 존재합니다. 다른 이름을 사용해주세요.'
+        '❌ 이미 같은 이름의 분석자료가 존재합니다. 다른 이름을 사용해주세요.'
       );
       return false;
     }

@@ -30,7 +30,7 @@ export default function Home() {
   const handleReset = () => {
     if (
       confirm(
-        '작성 중인 내용이 모두 사라집니다.\n새로운 견적서를 작성하시겠습니까?'
+        '작성 중인 내용이 모두 사라집니다.\n새로운 분석자료를 작성하시겠습니까?'
       )
     ) {
       store.resetProposal();
@@ -41,7 +41,7 @@ export default function Home() {
   // [기존] 저장 (덮어쓰기 or 신규)
   const handleSave = async () => {
     const defaultName = store.proposalName || store.getProposalFileName();
-    const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
+    const name = window.prompt('분석자료 저장 이름을 입력해주세요:', defaultName);
 
     if (name !== null) {
       const finalName = name.trim() === '' ? defaultName : name;
