@@ -5,22 +5,14 @@ import { useProposalStore } from '../../lib/store';
 import styles from '../PreviewPanel.module.css';
 import { LucideBriefcase } from 'lucide-react';
 
-// [Helper] 반올림
-const round2 = (num: number) => Math.round(num * 100) / 100;
-
 export default function PreviewFinancialTable() {
   const store = useProposalStore();
   const { config, truckCount, selectedModel, moduleTier, useEc } = store;
 
-  // [핵심] 스토어 계산 함수 호출 -> Step 4와 값 동일
+  // [핵심] 스토어 계산 함수 호출
   const results = store.getSimulationResults();
 
-  // UI 표시용 변수 (results에서 꺼내 씀)
-  const isEul = store.contractType.includes('(을)');
-
-  // 투자비 세부 항목 (results에는 합계만 있으므로, 상세는 여기서 재계산 혹은 store에서 가져와도 됨)
-  // store.recalculateInvestment()가 실행된 상태라면 store.totalInvestment 등에 값이 있지만,
-  // 안전하게 여기서 상세 항목만 다시 계산해서 보여줍니다.
+  // 투자비 세부 항목 계산
   let solarPrice = config.price_solar_standard;
   if (moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
   if (moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
@@ -44,6 +36,16 @@ export default function PreviewFinancialTable() {
   let appliedSellPrice = config.unit_price_kepco;
   if (selectedModel === 'RE100') appliedSellPrice = config.unit_price_ec_1_5;
   if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
+
+  const isEul = store.contractType.includes('(을)');
+
+  // [수정] ROI (총 수익률) 계산 로직 - Step 4와 동일하게 맞춤
+  // 총비용 = 초기투자비 + (연간유지비 * 20년)
+  // 총수익 = 20년 순수익 (이미 비용 차감된 값) -> 따라서 수익률 = (순수익 / 총비용) * 100
+  const totalCost20 =
+    results.totalInvestment + results.annualMaintenanceCost * 20;
+  const profitRate =
+    totalCost20 > 0 ? (results.self_final_profit / totalCost20) * 100 : 0;
 
   return (
     <div className={styles.financialSection}>
@@ -117,14 +119,12 @@ export default function PreviewFinancialTable() {
             <td colSpan={4} className={styles.textRight}>
               초기 투자비 합계
             </td>
-            {/* store 계산 결과 사용 */}
             <td>{results.totalInvestmentUk.toFixed(2)}</td>
           </tr>
           <tr className={styles.bgTotal} style={{ backgroundColor: '#334155' }}>
             <td colSpan={4} className={styles.textRight}>
               20년 투자총액 (유지보수 포함)
             </td>
-            {/* 20년 투자비 = 초기비 + (연간운영비 * 20) / 1억 */}
             <td>
               {(
                 results.totalInvestmentUk +
@@ -169,7 +169,6 @@ export default function PreviewFinancialTable() {
               ② 잉여 한전 판매 수익
             </td>
             <td className={styles.bgPinkRow}>
-              {/* 한전 판매 물량 = 총 잉여 - EC 운반량 (KEPCO모델이면 총 잉여) */}
               {selectedModel === 'KEPCO'
                 ? Math.round(results.annualSurplus).toLocaleString()
                 : Math.round(results.volume_surplus_final).toLocaleString()}
@@ -253,12 +252,8 @@ export default function PreviewFinancialTable() {
         </div>
         <div className={styles.finalMetricBox}>
           <span className={styles.finalLabel}>총 수익률(ROI)</span>
-          {/* 자가자본 기준 ROI */}
-          <span className={styles.finalValue}>
-            {results.self_roi_years > 0
-              ? (100 / results.self_roi_years).toFixed(1)
-              : 0}
-          </span>
+          {/* [수정] 20년 총 수익률 표시 */}
+          <span className={styles.finalValue}>{profitRate.toFixed(1)}</span>
           <span className={styles.finalUnit}>%</span>
         </div>
       </div>
