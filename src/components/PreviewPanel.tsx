@@ -226,7 +226,7 @@ export default function PreviewPanel() {
         <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
-        <div style={{ height: '100%' }}></div>
+        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={5} />
       </div>
 
@@ -235,7 +235,7 @@ export default function PreviewPanel() {
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
         </div>
-        <div style={{ height: '100%' }}></div>
+        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={6} />
       </div>
 
@@ -254,7 +254,7 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
-        <div style={{ height: '100%' }}></div>
+        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={7} />
       </div>
     </div>
