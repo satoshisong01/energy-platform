@@ -9,6 +9,7 @@ import {
   LucideSave,
   LucideFolderOpen,
   LucideFilePlus,
+  LucideCopy, // [NEW] 아이콘 추가
 } from 'lucide-react';
 
 import Step1_BasicInfo from '../src/components/Step1_BasicInfo';
@@ -37,17 +38,31 @@ export default function Home() {
     }
   };
 
-  // [수정된 부분] 저장 핸들러
+  // [기존] 저장 (덮어쓰기 or 신규)
   const handleSave = async () => {
-    // 1. 이미 저장된 이름이 있으면 그걸 쓰고, 없으면 규칙에 따라 자동 생성
     const defaultName = store.proposalName || store.getProposalFileName();
-
-    // 2. 사용자에게 확인 (자동 생성된 이름을 기본값으로 보여줌)
     const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
 
     if (name !== null) {
       const finalName = name.trim() === '' ? defaultName : name;
       await store.saveProposal(finalName);
+    }
+  };
+
+  // [NEW] 다른 이름으로 저장 (복제)
+  const handleSaveAs = async () => {
+    // 현재 이름 뒤에 _v2 등을 붙여서 제안
+    const baseName = store.proposalName || store.getProposalFileName();
+    const defaultNewName = `${baseName}_copy`;
+
+    const name = window.prompt(
+      '새로운 파일 이름을 입력해주세요 (다른 이름으로 저장):',
+      defaultNewName
+    );
+
+    if (name !== null) {
+      const finalName = name.trim() === '' ? defaultNewName : name;
+      await store.saveAsProposal(finalName);
     }
   };
 
@@ -98,10 +113,21 @@ export default function Home() {
               >
                 <LucideFolderOpen size={20} />
               </button>
+
+              {/* [NEW] 다른 이름으로 저장 버튼 */}
+              <button
+                onClick={handleSaveAs}
+                className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700 transition shadow-sm"
+                title="다른 이름으로 저장 (복제)"
+              >
+                <LucideCopy size={16} /> 복제
+              </button>
+
+              {/* 기존 저장 버튼 */}
               <button
                 onClick={handleSave}
                 className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-700 transition shadow-sm"
-                title="현재 내용 저장"
+                title="현재 내용 저장 (덮어쓰기)"
               >
                 <LucideSave size={16} /> 저장
               </button>

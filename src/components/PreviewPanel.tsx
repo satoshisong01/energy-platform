@@ -179,7 +179,7 @@ export default function PreviewPanel() {
         <div style={{ width: '100%', marginTop: '20px' }}>
           <PreviewSummary />
         </div>
-        <div style={{ height: '100%' }}></div>
+        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={1} />
       </div>
 
@@ -193,6 +193,7 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
+        <p>　</p>
         <div style={{ height: '100%' }}></div>
         <PageFooter page={2} />
       </div>
@@ -208,6 +209,8 @@ export default function PreviewPanel() {
             totalBenefit={totalBenefit}
           />
         </div>
+        <p>　</p>
+        <p>　</p>
         <div style={{ height: '100%' }}></div>
         <PageFooter page={3} />
       </div>
@@ -217,7 +220,7 @@ export default function PreviewPanel() {
         <div style={{ width: '100%' }}>
           <PreviewFinancialTable />
         </div>
-        <div style={{ height: '100%' }}></div>
+        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={4} />
       </div>
 
@@ -227,6 +230,7 @@ export default function PreviewPanel() {
           <PreviewModelVisual />
         </div>
         {/* <div style={{ height: '100%' }}></div> */}
+        <p>　</p>
         <PageFooter page={5} />
       </div>
 

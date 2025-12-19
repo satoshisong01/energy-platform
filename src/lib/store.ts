@@ -13,7 +13,7 @@ export type RoofArea = {
 
 export type MonthlyData = {
   month: number;
-  year?: number;
+  year?: number; // [NEW] 엑셀 업로드 시 연도 저장을 위해 추가
   usageKwh: number;
   selfConsumption: number;
   totalBill: number;
@@ -120,6 +120,7 @@ type SimulationResult = {
   rec_1000_rent: number;
   rec_1000_sub: number;
 
+  // [NEW] 연간 REC 수익
   rec_annual_common: number;
   rec_annual_rent: number;
   rec_annual_sub: number;
@@ -159,6 +160,8 @@ interface ProposalState {
   maintenanceRate: number;
   degradationRate: number;
   totalInvestment: number;
+
+  // [NEW] REC 평균 가격
   recAveragePrice: number;
 
   // --- Actions ---
@@ -185,9 +188,12 @@ interface ProposalState {
     field: keyof MonthlyData,
     value: number
   ) => void;
-  setMonthlyData: (data: MonthlyData[]) => void; // 전체 데이터 교체용
+
+  // [NEW] 엑셀 업로드 및 일괄 적용용
+  setMonthlyData: (data: MonthlyData[]) => void;
   copyJanToAll: () => void;
-  copyFieldToAll: (field: keyof MonthlyData) => void; // 특정 필드 일괄 복사
+  copyFieldToAll: (field: keyof MonthlyData) => void;
+
   setEnergyNote: (note: string) => void;
   updateRationalization: (
     field: keyof RationalizationData,
@@ -202,15 +208,19 @@ interface ProposalState {
     value: string | number
   ) => void;
   recalculateInvestment: () => void;
+
+  // [NEW] 용량 수동 설정 및 REC 가격 설정
   setCapacityKw: (val: number) => void;
   setRecAveragePrice: (price: number) => void;
 
-  // [NEW] 자동 생성 파일명 Getter
+  // [NEW] 파일명 자동 생성 Getter
   getProposalFileName: () => string;
 
   // DB Actions
   checkDuplicateName: (name: string, excludeId?: number) => Promise<boolean>;
   saveProposal: (customName?: string) => Promise<boolean>;
+  // [NEW] 다른 이름으로 저장
+  saveAsProposal: (customName: string) => Promise<boolean>;
   renameProposal: (id: number, newName: string) => Promise<boolean>;
   fetchProposalList: () => Promise<ProposalMeta[]>;
   loadProposal: (id: number) => Promise<void>;
@@ -305,7 +315,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   maintenanceRate: 25.0,
   degradationRate: 0.5,
   totalInvestment: 0,
-  recAveragePrice: 80,
+  recAveragePrice: 80, // [NEW] 초기값
 
   // --- Actions ---
   setClientName: (name) => set({ clientName: name }),
@@ -348,7 +358,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         d.month === month ? { ...d, [field]: value } : d
       ),
     })),
+
+  // [NEW] 전체 데이터 교체 (엑셀 업로드용)
   setMonthlyData: (data) => set({ monthlyData: data }),
+
   copyJanToAll: () =>
     set((state) => {
       const jan = state.monthlyData[0];
@@ -367,6 +380,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return { monthlyData: newData };
     }),
+
+  // [NEW] 특정 필드 일괄 복사
   copyFieldToAll: (field) =>
     set((state) => {
       const firstVal = state.monthlyData[0][field];
@@ -375,6 +390,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return { monthlyData: newData };
     }),
+
   setEnergyNote: (note) => set({ energyNote: note }),
   updateRationalization: (field, value) =>
     set((state) => ({
@@ -425,28 +441,26 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
     set({ totalInvestment: solarCost + ecCost + tractorCost + platformCost });
   },
+
+  // [NEW] 용량 및 REC 가격 설정
   setCapacityKw: (val) => {
     set({ capacityKw: val });
     get().recalculateInvestment();
   },
   setRecAveragePrice: (price) => set({ recAveragePrice: price }),
 
-  // [NEW] 제안서 파일명 자동 생성 함수
+  // [NEW] 자동 파일명 생성
   getProposalFileName: () => {
     const state = get();
-    // 1. 날짜 (YYMMDD)
     const date = new Date();
     const yy = String(date.getFullYear()).slice(2);
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     const dateStr = `${yy}${mm}${dd}`;
 
-    // 2. EC 파트 (선택 시에만 표시)
     const isEcActive = state.useEc && state.selectedModel !== 'KEPCO';
     const ecPart = isEcActive ? `_EC${state.truckCount}대` : '';
 
-    // 3. 최종 조합
-    // 예: 분석자료_(주)대림풍력_389kW_EC3대_251219
     return `분석자료_${state.clientName}_${state.capacityKw}kW${ecPart}_${dateStr}`;
   },
 
@@ -469,8 +483,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
   saveProposal: async (customName) => {
     const state = get();
-
-    // [수정] customName이 없으면 getProposalFileName()으로 기본값 생성
     const defaultName = get().getProposalFileName();
     const finalName = customName || state.proposalName || defaultName;
 
@@ -541,6 +553,68 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return true;
     } catch (error: any) {
       console.error('저장 실패:', error);
+      alert(`저장 실패: ${error.message}`);
+      return false;
+    }
+  },
+
+  // [NEW] 다른 이름으로 저장 (복제)
+  saveAsProposal: async (customName) => {
+    const state = get();
+
+    const isDuplicate = await get().checkDuplicateName(customName);
+    if (isDuplicate) {
+      alert(
+        '❌ 이미 같은 이름의 견적서가 존재합니다. 다른 이름을 사용해주세요.'
+      );
+      return false;
+    }
+
+    const saveData = {
+      clientName: state.clientName,
+      targetDate: state.targetDate,
+      address: state.address,
+      roofAreas: state.roofAreas,
+      monthlyData: state.monthlyData,
+      contractType: state.contractType,
+      baseRate: state.baseRate,
+      unitPriceSavings: state.unitPriceSavings,
+      energyNote: state.energyNote,
+      rationalization: state.rationalization,
+      selectedModel: state.selectedModel,
+      moduleTier: state.moduleTier,
+      useEc: state.useEc,
+      truckCount: state.truckCount,
+      maintenanceRate: state.maintenanceRate,
+      degradationRate: state.degradationRate,
+      config: state.config,
+      tariffPresets: state.tariffPresets,
+      recAveragePrice: state.recAveragePrice,
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('proposals')
+        .insert({
+          client_name: state.clientName,
+          proposal_name: customName,
+          address: state.address,
+          input_data: saveData,
+          status: 'completed',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        set({ proposalId: data.id, proposalName: customName });
+        alert(`✅ '${customName}'(으)로 복제 저장되었습니다.`);
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      console.error('다른 이름으로 저장 실패:', error);
       alert(`저장 실패: ${error.message}`);
       return false;
     }
@@ -797,7 +871,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
+    // 10. 1 REC & REC Annual Revenue
     const recPrice = state.recAveragePrice || 80;
+
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * 0.2 * 3.64 * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
@@ -850,9 +926,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       rec_1000_common,
       rec_1000_rent,
       rec_1000_sub,
+
+      // 반환값에 추가
       rec_annual_common,
       rec_annual_rent,
       rec_annual_sub,
+
       self_roi_years,
       rps_roi_years,
       fac_roi_years,

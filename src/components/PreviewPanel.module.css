@@ -451,3 +451,16 @@
     display: none !important;
   }
 }
+
+/* [수정] 페이지 하단 번호/제목 영역 */
+.pageFooter {
+  /* 1. 웹 화면(프리뷰)에서는 아예 숨김 */
+  display: none;
+}
+
+/* 2. 인쇄(PDF 저장) 시에만 보이도록 설정 */
+@media print {
+  .pageFooter {
+    display: flex; /* 인쇄 모드에서만 flex로 표시 */
+  }
+}
