@@ -1,4 +1,3 @@
-// 4. Step4_Simulation.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -75,7 +74,7 @@ export default function Step4_Simulation() {
   // 합리화 절감액 (KEPCO 모델은 미사용, 그 외는 사용)
   // 1. 기본료 절감액 (자동 계산: 차이 * 300 * 12)
   const diff_base = rationalization.base_eul - rationalization.base_gap;
-  const saving_base = diff_base * 300 * 12; // [수정] 요청하신 고정 공식 적용
+  const saving_base = diff_base * 300 * 12;
 
   // 2. 전력량 요금 절감액
   const diff_light = rationalization.light_eul - rationalization.light_gap;
@@ -387,7 +386,7 @@ export default function Step4_Simulation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* [수정됨] 기본료 행: 자동 계산 적용 */}
+                  {/* 기본료 행 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       기본료
@@ -411,6 +410,7 @@ export default function Step4_Simulation() {
                     </td>
                   </tr>
 
+                  {/* 경부하 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       경부하
@@ -436,6 +436,7 @@ export default function Step4_Simulation() {
                       {Math.round(saving_light).toLocaleString()}
                     </td>
                   </tr>
+                  {/* 중간부하 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       중간부하
@@ -461,6 +462,7 @@ export default function Step4_Simulation() {
                       {Math.round(saving_mid).toLocaleString()}
                     </td>
                   </tr>
+                  {/* 최대부하 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       최대부하
@@ -670,10 +672,11 @@ export default function Step4_Simulation() {
                 </span>
               </div>
               <div className={`${styles.row} ${styles.bgPink}`}>
+                {/* [수정됨] 잉여 전력량 표시를 'net surplus (raw - ec)'로 변경 */}
                 <span className={styles.dLabel}>잉여 전력량 (년)</span>
                 <span>
                   <span className={styles.dVal}>
-                    {Math.round(rawSurplus).toLocaleString()}
+                    {Math.round(volume_surplus).toLocaleString()}
                   </span>{' '}
                   kWh
                 </span>
