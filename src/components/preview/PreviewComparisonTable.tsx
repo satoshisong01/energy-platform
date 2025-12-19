@@ -4,8 +4,8 @@ import React from 'react';
 import { useProposalStore } from '../../lib/store';
 import styles from './PreviewComparisonTable.module.css';
 
-// [Helper] 천원 단위 변환
-const toCheon = (val: number) => Math.round(val / 1000).toLocaleString();
+// [Helper] 원 단위 변환 (반올림 + 콤마)
+const toWon = (val: number) => Math.round(val).toLocaleString();
 
 export default function PreviewComparisonTable() {
   const store = useProposalStore();
@@ -83,17 +83,17 @@ export default function PreviewComparisonTable() {
             <tr>
               <td className={styles.rowHeader}>초기 투자비</td>
               <td className={styles.valBold}>
-                {toCheon(results.totalInvestment)} 천원
+                {toWon(results.totalInvestment)} 원
                 <br />
                 <span className="text-[9px] text-blue-300">(자부담 100%)</span>
               </td>
               <td className={styles.val}>
-                {toCheon(results.totalInvestment)} 천원
+                {toWon(results.totalInvestment)} 원
                 <br />
                 <span className="text-[9px] text-blue-600">(자부담 20%)</span>
               </td>
               <td className={styles.val}>
-                {toCheon(results.totalInvestment)} 천원
+                {toWon(results.totalInvestment)} 원
                 <br />
                 <span className="text-[9px] text-blue-600">(자부담 0%)</span>
               </td>
@@ -105,33 +105,31 @@ export default function PreviewComparisonTable() {
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowHeader}>연간 수입 (Gross)</td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {toWon(results.annualGrossRevenue)} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {toWon(results.annualGrossRevenue)} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {toWon(results.annualGrossRevenue)} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.rental_revenue_yr)} 천원
+                {toWon(results.rental_revenue_yr)} 원
               </td>
-              <td className={styles.val}>
-                {toCheon(results.sub_revenue_yr)} 천원
-              </td>
+              <td className={styles.val}>{toWon(results.sub_revenue_yr)} 원</td>
             </tr>
 
             {/* O&M */}
             <tr>
               <td className={styles.rowLabel}>O&M (유지보수비)</td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{toWon(results.annualMaintenanceCost)} 원
               </td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{toWon(results.annualMaintenanceCost)} 원
               </td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{toWon(results.annualMaintenanceCost)} 원
               </td>
               <td className={styles.val}>-</td>
               <td className={styles.val}>-</td>
@@ -143,20 +141,18 @@ export default function PreviewComparisonTable() {
                 연간 영업이익(Net)
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {toWon(results.annualOperatingProfit)} 원
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {toWon(results.annualOperatingProfit)} 원
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {toWon(results.annualOperatingProfit)} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.rental_revenue_yr)} 천원
+                {toWon(results.rental_revenue_yr)} 원
               </td>
-              <td className={styles.val}>
-                {toCheon(results.sub_revenue_yr)} 천원
-              </td>
+              <td className={styles.val}>{toWon(results.sub_revenue_yr)} 원</td>
             </tr>
 
             {/* 4. 금융 비용 */}
@@ -164,7 +160,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.rowLabel}>RPS / 연 이자 (1~5년)</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(results.rps_interest_only)}
+                -{toWon(results.rps_interest_only)} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -174,7 +170,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.rowLabel}>RPS / 연 상환액 (6~15년)</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(Math.abs(results.rps_pmt))}
+                -{toWon(Math.abs(results.rps_pmt))} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -185,7 +181,7 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(results.fac_interest_only)}
+                -{toWon(results.fac_interest_only)} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -195,7 +191,7 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(Math.abs(results.fac_pmt))}
+                -{toWon(Math.abs(results.fac_pmt))} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -205,7 +201,9 @@ export default function PreviewComparisonTable() {
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowLabel}>RPS / 순수익 (1~5년)</td>
               <td>-</td>
-              <td className={styles.valBlue}>{toCheon(results.rps_net_1_5)}</td>
+              <td className={styles.valBlue}>
+                {toWon(results.rps_net_1_5)} 원
+              </td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -214,7 +212,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.rowLabel}>RPS / 순수익 (6~15년)</td>
               <td>-</td>
               <td className={styles.valBlue}>
-                {toCheon(results.rps_net_6_15)}
+                {toWon(results.rps_net_6_15)} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -224,7 +222,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.rowLabel}>팩토링 / 순수익 (1년)</td>
               <td>-</td>
               <td>-</td>
-              <td className={styles.valBlue}>{toCheon(results.fac_net_1)}</td>
+              <td className={styles.valBlue}>{toWon(results.fac_net_1)} 원</td>
               <td>-</td>
               <td>-</td>
             </tr>
@@ -233,7 +231,7 @@ export default function PreviewComparisonTable() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valBlue}>
-                {toCheon(results.fac_net_2_10)}
+                {toWon(results.fac_net_2_10)} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -259,32 +257,25 @@ export default function PreviewComparisonTable() {
               </td>
             </tr>
 
-            {/* [NEW] REC 수익/연간 */}
+            {/* REC 수익/연간 */}
             <tr className="bg-white border-b-2 border-slate-300 font-bold">
               <td className={styles.rowHeader} style={{ color: '#1d4ed8' }}>
                 REC수익/연간
               </td>
-              <td className={styles.val}>{/* 공란(엑셀 참조) */}</td>
+              <td className={styles.val}>{/* 공란 */}</td>
               <td className={styles.val}>{/* 공란 */}</td>
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
-                {/* 팩토링 열에 표시 (엑셀 참조 시 우측에 몰려있음) */}
-                {results.rec_annual_common.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}
+                {toWon(results.rec_annual_common)} 원
               </td>
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
-                {results.rec_annual_rent.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}
+                {toWon(results.rec_annual_rent)} 원
               </td>
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
-                {results.rec_annual_sub.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}
+                {toWon(results.rec_annual_sub)} 원
               </td>
             </tr>
 
-            {/* 5. 최종 결과 (20년 누적) */}
+            {/* 5. 최종 결과 (20년 누적) - 여긴 억 단위가 보기 좋아서 유지 */}
             <tr className={styles.rowTotal}>
               <td>실제 수익 (20년)</td>
               <td>{(results.self_final_profit / 100000000).toFixed(2)} 억원</td>
@@ -296,12 +287,12 @@ export default function PreviewComparisonTable() {
               <td>{(results.sub_final_profit / 100000000).toFixed(2)} 억원</td>
             </tr>
 
-            {/* 20년 수익 평균치 */}
+            {/* 20년 수익 평균치 - 원 단위로 변경 */}
             <tr className="bg-slate-100 text-sm">
               <td className={styles.rowLabel}>20년 수익 평균치</td>
-              <td className={styles.val}>{toCheon(self_avg)} 천원</td>
-              <td className={styles.val}>{toCheon(rps_avg)} 천원</td>
-              <td className={styles.val}>{toCheon(fac_avg)} 천원</td>
+              <td className={styles.val}>{toWon(self_avg)} 원</td>
+              <td className={styles.val}>{toWon(rps_avg)} 원</td>
+              <td className={styles.val}>{toWon(fac_avg)} 원</td>
               <td>-</td>
               <td>-</td>
             </tr>

@@ -5,17 +5,12 @@ import { useProposalStore } from '../lib/store';
 import styles from './Step5_Comparison.module.css';
 import { LucideCheckCircle2, LucideBriefcase } from 'lucide-react';
 
-// [Helper] 천원 단위 변환
-const toCheon = (val: number) => Math.round(val / 1000).toLocaleString();
-
 export default function Step5_Comparison() {
   const store = useProposalStore();
   const { config } = store;
 
-  // [핵심] 중앙 계산 로직 호출 (모든 값을 여기서 받아옴)
   const results = store.getSimulationResults();
 
-  // AI 분석 멘트 생성
   const models = [
     {
       id: 'self',
@@ -29,7 +24,7 @@ export default function Step5_Comparison() {
       profit: results.rps_final_profit,
       invest: results.rps_equity,
     },
-    { id: 'fac', name: '팩토링', profit: results.fac_final_profit, invest: 0 }, // 팩토링은 자부담 0 가정
+    { id: 'fac', name: '팩토링', profit: results.fac_final_profit, invest: 0 },
     {
       id: 'rent',
       name: '임대형',
@@ -111,17 +106,17 @@ export default function Step5_Comparison() {
             <tr>
               <td className={styles.rowHeader}>초기 투자비</td>
               <td className={styles.valBold}>
-                {toCheon(results.totalInvestment)} 천원
+                {Math.round(results.totalInvestment).toLocaleString()} 원
                 <br />
                 <span className="text-[10px] text-blue-300">(자부담 100%)</span>
               </td>
               <td className={styles.val}>
-                {toCheon(results.totalInvestment)} 천원
+                {Math.round(results.totalInvestment).toLocaleString()} 원
                 <br />
                 <span className="text-[10px] text-blue-600">(자부담 20%)</span>
               </td>
               <td className={styles.val}>
-                {toCheon(results.totalInvestment)} 천원
+                {Math.round(results.totalInvestment).toLocaleString()} 원
                 <br />
                 <span className="text-[10px] text-blue-600">(자부담 0%)</span>
               </td>
@@ -133,19 +128,19 @@ export default function Step5_Comparison() {
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowHeader}>연간 수입 (Gross)</td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {Math.round(results.annualGrossRevenue).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {Math.round(results.annualGrossRevenue).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.annualGrossRevenue)} 천원
+                {Math.round(results.annualGrossRevenue).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.rental_revenue_yr)} 천원
+                {Math.round(results.rental_revenue_yr).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.sub_revenue_yr)} 천원
+                {Math.round(results.sub_revenue_yr).toLocaleString()} 원
               </td>
             </tr>
 
@@ -153,13 +148,13 @@ export default function Step5_Comparison() {
             <tr>
               <td className={styles.rowLabel}>O&M (유지보수비)</td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{Math.round(results.annualMaintenanceCost).toLocaleString()} 원
               </td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{Math.round(results.annualMaintenanceCost).toLocaleString()} 원
               </td>
               <td className={styles.valRed}>
-                -{toCheon(results.annualMaintenanceCost)} 천원
+                -{Math.round(results.annualMaintenanceCost).toLocaleString()} 원
               </td>
               <td className={styles.val}>-</td>
               <td className={styles.val}>-</td>
@@ -171,19 +166,19 @@ export default function Step5_Comparison() {
                 연간 영업이익(Net)
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {Math.round(results.annualOperatingProfit).toLocaleString()} 원
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {Math.round(results.annualOperatingProfit).toLocaleString()} 원
               </td>
               <td className={styles.valBlue}>
-                {toCheon(results.annualOperatingProfit)} 천원
+                {Math.round(results.annualOperatingProfit).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.rental_revenue_yr)} 천원
+                {Math.round(results.rental_revenue_yr).toLocaleString()} 원
               </td>
               <td className={styles.val}>
-                {toCheon(results.sub_revenue_yr)} 천원
+                {Math.round(results.sub_revenue_yr).toLocaleString()} 원
               </td>
             </tr>
 
@@ -192,7 +187,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>RPS / 연 이자 (1~5년)</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(results.rps_interest_only)}
+                -{Math.round(results.rps_interest_only).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -202,7 +197,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>RPS / 연 상환액 (6~15년)</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(Math.abs(results.rps_pmt))}
+                -{Math.round(Math.abs(results.rps_pmt)).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -213,7 +208,7 @@ export default function Step5_Comparison() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(results.fac_interest_only)}
+                -{Math.round(results.fac_interest_only).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -223,7 +218,7 @@ export default function Step5_Comparison() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valRed}>
-                -{toCheon(Math.abs(results.fac_pmt))}
+                -{Math.round(Math.abs(results.fac_pmt)).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -233,7 +228,9 @@ export default function Step5_Comparison() {
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowLabel}>RPS / 순수익 (1~5년)</td>
               <td>-</td>
-              <td className={styles.valBlue}>{toCheon(results.rps_net_1_5)}</td>
+              <td className={styles.valBlue}>
+                {Math.round(results.rps_net_1_5).toLocaleString()} 원
+              </td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -242,7 +239,7 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>RPS / 순수익 (6~15년)</td>
               <td>-</td>
               <td className={styles.valBlue}>
-                {toCheon(results.rps_net_6_15)}
+                {Math.round(results.rps_net_6_15).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
@@ -252,7 +249,9 @@ export default function Step5_Comparison() {
               <td className={styles.rowLabel}>팩토링 / 순수익 (1년)</td>
               <td>-</td>
               <td>-</td>
-              <td className={styles.valBlue}>{toCheon(results.fac_net_1)}</td>
+              <td className={styles.valBlue}>
+                {Math.round(results.fac_net_1).toLocaleString()} 원
+              </td>
               <td>-</td>
               <td>-</td>
             </tr>
@@ -261,7 +260,7 @@ export default function Step5_Comparison() {
               <td>-</td>
               <td>-</td>
               <td className={styles.valBlue}>
-                {toCheon(results.fac_net_2_10)}
+                {Math.round(results.fac_net_2_10).toLocaleString()} 원
               </td>
               <td>-</td>
               <td>-</td>
