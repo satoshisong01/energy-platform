@@ -12,9 +12,9 @@ import {
 
 export default function PreviewSummary() {
   const store = useProposalStore();
-  const { config, rationalization } = store;
+  const { config } = store;
 
-  // REC 값을 가져오기 위해 results 호출
+  // [핵심] Store의 중앙 계산 로직 결과 가져오기
   const results = store.getSimulationResults();
 
   const [showExpansion, setShowExpansion] = useState(false);
@@ -27,37 +27,22 @@ export default function PreviewSummary() {
   }, [store.useEc, store.selectedModel]);
 
   // ----------------------------------------------------------------
-  // 1. 기본 물량 재계산 (RE100 가정)
+  // 1. 공통 데이터 (Store 값 사용)
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
+  const re100Rate =
+    (results.initialAnnualGen /
+      store.monthlyData.reduce((acc, cur) => acc + cur.usageKwh, 0)) *
+      100 || 0;
 
-  const annualGen = store.monthlyData.reduce((acc, cur) => {
-    const days = new Date(2025, cur.month, 0).getDate();
-    return acc + capacity * 3.64 * days;
-  }, 0);
-
-  const annualSelf = store.monthlyData.reduce(
-    (acc, cur) => acc + cur.selfConsumption,
-    0
-  );
-
-  const totalUsage = store.monthlyData.reduce(
-    (acc, cur) => acc + cur.usageKwh,
-    0
-  );
-
-  const rawSurplus = Math.max(0, annualGen - annualSelf);
-
-  // ----------------------------------------------------------------
-  // 2. 공통 지표 계산
-  // ----------------------------------------------------------------
-  const re100Rate = totalUsage > 0 ? (annualGen / totalUsage) * 100 : 0;
-
+  // 전기요금 절감율 (기존 로직 유지하되 results 값 활용 가능하면 활용)
+  // 다만 절감율 계산은 월별 데이터 합산이 필요하므로 기존 로직 유지 (단, 기본료 절감액 공식은 Store와 동일해야 함)
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
     0
   );
 
+  // 절감율 계산을 위한 간단 로직 (Store와 동일하게 맞춤)
   let totalBillSavings = 0;
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
@@ -65,10 +50,12 @@ export default function PreviewSummary() {
     const solarGen = data.solarGeneration > 0 ? data.solarGeneration : autoGen;
     const selfConsum = data.selfConsumption;
 
+    // 사용량 요금 절감
     const usageSaving =
       Math.min(solarGen, selfConsum) *
       (store.unitPriceSavings || config.unit_price_savings);
 
+    // 기본요금 절감 (피크치 또는 부하율 기반)
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -95,121 +82,136 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  const isEul = store.contractType.includes('(을)');
-  const totalRationalizationSavings = isEul
-    ? rationalization.base_savings_manual +
-      (rationalization.light_eul - rationalization.light_gap) *
-        rationalization.light_usage +
-      (rationalization.mid_eul - rationalization.mid_gap) *
-        rationalization.mid_usage +
-      (rationalization.max_eul - rationalization.max_gap) *
-        rationalization.max_usage
-    : 0;
+  // ----------------------------------------------------------------
+  // 2. 시나리오 데이터 구성 (Store의 results 활용)
+  // ----------------------------------------------------------------
+  // * 참고: 현재 Store의 results는 '현재 설정된 상태' 기준의 값만 반환합니다.
+  //   따라서 '확장 플랜(REC 5.0)' 등의 비교 데이터를 보여주려면
+  //   Store 내부 로직과 동일한 계산을 여기서 일부 수행해야 합니다.
+  //   (단, 기본 플랜은 results 값을 그대로 씁니다.)
 
-  // ----------------------------------------------------------------
-  // 3. 시나리오별 계산 함수
-  // ----------------------------------------------------------------
-  const calculateScenario = (isPremium: boolean) => {
-    const targetEcPrice = isPremium
-      ? config.unit_price_ec_5_0
-      : config.unit_price_ec_1_5;
-    const modelName = isPremium ? 'REC 5.0' : 'REC 1.5';
+  const getScenarioData = (isPremium: boolean) => {
+    // A. 기본 플랜 (현재 설정 상태)
+    if (!isPremium) {
+      return {
+        title: 'TYPE A. Standard Plan (안정형)',
+        invest: results.totalInvestmentUk, // 억원 단위
+        ecCount: applyEc ? (store.truckCount > 0 ? store.truckCount : 3) : 0,
+        annualProfit: results.annualOperatingProfit / 100000000, // 억원 변환
+        totalProfit20: results.self_final_profit / 100000000, // 억원 변환
+        roiYears: results.self_roi_years,
+        profitRate:
+          (results.self_final_profit /
+            (results.totalInvestment + results.annualMaintenanceCost * 20)) *
+          100, // 대략적 수익률
+        isPro: false,
+        modelName: 'REC 1.5', // 기본
+      };
+    }
+
+    // B. 확장 플랜 (Premium / REC 5.0 가정)
+    // 여기서는 '가상 계산'이 필요하므로 간략하게직접 계산하거나, Store 구조를 바꿔야 하지만
+    // 기존 로직을 최대한 활용하여 '단가'만 바꿔서 계산합니다.
+
+    // (기존 코드의 calculateScenario 로직을 가져오되, Store와 수식 일치시킴)
+    const targetEcPrice = config.unit_price_ec_5_0; // Premium 단가
 
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
         : 3
       : 0;
-
     const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
+
+    // 물량 계산 (Store와 동일)
+    const annualGen = results.initialAnnualGen;
+    const annualSelf = store.monthlyData.reduce(
+      (acc, cur) => acc + cur.selfConsumption,
+      0
+    );
+    const rawSurplus = Math.max(0, annualGen - annualSelf);
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
+    // 수익 계산
     const revenue_saving =
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
-    const revenue_ec = volume_ec * targetEcPrice;
+    const revenue_ec = volume_ec * targetEcPrice; // 여기가 다름 (5.0 단가)
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
     const grossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
-      totalRationalizationSavings;
+      results.totalRationalizationSavings; // 합리화 절감액은 동일
 
+    // 비용 계산
     const laborCostWon =
       activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
     const maintenanceCost =
       (grossRevenue * store.maintenanceRate) / 100 + laborCostWon;
 
     const annualNetProfitWon = grossRevenue - maintenanceCost;
-    const annualNetProfitUk = annualNetProfitWon / 100000000;
 
-    let solarPrice = config.price_solar_standard;
-    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
-    if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
-
+    // 투자비 (Premium 모듈 가정)
+    const solarPrice = config.price_solar_premium;
     const solarCost = (capacity / 100) * solarPrice;
     const ecCost = activeTruckCount * config.price_ec_unit;
     const infraCost =
       activeTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
-
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
+    // 20년 수익
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const totalNet20Won = (annualNetProfitWon * (1 - Math.pow(R, n))) / (1 - R);
-    const totalNet20Uk = totalNet20Won / 100000000;
 
     const totalCost20 = investWon + maintenanceCost * 20;
-    const roiYears =
-      annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0;
-    const profitRate =
-      totalCost20 > 0 ? (totalNet20Won / totalCost20) * 100 : 0;
 
     return {
-      title: isPremium
-        ? 'TYPE B. Premium Plan (수익 극대화형)'
-        : 'TYPE A. Standard Plan (안정형)',
+      title: 'TYPE B. Premium Plan (수익 극대화형)',
       invest: investUk,
       ecCount: activeTruckCount,
-      annualProfit: annualNetProfitUk,
-      totalProfit20: totalNet20Uk,
-      roiYears,
-      profitRate,
-      isPro: isPremium,
-      modelName,
+      annualProfit: annualNetProfitWon / 100000000,
+      totalProfit20: totalNet20Won / 100000000,
+      roiYears: annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0,
+      profitRate: totalCost20 > 0 ? (totalNet20Won / totalCost20) * 100 : 0,
+      isPro: true,
+      modelName: 'REC 5.0',
     };
   };
 
-  const stdData = calculateScenario(false);
-  const expData = calculateScenario(true);
+  const stdData = getScenarioData(false);
+  const expData = getScenarioData(true);
 
   // ----------------------------------------------------------------
-  // 3. 하단 무투자 모델 데이터
+  // 3. 하단 무투자 모델 데이터 (Store의 results값 그대로 사용)
   // ----------------------------------------------------------------
+  // Store에서 이미 계산된 값을 가져옵니다. (단위: 원 -> 억원 변환 필요)
+
+  // 1) 단순 지붕 임대형
+  // (기존 코드: const simpleRentalRevenueUk = (capacity * 0.4) / 1000;)
+  // Store에는 이 값이 없으므로 여기서 계산 유지 (단순 계산이라 오차 적음)
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
       ? ((simpleRentalRevenueUk * 100000000) / totalBillBefore) * 100
       : 0;
 
-  const rental_revenue_won =
-    capacity * 0.2 * config.unit_price_kepco * 3.64 * 365 +
-    capacity * 0.8 * config.rental_price_per_kw;
-  const re100RentalRevenueUk = rental_revenue_won / 100000000;
+  // 2) RE100 연계 임대형
+  const re100RentalRevenueUk = results.rental_revenue_yr / 100000000;
   const re100RentalSavingRate =
-    totalBillBefore > 0 ? (rental_revenue_won / totalBillBefore) * 100 : 0;
+    totalBillBefore > 0
+      ? (results.rental_revenue_yr / totalBillBefore) * 100
+      : 0;
 
-  const price_standard = 210.5;
-  const sub_revenue_won =
-    annualSelf * (price_standard - config.sub_price_self) +
-    rawSurplus * config.sub_price_surplus;
-  const subRevenueUk = sub_revenue_won / 100000000;
+  // 3) 구독 서비스형
+  const subRevenueUk = results.sub_revenue_yr / 100000000;
   const subSavingRate =
-    totalBillBefore > 0 ? (sub_revenue_won / totalBillBefore) * 100 : 0;
+    totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
 
   // ----------------------------------------------------------------
   // UI Helper
@@ -409,7 +411,7 @@ export default function PreviewSummary() {
           전기요금 절감율)
         </div>
 
-        {/* 1. 단순 지붕 임대형 (REC 0.00 고정) */}
+        {/* 1. 단순 지붕 임대형 */}
         <div className={styles.compRow}>
           <span className={styles.compLabel}>1. 단순 지붕 임대형</span>
           <span className={styles.compValue}>
@@ -427,7 +429,7 @@ export default function PreviewSummary() {
           </span>
         </div>
 
-        {/* 2. RE100 연계 임대형 (results.rec_1000_rent) */}
+        {/* 2. RE100 연계 임대형 */}
         <div className={`${styles.compRow}`}>
           <span className={styles.compLabel}>2. RE100 연계 임대형</span>
           <span className={styles.compValue}>
@@ -448,7 +450,7 @@ export default function PreviewSummary() {
           </span>
         </div>
 
-        {/* 3. 구독 서비스형 (results.rec_1000_sub) */}
+        {/* 3. 구독 서비스형 */}
         <div className={styles.compRow}>
           <span className={styles.compLabel}>3. 구독 서비스형</span>
           <span className={styles.compValue}>

@@ -756,17 +756,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       useEc,
     } = state;
 
-    // 1. 투자비
+    // 1. 투자비 (원 단위 변환)
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
-    // 2. 발전량 및 소비량
+    // 2. 발전량 총합 계산
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
       const autoGen = capacityKw * 3.64 * days;
       return acc + (cur.solarGeneration > 0 ? cur.solarGeneration : autoGen);
     }, 0);
 
+    // 3. 모델별 물량 및 수익 배분
     let volume_self = 0;
     let rawSurplus = 0;
     let volume_ec = 0;
@@ -775,6 +776,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     let totalRationalizationSavings = 0;
 
     if (selectedModel === 'KEPCO') {
+      // [KEPCO 모델] 전량 판매 (자가소비 없음)
       volume_self = 0;
       rawSurplus = initialAnnualGen;
       volume_ec = 0;
@@ -782,6 +784,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       revenue_saving = 0;
       totalRationalizationSavings = 0;
     } else {
+      // [RE100 / REC5 모델] 자가소비 우선
       const annualSelfConsumption = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
         0
@@ -789,28 +792,42 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
       rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
+      // EC 운용량 계산
       const ecCapacityAnnual = truckCount * 100 * 4 * 365;
       if (useEc) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
       volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
+      // 자가소비 절감 수익
       const appliedSavingsPrice =
         state.unitPriceSavings || config.unit_price_savings;
       revenue_saving = volume_self * appliedSavingsPrice;
 
+      // [수정됨] 전기요금 합리화 절감액 계산 (Step 4와 동일한 공식 적용)
       const isEul = state.contractType.includes('(을)');
+
+      // 1) 기본료 절감액: (을 - 갑) * 300 * 12
+      const saving_base =
+        (rationalization.base_eul - rationalization.base_gap) * 300 * 12;
+
+      // 2) 전력량 요금 절감액
+      const saving_light =
+        (rationalization.light_eul - rationalization.light_gap) *
+        rationalization.light_usage;
+      const saving_mid =
+        (rationalization.mid_eul - rationalization.mid_gap) *
+        rationalization.mid_usage;
+      const saving_max =
+        (rationalization.max_eul - rationalization.max_gap) *
+        rationalization.max_usage;
+
       totalRationalizationSavings = isEul
-        ? rationalization.base_savings_manual +
-          (rationalization.light_eul - rationalization.light_gap) *
-            rationalization.light_usage +
-          (rationalization.mid_eul - rationalization.mid_gap) *
-            rationalization.mid_usage +
-          (rationalization.max_eul - rationalization.max_gap) *
-            rationalization.max_usage
+        ? saving_base + saving_light + saving_mid + saving_max
         : 0;
     }
 
+    // 4. 판매 단가 적용
     let appliedSellPrice = config.unit_price_kepco;
     if (selectedModel === 'RE100') appliedSellPrice = config.unit_price_ec_1_5;
     if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
@@ -818,46 +835,57 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const revenue_ec = volume_ec * appliedSellPrice;
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
+    // 5. 연간 총 수익 (Gross)
     const annualGrossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
       totalRationalizationSavings;
 
+    // 6. 비용 및 순수익 (Net)
     const laborCostWon =
       truckCount > 0 && useEc && selectedModel !== 'KEPCO'
         ? config.price_labor_ec * 100000000
         : 0;
+
     const annualMaintenanceCost =
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
-
     const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
+    // 7. 20년 수익 시뮬레이션 (자가자본)
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
+    // 등비수열 합 공식 이용
     const self_final_profit =
       (annualOperatingProfit * (1 - Math.pow(R, n))) / (1 - R);
 
+    // 8. 금융 모델별 계산 (RPS)
     const rps_rate = config.loan_rate_rps / 100;
     const rps_loan = totalInvestment * 0.8;
     const rps_equity = totalInvestment * 0.2;
-    const rps_interest_only = rps_loan * rps_rate;
-    const rps_pmt = PMT(rps_rate, 10, -rps_loan);
+    const rps_interest_only = rps_loan * rps_rate; // 거치기간 이자
+    const rps_pmt = PMT(rps_rate, 10, -rps_loan); // 상환기간 연간 불입액
+
+    // RPS 최종 수익: (20년 총수익) - (5년 거치이자) - (10년 원리금상환)
     const rps_final_profit =
       self_final_profit - rps_interest_only * 5 - Math.abs(rps_pmt) * 10;
     const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
-    const rps_net_6_15 = annualOperatingProfit + rps_pmt;
+    const rps_net_6_15 = annualOperatingProfit + rps_pmt; // pmt가 음수이므로 +
 
+    // 9. 금융 모델별 계산 (팩토링)
     const fac_rate = config.loan_rate_factoring / 100;
-    const fac_loan = totalInvestment;
+    const fac_loan = totalInvestment; // 100% 대출
     const fac_interest_only = fac_loan * fac_rate;
     const fac_pmt = PMT(fac_rate, 9, -fac_loan);
+
+    // 팩토링 최종 수익: (20년 총수익) - (1년 거치이자) - (9년 원리금상환)
     const fac_final_profit =
       self_final_profit - fac_interest_only * 1 - Math.abs(fac_pmt) * 9;
     const fac_net_1 = annualOperatingProfit - fac_interest_only;
     const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
+    // 10. 무투자 모델 (임대형, 구독형)
     const rental_revenue_yr =
       capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365 +
       capacityKw * 0.8 * config.rental_price_per_kw;
@@ -878,17 +906,20 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
-    // 10. 1 REC & REC Annual Revenue
+    // 11. REC 데이터 계산
     const recPrice = state.recAveragePrice || 80;
 
+    // 1 REC (1000kW 기준 가치)
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * 0.2 * 3.64 * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
 
+    // 연간 REC 수익 (환산 금액)
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;
     const rec_annual_sub = rec_1000_sub * recPrice * 1000;
 
+    // 12. ROI (회수기간)
     const self_roi_years =
       annualOperatingProfit > 0 ? totalInvestment / annualOperatingProfit : 0;
     const rps_roi_years =
@@ -933,12 +964,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       rec_1000_common,
       rec_1000_rent,
       rec_1000_sub,
-
-      // 반환값에 추가
       rec_annual_common,
       rec_annual_rent,
       rec_annual_sub,
-
       self_roi_years,
       rps_roi_years,
       fac_roi_years,
