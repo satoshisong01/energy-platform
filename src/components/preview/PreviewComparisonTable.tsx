@@ -257,25 +257,34 @@ export default function PreviewComparisonTable() {
               </td>
             </tr>
 
-            {/* REC 수익/연간 */}
+            {/* [수정] REC 수익/연간 - 각각 분리 표시 */}
             <tr className="bg-white border-b-2 border-slate-300 font-bold">
               <td className={styles.rowHeader} style={{ color: '#1d4ed8' }}>
                 REC수익/연간
               </td>
-              <td className={styles.val}>{/* 공란 */}</td>
-              <td className={styles.val}>{/* 공란 */}</td>
+              {/* 자가자본 */}
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                 {toWon(results.rec_annual_common)} 원
               </td>
+              {/* RPS 정책자금 */}
+              <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                {toWon(results.rec_annual_common)} 원
+              </td>
+              {/* 팩토링 */}
+              <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                {toWon(results.rec_annual_common)} 원
+              </td>
+              {/* 임대형 */}
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                 {toWon(results.rec_annual_rent)} 원
               </td>
+              {/* 구독형 */}
               <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                 {toWon(results.rec_annual_sub)} 원
               </td>
             </tr>
 
-            {/* 5. 최종 결과 (20년 누적) - 여긴 억 단위가 보기 좋아서 유지 */}
+            {/* 5. 최종 결과 (20년 누적) */}
             <tr className={styles.rowTotal}>
               <td>실제 수익 (20년)</td>
               <td>{(results.self_final_profit / 100000000).toFixed(2)} 억원</td>
@@ -287,7 +296,7 @@ export default function PreviewComparisonTable() {
               <td>{(results.sub_final_profit / 100000000).toFixed(2)} 억원</td>
             </tr>
 
-            {/* 20년 수익 평균치 - 원 단위로 변경 */}
+            {/* 20년 수익 평균치 */}
             <tr className="bg-slate-100 text-sm">
               <td className={styles.rowLabel}>20년 수익 평균치</td>
               <td className={styles.val}>{toWon(self_avg)} 원</td>

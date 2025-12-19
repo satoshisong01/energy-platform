@@ -8,13 +8,13 @@ import {
   LucideWallet,
   LucideChevronsDown,
   LucideTruck,
+  LucideZap,
 } from 'lucide-react';
 
 export default function PreviewSummary() {
   const store = useProposalStore();
   const { config } = store;
 
-  // [핵심] Store의 중앙 계산 로직 결과 가져오기
   const results = store.getSimulationResults();
 
   const [showExpansion, setShowExpansion] = useState(false);
@@ -30,14 +30,12 @@ export default function PreviewSummary() {
   // 1. 공통 데이터
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
-
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
   const re100Rate =
     totalUsage > 0 ? (results.initialAnnualGen / totalUsage) * 100 : 0;
-
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
     0
@@ -49,11 +47,9 @@ export default function PreviewSummary() {
     const autoGen = capacity * 3.64 * days;
     const solarGen = data.solarGeneration > 0 ? data.solarGeneration : autoGen;
     const selfConsum = data.selfConsumption;
-
     const usageSaving =
       Math.min(solarGen, selfConsum) *
       (store.unitPriceSavings || config.unit_price_savings);
-
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -64,7 +60,6 @@ export default function PreviewSummary() {
     );
     const dynamicPeakRatio =
       totalUsageYear > 0 ? totalSelfYear / totalUsageYear : 0;
-
     let baseBillSaving = 0;
     if (data.peakKw > 0) {
       baseBillSaving = Math.max(
@@ -81,17 +76,62 @@ export default function PreviewSummary() {
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
   // ----------------------------------------------------------------
-  // 2. 시나리오 데이터 구성
+  // [NEW] 한전 장기 계약 (Baseline) 데이터 계산
+  // ----------------------------------------------------------------
+  const calculateKepcoData = () => {
+    // 1. 투자비 (모듈 등급에 따름, 공통)
+    let solarPrice = config.price_solar_standard;
+    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
+    else if (store.moduleTier === 'ECONOMY')
+      solarPrice = config.price_solar_economy;
+
+    const solarCost = (capacity / 100) * solarPrice;
+    // 한전형은 EC, 트랙터 등 불필요
+    const investWon = solarCost * 100000000;
+    const investUk = solarCost;
+
+    // 2. 수익 (전량 한전 판매)
+    const annualGen = results.initialAnnualGen;
+    const annualRevenue = annualGen * config.unit_price_kepco;
+
+    // 3. 비용 (유지보수비만)
+    const maintenanceCost = annualRevenue * (store.maintenanceRate / 100);
+    const annualNetProfit = annualRevenue - maintenanceCost;
+
+    // 4. 20년 수익
+    const degradationRateDecimal = -(store.degradationRate / 100);
+    const R = 1 + degradationRateDecimal;
+    const n = 20;
+    const totalNet20Won = (annualNetProfit * (1 - Math.pow(R, n))) / (1 - R);
+
+    // ROI
+    const roiYears = annualNetProfit > 0 ? investWon / annualNetProfit : 0;
+    const profitRate =
+      (totalNet20Won / (investWon + maintenanceCost * 20)) * 100;
+
+    return {
+      title: '한전 장기 계약 (20년)',
+      investUk: investUk,
+      capacity: capacity,
+      annualGen: annualGen,
+      annualProfitUk: annualNetProfit / 100000000,
+      annualRevenueRatio: (annualNetProfit / investWon) * 100, // 연 수익률
+      totalProfit20Uk: totalNet20Won / 100000000,
+      totalProfitRatio: profitRate,
+      roiYears: roiYears,
+    };
+  };
+  const kepcoData = calculateKepcoData();
+
+  // ----------------------------------------------------------------
+  // 2. 시나리오 데이터 구성 (Type A / B)
   // ----------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
-    // 1) EC 적용 여부에 따른 트럭 수 결정
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
         : 3
       : 0;
-
-    // 2) 물량 계산
     const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
     const annualGen = results.initialAnnualGen;
     const annualSelf = store.monthlyData.reduce(
@@ -99,60 +139,48 @@ export default function PreviewSummary() {
       0
     );
     const rawSurplus = Math.max(0, annualGen - annualSelf);
-
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-    // 3) 단가 결정 (Standard vs Premium) - 수익 모델 차이만 반영 (투자비 영향 X)
     const targetEcPrice = isPremium
       ? config.unit_price_ec_5_0
       : config.unit_price_ec_1_5;
-    const modelName = isPremium
-      ? 'REC 5.0 (예상 인센티브)'
-      : 'REC 1.5 (현행 기준)';
+    const modelName = isPremium ? 'REC 5.0 (예상)' : 'REC 1.5 (현행)';
 
-    // 4) 수익 계산
     const revenue_saving =
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
     const revenue_ec = volume_ec * targetEcPrice;
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
-
     const grossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
       results.totalRationalizationSavings;
 
-    // 5) 비용 계산
     const laborCostWon =
       activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
     const maintenanceCost =
       (grossRevenue * store.maintenanceRate) / 100 + laborCostWon;
-
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // 6) 투자비 계산 (모듈 등급 통일)
+    // 투자비 (공통 단가 적용)
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     else if (store.moduleTier === 'ECONOMY')
       solarPrice = config.price_solar_economy;
-    // else: STANDARD
 
     const solarCost = (capacity / 100) * solarPrice;
     const ecCost = activeTruckCount * config.price_ec_unit;
     const infraCost =
       activeTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
-
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
-    // 7) 20년 수익 계산
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const totalNet20Won = (annualNetProfitWon * (1 - Math.pow(R, n))) / (1 - R);
-
     const totalCost20 = investWon + maintenanceCost * 20;
     const roiYears =
       annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0;
@@ -161,8 +189,8 @@ export default function PreviewSummary() {
 
     return {
       title: isPremium
-        ? 'TYPE B. Premium Plan (정책 인센티브 확대 시)'
-        : 'TYPE A. Standard Plan (현행 기준)',
+        ? 'TYPE B. Premium Plan (수익 극대화)'
+        : 'TYPE A. Standard Plan (자가소비형)',
       invest: investUk,
       ecCount: activeTruckCount,
       annualProfit: annualNetProfitWon / 100000000,
@@ -177,33 +205,27 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
-  // ----------------------------------------------------------------
-  // 3. 하단 무투자 모델 데이터
-  // ----------------------------------------------------------------
+  // 하단 무투자 모델
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
       ? ((simpleRentalRevenueUk * 100000000) / totalBillBefore) * 100
       : 0;
-
   const re100RentalRevenueUk = results.rental_revenue_yr / 100000000;
   const re100RentalSavingRate =
     totalBillBefore > 0
       ? (results.rental_revenue_yr / totalBillBefore) * 100
       : 0;
-
   const subRevenueUk = results.sub_revenue_yr / 100000000;
   const subSavingRate =
     totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
 
-  // ----------------------------------------------------------------
-  // UI Helper
-  // ----------------------------------------------------------------
   const toUk = (val: number) => val.toFixed(2);
 
+  // [렌더링] 시나리오 카드
   const renderRow = (d: typeof stdData) => (
     <div className={`${styles.flowContainer} ${d.isPro ? styles.proRow : ''}`}>
-      {/* 1. 투자 */}
+      {/* 투자 */}
       <div className={`${styles.card} ${styles.cardInvest}`}>
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -224,7 +246,7 @@ export default function PreviewSummary() {
               <span
                 style={{
                   color: d.ecCount > 0 ? '#2563eb' : '#94a3b8',
-                  fontWeight: d.ecCount > 0 ? 'bold' : 'normal',
+                  fontWeight: 'bold',
                 }}
               >
                 {d.ecCount > 0 ? `${d.ecCount} 대` : '미적용'}
@@ -236,13 +258,13 @@ export default function PreviewSummary() {
 
       <div className={styles.arrowWrapper}>
         <LucideArrowRight
-          size={24}
+          size={20}
           strokeWidth={3}
           color={d.isPro ? '#f59e0b' : '#cbd5e1'}
         />
       </div>
 
-      {/* 2. 연간 수익 */}
+      {/* 연간 수익 */}
       <div className={`${styles.card} ${styles.cardAnnual}`}>
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -269,21 +291,20 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 중간 연결부 */}
+      {/* 중간 연결부 (간소화) */}
       <div className={styles.middleConnect}>
-        <div className={styles.connectArrowLine}></div>
         <div className={styles.connectContent}>
           <div className={styles.connectItem}>
             <span className={styles.connectValueRed}>
-              {re100Rate.toFixed(1)} %
+              {re100Rate.toFixed(0)}%
             </span>
-            <span className={styles.connectLabel}>RE100 충족</span>
+            <span className={styles.connectLabel}>RE100</span>
           </div>
           <div className={styles.connectItem}>
             <span className={styles.connectValueBlue}>
-              {savingRate.toFixed(1)} %
+              {savingRate.toFixed(0)}%
             </span>
-            <span className={styles.connectLabel}>전기요금 절감</span>
+            <span className={styles.connectLabel}>절감</span>
           </div>
         </div>
         <div className={styles.connectArrowLine}>
@@ -291,7 +312,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 3. 20년 수익 */}
+      {/* 20년 수익 */}
       <div
         className={`${styles.card} ${styles.cardTotal} ${
           d.isPro ? styles.cardHighlight : ''
@@ -312,15 +333,13 @@ export default function PreviewSummary() {
               {toUk(d.totalProfit20)} <span className={styles.unit}>억원</span>
             </div>
             <div className={styles.profitRateBadge}>
-              {d.profitRate.toFixed(1)}%
+              {d.profitRate.toFixed(0)}%
             </div>
           </div>
-
           <div className={styles.roiBox}>
-            <span className={styles.roiLabel}>ROI (회수)</span>
-            <span className={styles.roiValue}>{d.roiYears.toFixed(2)} 년</span>
+            <span className={styles.roiLabel}>ROI</span>
+            <span className={styles.roiValue}>{d.roiYears.toFixed(2)}년</span>
           </div>
-
           {d.isPro && (
             <div className={styles.deltaText}>
               (Basic 대비 +{toUk(d.totalProfit20 - stdData.totalProfit20)}억)
@@ -337,32 +356,78 @@ export default function PreviewSummary() {
         <div className={styles.headerTitle}>
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
-
-        <div className="flex items-center gap-3 no-print">
-          <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition shadow-sm select-none">
+        <div className="flex items-center gap-2 no-print">
+          <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
             <input
               type="checkbox"
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-3 h-3"
               checked={applyEc}
               onChange={(e) => setApplyEc(e.target.checked)}
             />
-            <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-              <LucideTruck
-                size={16}
-                className={applyEc ? 'text-blue-600' : 'text-slate-400'}
-              />
-              <span>에너지 캐리어(EC) 적용 비교</span>
-            </div>
+            <span className="font-bold text-slate-700">EC 적용</span>
           </label>
-
           <button
             className={`${styles.expandBtn} ${
               showExpansion ? styles.active : ''
             }`}
             onClick={() => setShowExpansion(!showExpansion)}
           >
-            {showExpansion ? '➖ 비교 닫기' : '➕ REC 5.0 확장 플랜 비교'}
+            {showExpansion ? '닫기' : 'REC 5.0 비교'}
           </button>
+        </div>
+      </div>
+
+      {/* [NEW] 한전 장기 계약 섹션 (타이트한 가로형 바) */}
+      <div className={styles.kepcoSection}>
+        <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
+        <div className={styles.kepcoContent}>
+          <div className={styles.kepcoItem}>
+            <span className={styles.kLabel}>투자</span>
+            <span className={styles.kValue}>
+              {kepcoData.investUk.toFixed(2)} 억
+            </span>
+            <span className={styles.kSub}>{kepcoData.capacity} kW</span>
+          </div>
+          <div className={styles.kArrow}>
+            <LucideArrowRight size={14} />
+          </div>
+          <div className={styles.kepcoItem}>
+            <span className={styles.kLabel}>연간 발전량</span>
+            <span className={styles.kValueSm}>
+              {Math.round(kepcoData.annualGen).toLocaleString()} kWh
+            </span>
+          </div>
+          <div className={styles.kArrow}>
+            <LucideArrowRight size={14} />
+          </div>
+          <div className={styles.kepcoItem}>
+            <span className={styles.kLabel}>연간 수익/수익률</span>
+            <div className="flex gap-2">
+              <span className={styles.kValue}>
+                {kepcoData.annualProfitUk.toFixed(2)} 억
+              </span>
+              <span className={styles.kSubBlue}>
+                {kepcoData.annualRevenueRatio.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+          <div className={styles.kArrow}>
+            <LucideArrowRight size={14} />
+          </div>
+          <div className={styles.kepcoItem}>
+            <span className={styles.kLabel}>20년간 수익</span>
+            <div className="flex gap-2">
+              <span className={styles.kValue}>
+                {kepcoData.totalProfit20Uk.toFixed(2)} 억
+              </span>
+              <span className={styles.kSubBlue}>
+                {kepcoData.totalProfitRatio.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+          <div className={styles.kepcoRoiBadge}>
+            {kepcoData.roiYears.toFixed(2)} 년
+          </div>
         </div>
       </div>
 
@@ -376,7 +441,7 @@ export default function PreviewSummary() {
           <div className={styles.connector}>
             <div className={styles.connectorLine}></div>
             <div className={styles.connectorIcon}>
-              <LucideChevronsDown size={20} /> 설비 확장 시 수익 극대화
+              <LucideChevronsDown size={16} /> 수익 극대화
             </div>
             <div className={styles.connectorLine}></div>
           </div>
@@ -390,68 +455,46 @@ export default function PreviewSummary() {
       {/* 하단 비교 섹션 */}
       <div className={styles.comparisonSection}>
         <div className={styles.compHeader}>
-          <LucideWallet size={16} /> 초기 투자가 없는 모델 비교 (연간 수익 /
-          전기요금 절감율)
+          <LucideWallet size={14} /> 초기 투자가 없는 모델 (연간 수익 / 절감율)
         </div>
-
-        {/* 1. 단순 지붕 임대형 */}
-        <div className={styles.compRow}>
-          <span className={styles.compLabel}>1. 단순 지붕 임대형</span>
-          <span className={styles.compValue}>
-            {simpleRentalRevenueUk.toFixed(3)} 억원
-          </span>
-          <span className={styles.compSub}>
-            (전기요금 절감율{' '}
-            <span className="font-bold text-blue-600">
-              {simpleRentalSavingRate.toFixed(1)}%
+        <div className={styles.compGrid}>
+          <div className={styles.compRow}>
+            <span className={styles.compLabel}>단순 지붕 임대</span>
+            <span className={styles.compValue}>
+              {simpleRentalRevenueUk.toFixed(2)} 억
             </span>
-            )
-          </span>
-          <span className={styles.compRec}>
-            REC <span className={styles.recValue}>0.00</span>
-          </span>
-        </div>
-
-        {/* 2. RE100 연계 임대형 */}
-        <div className={`${styles.compRow}`}>
-          <span className={styles.compLabel}>2. RE100 연계 임대형</span>
-          <span className={styles.compValue}>
-            {re100RentalRevenueUk.toFixed(3)} 억원
-          </span>
-          <span className={styles.compSub}>
-            (전기요금 절감율{' '}
-            <span className="font-bold text-blue-600">
-              {re100RentalSavingRate.toFixed(1)}%
+            <span className={styles.compSub}>
+              (절감{' '}
+              <span className="text-blue-600">
+                {simpleRentalSavingRate.toFixed(2)}%
+              </span>
+              )
             </span>
-            )
-          </span>
-          <span className={styles.compRec}>
-            REC{' '}
-            <span className={styles.recValue}>
-              {results.rec_1000_rent.toFixed(2)}
+          </div>
+          <div className={styles.compRow}>
+            <span className={styles.compLabel}>RE100 임대</span>
+            <span className={styles.compValue}>
+              {re100RentalRevenueUk.toFixed(2)} 억
             </span>
-          </span>
-        </div>
-
-        {/* 3. 구독 서비스형 */}
-        <div className={styles.compRow}>
-          <span className={styles.compLabel}>3. 구독 서비스형</span>
-          <span className={styles.compValue}>
-            {subRevenueUk.toFixed(3)} 억원
-          </span>
-          <span className={styles.compSub}>
-            (전기요금 절감율{' '}
-            <span className="font-bold text-blue-600">
-              {subSavingRate.toFixed(1)}%
+            <span className={styles.compSub}>
+              (절감{' '}
+              <span className="text-blue-600">
+                {re100RentalSavingRate.toFixed(2)}%
+              </span>
+              )
             </span>
-            )
-          </span>
-          <span className={styles.compRec}>
-            REC{' '}
-            <span className={styles.recValue}>
-              {results.rec_1000_sub.toFixed(2)}
+          </div>
+          <div className={styles.compRow}>
+            <span className={styles.compLabel}>구독 서비스</span>
+            <span className={styles.compValue}>
+              {subRevenueUk.toFixed(2)} 억
             </span>
-          </span>
+            <span className={styles.compSub}>
+              (절감{' '}
+              <span className="text-blue-600">{subSavingRate.toFixed(2)}%</span>
+              )
+            </span>
+          </div>
         </div>
       </div>
     </div>

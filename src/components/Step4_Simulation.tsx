@@ -1,3 +1,4 @@
+// 4. Step4_Simulation.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -363,7 +364,7 @@ export default function Step4_Simulation() {
             onClick={() => setShowRationalization(!showRationalization)}
           >
             <span className="font-bold text-slate-700 text-sm flex items-center gap-2">
-              ⚡ 전기요금 합리화 절감액 계산 (을 ↔ 갑 비교)
+              ⚡ 전기요금 합리화 절감액 계산
             </span>
             {showRationalization ? (
               <LucideChevronUp size={16} />

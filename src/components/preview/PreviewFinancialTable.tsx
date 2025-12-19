@@ -37,11 +37,7 @@ export default function PreviewFinancialTable() {
   if (selectedModel === 'RE100') appliedSellPrice = config.unit_price_ec_1_5;
   if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
 
-  const isEul = store.contractType.includes('(을)');
-
-  // [수정] ROI (총 수익률) 계산 로직 - Step 4와 동일하게 맞춤
-  // 총비용 = 초기투자비 + (연간유지비 * 20년)
-  // 총수익 = 20년 순수익 (이미 비용 차감된 값) -> 따라서 수익률 = (순수익 / 총비용) * 100
+  // [수정] ROI (총 수익률) 계산 로직
   const totalCost20 =
     results.totalInvestment + results.annualMaintenanceCost * 20;
   const profitRate =
@@ -196,7 +192,7 @@ export default function PreviewFinancialTable() {
           </tr>
           <tr>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
-              ④ 전기요금합리화절감액{isEul ? '(을)' : '(갑)'}
+              {/* [수정] (을)/(갑) 표시 제거 */}④ 전기요금합리화절감액
             </td>
             <td className={styles.bgPinkRow}>-</td>
             <td className={styles.bgYellowRow}>-</td>
@@ -252,7 +248,6 @@ export default function PreviewFinancialTable() {
         </div>
         <div className={styles.finalMetricBox}>
           <span className={styles.finalLabel}>총 수익률(ROI)</span>
-          {/* [수정] 20년 총 수익률 표시 */}
           <span className={styles.finalValue}>{profitRate.toFixed(1)}</span>
           <span className={styles.finalUnit}>%</span>
         </div>
