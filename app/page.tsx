@@ -8,10 +8,9 @@ import {
   LucideSettings,
   LucideSave,
   LucideFolderOpen,
-  LucideFilePlus, // [NEW] 새 문서 아이콘 추가
+  LucideFilePlus,
 } from 'lucide-react';
 
-// 분리한 컴포넌트들 임포트
 import Step1_BasicInfo from '../src/components/Step1_BasicInfo';
 import Step2_SiteInfo from '../src/components/Step2_SiteInfo';
 import Step3_EnergyData from '../src/components/Step3_EnergyData';
@@ -19,18 +18,14 @@ import Step4_Simulation from '../src/components/Step4_Simulation';
 import PreviewPanel from '../src/components/PreviewPanel';
 import ConfigModal from '../src/components/ConfigModal';
 import Step5_Comparison from '../src/components/Step5_Comparison';
-
-// 불러오기 팝업 임포트
 import ProposalListModal from '../src/components/ProposalListModal';
 
 export default function Home() {
   const store = useProposalStore();
 
-  // 팝업 상태 관리
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
 
-  // [NEW] 초기화(새 문서) 핸들러
   const handleReset = () => {
     if (
       confirm(
@@ -38,13 +33,16 @@ export default function Home() {
       )
     ) {
       store.resetProposal();
-      window.scrollTo(0, 0); // 맨 위로 스크롤
+      window.scrollTo(0, 0);
     }
   };
 
-  // 저장 핸들러
+  // [수정된 부분] 저장 핸들러
   const handleSave = async () => {
-    const defaultName = store.proposalName || `${store.clientName} 견적서`;
+    // 1. 이미 저장된 이름이 있으면 그걸 쓰고, 없으면 규칙에 따라 자동 생성
+    const defaultName = store.proposalName || store.getProposalFileName();
+
+    // 2. 사용자에게 확인 (자동 생성된 이름을 기본값으로 보여줌)
     const name = window.prompt('견적서 저장 이름을 입력해주세요:', defaultName);
 
     if (name !== null) {
@@ -55,27 +53,16 @@ export default function Home() {
 
   return (
     <main className={styles.container}>
-      {/* ------------------------------------------------------------
-          ⚙️ 설정 팝업 (Modal)
-      ------------------------------------------------------------ */}
       <ConfigModal
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
       />
-
-      {/* ------------------------------------------------------------
-          📂 불러오기 팝업 (Modal)
-      ------------------------------------------------------------ */}
       <ProposalListModal
         isOpen={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
       />
 
-      {/* ------------------------------------------------------------
-          👈 좌측: 입력 패널 (Input Zone)
-      ------------------------------------------------------------ */}
       <section className={styles.inputPanel}>
-        {/* Sticky Header */}
         <div className={styles.stickyHeader}>
           <div
             style={{
@@ -89,10 +76,7 @@ export default function Home() {
               <LucideSun className="text-orange-500 fill-orange-500" />
               정보 입력 패널
             </h1>
-
-            {/* 상단 액션 버튼 그룹 */}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {/* [NEW] 새 문서(초기화) 버튼 - 톱니바퀴 왼쪽에 배치 */}
               <button
                 onClick={handleReset}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
@@ -100,8 +84,6 @@ export default function Home() {
               >
                 <LucideFilePlus size={20} />
               </button>
-
-              {/* 기준 단가 설정 버튼 */}
               <button
                 onClick={() => setIsConfigOpen(true)}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
@@ -109,8 +91,6 @@ export default function Home() {
               >
                 <LucideSettings size={20} />
               </button>
-
-              {/* 불러오기 버튼 */}
               <button
                 onClick={() => setIsLoadModalOpen(true)}
                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
@@ -118,8 +98,6 @@ export default function Home() {
               >
                 <LucideFolderOpen size={20} />
               </button>
-
-              {/* 저장 버튼 */}
               <button
                 onClick={handleSave}
                 className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-blue-700 transition shadow-sm"
@@ -134,28 +112,16 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Form Content */}
         <div className={styles.formContent}>
-          {/* 1. 기본 정보 */}
           <Step1_BasicInfo />
-
-          {/* 2. 설치 공간 (Sheet 3) */}
           <Step2_SiteInfo />
-
-          {/* 3. 전력 데이터 (Sheet 4, 5) */}
           <Step3_EnergyData />
-
-          {/* 4. 투자비 및 수익 시뮬레이션 (Sheet 6, 7, 8) */}
           <Step4_Simulation />
           <Step5_Comparison />
         </div>
       </section>
 
-      {/* ------------------------------------------------------------
-          👉 우측: 미리보기 패널 (Preview Zone)
-      ------------------------------------------------------------ */}
       <section className={styles.previewPanel}>
-        {/* 우측 화면 컴포넌트 */}
         <PreviewPanel />
       </section>
     </main>
