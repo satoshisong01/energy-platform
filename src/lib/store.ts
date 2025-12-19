@@ -156,6 +156,7 @@ interface ProposalState {
   totalInvestment: number;
 
   // --- Actions ---
+  setCapacityKw: (val: number) => void;
   setClientName: (name: string) => void;
   setTargetDate: (date: string) => void;
   setAddress: (addr: string) => void;
@@ -216,6 +217,10 @@ const PMT = (rate: number, nper: number, pv: number) => {
 };
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
+  setCapacityKw: (val) => {
+    set({ capacityKw: val });
+    get().recalculateInvestment();
+  },
   proposalId: null,
   proposalName: '',
   clientName: '(주)대림풍력',

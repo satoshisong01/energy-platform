@@ -76,13 +76,35 @@ export default function Step2_SiteInfo() {
             paddingLeft: '1rem',
           }}
         >
-          <div className={styles.summaryLabel}>설치 용량</div>
-          <div className={styles.summaryValue}>
-            {store.capacityKw.toLocaleString()}{' '}
+          <div className={styles.summaryLabel}>설치 용량 (수정가능)</div>
+          <div
+            className={styles.summaryValue}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '4px',
+            }}
+          >
+            <input
+              type="number"
+              value={store.capacityKw || ''}
+              onChange={(e) => store.setCapacityKw(Number(e.target.value))}
+              className={styles.inputBare}
+              style={{
+                textAlign: 'right',
+                width: '80px',
+                color: 'white',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                background: 'transparent',
+                borderBottom: '1px dashed rgba(255,255,255,0.5)',
+                padding: '0 2px',
+              }}
+            />
             <span className={styles.summaryUnit}>kW</span>
           </div>
         </div>
-        {/* 모듈 수량 추가 */}
         <div
           style={{
             textAlign: 'right',
