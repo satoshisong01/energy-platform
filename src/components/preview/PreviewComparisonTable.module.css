@@ -173,3 +173,25 @@
   color: #4f46e5;
   font-weight: 700;
 }
+
+/* [NEW] 구비서류/요건 셀 스타일 */
+.docCell {
+  font-size: 0.65rem; /* 글씨를 조금 작게 */
+  text-align: left; /* 왼쪽 정렬 */
+  vertical-align: top;
+  padding: 8px;
+  line-height: 1.4;
+  color: #334155;
+  background-color: white;
+  border-right: 1px solid #e2e8f0;
+}
+
+.docCell div {
+  margin-bottom: 2px;
+}
+
+/* 강조 텍스트 (파란색) */
+.textBlueBold {
+  color: #2563eb;
+  font-weight: 700;
+}

@@ -9,20 +9,39 @@ const toCheon = (val: number) => Math.round(val / 1000).toLocaleString();
 
 export default function PreviewComparisonTable() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, recAveragePrice, setRecAveragePrice } = store;
 
-  // [핵심] 스토어에서 계산된 결과 가져오기 (Step 5와 동일)
+  // 스토어에서 계산된 결과 가져오기
   const results = store.getSimulationResults();
 
-  // 20년 수익 평균치 계산 (총수익 / 20)
+  // 20년 수익 평균치 계산
   const self_avg = results.self_final_profit / 20;
   const rps_avg = results.rps_final_profit / 20;
   const fac_avg = results.fac_final_profit / 20;
 
   return (
     <div className={styles.container}>
-      <div className={styles.titleWrapper}>
+      <div
+        className={styles.titleWrapper}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <h3 className={styles.title}>5. 금융 모델별 수익성 비교 분석</h3>
+
+        {/* [NEW] REC 평균가격 조정 입력 (인쇄 시 숨김) */}
+        <div className="no-print flex items-center gap-2 text-xs bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+          <span className="font-bold text-yellow-800">REC 평균가격:</span>
+          <input
+            type="number"
+            className="w-16 p-1 border rounded text-right font-bold text-slate-700 focus:outline-blue-500"
+            value={recAveragePrice}
+            onChange={(e) => setRecAveragePrice(Number(e.target.value))}
+          />
+          <span className="text-slate-500">원</span>
+        </div>
       </div>
 
       <div className={styles.tableWrapper}>
@@ -221,19 +240,48 @@ export default function PreviewComparisonTable() {
             </tr>
 
             {/* 1 REC */}
-            <tr className="bg-yellow-50 font-bold">
+            <tr className="bg-blue-50 font-bold">
               <td className={styles.rowHeader}>1 REC (1000kW)</td>
-              <td className={styles.val}>
-                {results.rec_1000_common.toFixed(2)}
+              <td className={styles.val} style={{ color: '#2563eb' }}>
+                {results.rec_1000_common.toFixed(1)}
               </td>
-              <td className={styles.val}>
-                {results.rec_1000_common.toFixed(2)}
+              <td className={styles.val} style={{ color: '#2563eb' }}>
+                {results.rec_1000_common.toFixed(1)}
               </td>
-              <td className={styles.val}>
-                {results.rec_1000_common.toFixed(2)}
+              <td className={styles.val} style={{ color: '#2563eb' }}>
+                {results.rec_1000_common.toFixed(1)}
               </td>
-              <td className={styles.val}>{results.rec_1000_rent.toFixed(2)}</td>
-              <td className={styles.val}>{results.rec_1000_sub.toFixed(2)}</td>
+              <td className={styles.val} style={{ color: '#2563eb' }}>
+                {results.rec_1000_rent.toFixed(1)}
+              </td>
+              <td className={styles.val} style={{ color: '#2563eb' }}>
+                {results.rec_1000_sub.toFixed(1)}
+              </td>
+            </tr>
+
+            {/* [NEW] REC 수익/연간 */}
+            <tr className="bg-white border-b-2 border-slate-300 font-bold">
+              <td className={styles.rowHeader} style={{ color: '#1d4ed8' }}>
+                REC수익/연간
+              </td>
+              <td className={styles.val}>{/* 공란(엑셀 참조) */}</td>
+              <td className={styles.val}>{/* 공란 */}</td>
+              <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                {/* 팩토링 열에 표시 (엑셀 참조 시 우측에 몰려있음) */}
+                {results.rec_annual_common.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })}
+              </td>
+              <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                {results.rec_annual_rent.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })}
+              </td>
+              <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                {results.rec_annual_sub.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })}
+              </td>
             </tr>
 
             {/* 5. 최종 결과 (20년 누적) */}

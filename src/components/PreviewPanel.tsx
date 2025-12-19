@@ -12,6 +12,8 @@ import PreviewFinancialTable from './preview/PreviewFinancialTable';
 import PreviewModelVisual from './preview/PreviewModelVisual';
 import PreviewComparisonTable from './preview/PreviewComparisonTable';
 import PreviewSummary from './preview/PreviewSummary';
+// [NEW] 새로 만든 컴포넌트 임포트
+import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
 
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -43,8 +45,6 @@ export default function PreviewPanel() {
   // ----------------------------------------------------------------
   // [1] 월별 데이터 계산 (PreviewChart, PreviewDetailTable 용으로 유지)
   // ----------------------------------------------------------------
-  // * 주의: FinancialTable이나 Summary 등은 이제 스토어 중앙 로직을 쓰지만,
-  //         차트나 상세 테이블은 여전히 이 로컬 계산 데이터를 props로 받아야 합니다.
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
@@ -177,11 +177,9 @@ export default function PreviewPanel() {
         </div>
 
         <div style={{ width: '100%', marginTop: '20px' }}>
-          {/* Summary는 이제 내부에서 store 데이터를 직접 가져옵니다 */}
           <PreviewSummary />
         </div>
-
-        {/* Footer */}
+        <div style={{ height: '100%' }}></div>
         <PageFooter page={1} />
       </div>
 
@@ -195,6 +193,7 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
+        <div style={{ height: '100%' }}></div>
         <PageFooter page={2} />
       </div>
 
@@ -209,15 +208,16 @@ export default function PreviewPanel() {
             totalBenefit={totalBenefit}
           />
         </div>
+        <div style={{ height: '100%' }}></div>
         <PageFooter page={3} />
       </div>
 
       {/* [페이지 4] 투자 및 수익 분석 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
-          {/* [수정] props 제거 (내부에서 store.getSimulationResults 사용) */}
           <PreviewFinancialTable />
         </div>
+        <div style={{ height: '100%' }}></div>
         <PageFooter page={4} />
       </div>
 
@@ -226,16 +226,27 @@ export default function PreviewPanel() {
         <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
+        <div style={{ height: '100%' }}></div>
         <PageFooter page={5} />
       </div>
 
-      {/* [페이지 6] 비교 테이블 및 푸터 */}
+      {/* [페이지 6] 비교 테이블 (수익성 분석) */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
-          {/* [수정] props 제거 (내부에서 store.getSimulationResults 사용) */}
           <PreviewComparisonTable />
+        </div>
+        <div style={{ height: '100%' }}></div>
+        <PageFooter page={6} />
+      </div>
 
-          <div className={styles.footer} style={{ marginTop: '40px' }}>
+      {/* [NEW] [페이지 7] 사업 조건 및 구비 서류 + 최종 푸터 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
+        <div style={{ width: '100%' }}>
+          {/* 구비서류 테이블 */}
+          <PreviewRequirementsTable />
+
+          {/* 연락처 푸터 (마지막 페이지로 이동) */}
+          <div className={styles.footer} style={{ marginTop: '60px' }}>
             <div className={styles.contactInfo}>
               <div>김 종 우 &nbsp;|&nbsp; 010.5617.9500</div>
               <div>jongwoo@firstcorea.com</div>
@@ -243,7 +254,8 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
-        <PageFooter page={6} />
+        <div style={{ height: '100%' }}></div>
+        <PageFooter page={7} />
       </div>
     </div>
   );

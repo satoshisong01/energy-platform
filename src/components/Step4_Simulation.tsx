@@ -72,17 +72,22 @@ export default function Step4_Simulation() {
   const isEul = store.contractType.includes('(을)');
 
   // 합리화 절감액 (KEPCO 모델은 미사용, 그 외는 사용)
+  // 1. 기본료 절감액 (자동 계산: 차이 * 300 * 12)
+  const diff_base = rationalization.base_eul - rationalization.base_gap;
+  const saving_base = diff_base * 300 * 12; // [수정] 요청하신 고정 공식 적용
+
+  // 2. 전력량 요금 절감액
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
+
   const saving_light = diff_light * rationalization.light_usage;
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
+
+  // 3. 총 절감액 합계
   const totalRationalizationSavings = isEul
-    ? rationalization.base_savings_manual +
-      saving_light +
-      saving_mid +
-      saving_max
+    ? saving_base + saving_light + saving_mid + saving_max
     : 0;
 
   // --------------------------------------------------------------------------
@@ -350,7 +355,7 @@ export default function Step4_Simulation() {
         </div>
       )}
 
-      {/* [복구됨] 합리화 절감액 설정창 (isEul일 때만 표시) */}
+      {/* 합리화 절감액 설정창 (isEul일 때만 표시) */}
       {isEul && (
         <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden">
           <button
@@ -381,6 +386,7 @@ export default function Step4_Simulation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {/* [수정됨] 기본료 행: 자동 계산 적용 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       기본료
@@ -396,17 +402,14 @@ export default function Step4_Simulation() {
                         rationalization.base_eul - rationalization.base_gap
                       ).toLocaleString()}
                     </td>
-                    <td className="p-1 border-r">
-                      {renderRationalizationInput('base_usage', '0')}
+                    <td className="p-1 border-r text-gray-500">
+                      3,600 (300×12)
                     </td>
-                    <td className="p-1 bg-blue-50">
-                      {renderRationalizationInput(
-                        'base_savings_manual',
-                        '직접입력',
-                        'text-blue-600 font-bold border-blue-200'
-                      )}
+                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                      {Math.round(saving_base).toLocaleString()}
                     </td>
                   </tr>
+
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       경부하
@@ -500,6 +503,7 @@ export default function Step4_Simulation() {
         </div>
       )}
 
+      {/* 투자비 테이블 */}
       <div className="mt-4">
         <div className="flex items-center gap-2 mb-2 text-blue-800">
           <LucideTable size={16} />
@@ -613,6 +617,7 @@ export default function Step4_Simulation() {
         )}
       </div>
 
+      {/* 수익 상세 분석 */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-2 text-green-800">
           <LucideTrendingUp size={16} />

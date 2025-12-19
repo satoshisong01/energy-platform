@@ -14,16 +14,14 @@ export default function PreviewSummary() {
   const store = useProposalStore();
   const { config, rationalization } = store;
 
+  // REC 값을 가져오기 위해 results 호출
   const results = store.getSimulationResults();
 
   const [showExpansion, setShowExpansion] = useState(false);
-
-  // [NEW] EC 적용 여부 토글 상태 (초기값: 현재 설정이 EC 사용 중이면 true)
   const [applyEc, setApplyEc] = useState(
     store.useEc && store.selectedModel !== 'KEPCO'
   );
 
-  // store 설정이 바뀌면 토글 상태도 동기화 (선택 사항)
   useEffect(() => {
     setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
   }, [store.useEc, store.selectedModel]);
@@ -33,25 +31,21 @@ export default function PreviewSummary() {
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
 
-  // 1) 연간 발전량
   const annualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + capacity * 3.64 * days;
   }, 0);
 
-  // 2) 연간 자가소비량
   const annualSelf = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0
   );
 
-  // 3) 연간 총 사용량
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
 
-  // 4) 잉여 전력
   const rawSurplus = Math.max(0, annualGen - annualSelf);
 
   // ----------------------------------------------------------------
@@ -113,7 +107,7 @@ export default function PreviewSummary() {
     : 0;
 
   // ----------------------------------------------------------------
-  // 3. 시나리오별 계산 함수 (체크박스 상태 applyEc 반영)
+  // 3. 시나리오별 계산 함수
   // ----------------------------------------------------------------
   const calculateScenario = (isPremium: boolean) => {
     const targetEcPrice = isPremium
@@ -121,17 +115,11 @@ export default function PreviewSummary() {
       : config.unit_price_ec_1_5;
     const modelName = isPremium ? 'REC 5.0' : 'REC 1.5';
 
-    // [핵심] 체크박스(applyEc)가 켜져 있으면 설정된 트럭 수 사용, 꺼져 있으면 0대
-    // 만약 설정된 트럭이 0대인데 체크를 켰다면, 기본 3대로 가정해서 보여줌
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
         : 3
       : 0;
-
-    // -----------------------------------
-    // [계산 로직]
-    // -----------------------------------
 
     const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
@@ -157,7 +145,6 @@ export default function PreviewSummary() {
     const annualNetProfitWon = grossRevenue - maintenanceCost;
     const annualNetProfitUk = annualNetProfitWon / 100000000;
 
-    // 투자비
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
@@ -249,7 +236,6 @@ export default function PreviewSummary() {
             </div>
             <div className={styles.detailItem}>
               <span>EC설비</span>
-              {/* EC 여부에 따라 텍스트 표시 */}
               <span
                 style={{
                   color: d.ecCount > 0 ? '#2563eb' : '#94a3b8',
@@ -367,9 +353,7 @@ export default function PreviewSummary() {
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
 
-        {/* [NEW] 우측 컨트롤 영역 */}
         <div className="flex items-center gap-3 no-print">
-          {/* EC 토글 체크박스 */}
           <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition shadow-sm select-none">
             <input
               type="checkbox"
@@ -397,13 +381,11 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 1. 기본 플랜 (REC 1.5) */}
       <div className={styles.planSection}>
         <div className={styles.sectionTitle}>{stdData.title}</div>
         {renderRow(stdData)}
       </div>
 
-      {/* 2. 확장 플랜 (REC 5.0) */}
       {showExpansion && (
         <div className={`${styles.planSection} ${styles.fadeIn}`}>
           <div className={styles.connector}>
@@ -427,6 +409,7 @@ export default function PreviewSummary() {
           전기요금 절감율)
         </div>
 
+        {/* 1. 단순 지붕 임대형 (REC 0.00 고정) */}
         <div className={styles.compRow}>
           <span className={styles.compLabel}>1. 단순 지붕 임대형</span>
           <span className={styles.compValue}>
@@ -439,8 +422,12 @@ export default function PreviewSummary() {
             </span>
             )
           </span>
+          <span className={styles.compRec}>
+            REC <span className={styles.recValue}>0.00</span>
+          </span>
         </div>
 
+        {/* 2. RE100 연계 임대형 (results.rec_1000_rent) */}
         <div className={`${styles.compRow}`}>
           <span className={styles.compLabel}>2. RE100 연계 임대형</span>
           <span className={styles.compValue}>
@@ -453,8 +440,15 @@ export default function PreviewSummary() {
             </span>
             )
           </span>
+          <span className={styles.compRec}>
+            REC{' '}
+            <span className={styles.recValue}>
+              {results.rec_1000_rent.toFixed(2)}
+            </span>
+          </span>
         </div>
 
+        {/* 3. 구독 서비스형 (results.rec_1000_sub) */}
         <div className={styles.compRow}>
           <span className={styles.compLabel}>3. 구독 서비스형</span>
           <span className={styles.compValue}>
@@ -466,6 +460,12 @@ export default function PreviewSummary() {
               {subSavingRate.toFixed(1)}%
             </span>
             )
+          </span>
+          <span className={styles.compRec}>
+            REC{' '}
+            <span className={styles.recValue}>
+              {results.rec_1000_sub.toFixed(2)}
+            </span>
           </span>
         </div>
       </div>

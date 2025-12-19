@@ -555,3 +555,65 @@
 .flowContainer > .arrowWrapper:first-of-type {
   display: flex;
 }
+
+/* 하단 비교 (초기투자 없는 모델) */
+.comparisonSection {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+.compHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #be185d;
+  margin-bottom: 0.8rem;
+  border-bottom: 2px solid #cbd5e1;
+  padding-bottom: 0.5rem;
+}
+.compRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0; /* 패딩 약간 늘림 */
+  border-bottom: 1px dashed #e2e8f0;
+  font-size: 0.75rem;
+}
+.compRow:last-child {
+  border-bottom: none;
+}
+
+/* [수정] 4개 컬럼 비율 조정 (라벨, 금액, 절감율, REC) */
+.compLabel {
+  width: 30%;
+  color: #334155;
+}
+.compValue {
+  width: 20%;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: right;
+}
+.compSub {
+  width: 30%; /* 비율 조정 */
+  font-size: 0.8rem;
+  color: #64748b;
+  text-align: center;
+}
+
+/* [NEW] REC 컬럼 스타일 */
+.compRec {
+  width: 20%;
+  text-align: right;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+.recValue {
+  font-weight: 700;
+  color: #334155;
+  margin-left: 4px;
+}
