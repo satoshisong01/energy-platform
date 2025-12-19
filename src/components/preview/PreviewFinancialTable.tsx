@@ -109,7 +109,7 @@ export default function PreviewFinancialTable() {
           <tr>
             <td>운영플랫폼</td>
             <td>1 set</td>
-            <td>{platformCost > 0 ? 1 : 0} ea</td>
+            <td>{platformCost > 0 ? 1 : 0} set</td>
             <td>{config.price_platform}</td>
             <td className={styles.textBold}>{platformCost.toFixed(2)}</td>
           </tr>

@@ -107,7 +107,7 @@ export default function PreviewRequirementsTable() {
               <td className={styles.val}>O</td>
               <td className={styles.val}>O</td>
               <td className={styles.val}>O</td>
-              <td className={styles.val}>△</td>
+              <td className={styles.val}>O</td>
               <td className={styles.val}>O</td>
             </tr>
 
