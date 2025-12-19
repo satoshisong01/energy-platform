@@ -14,7 +14,7 @@ export default function PreviewSummary() {
   const store = useProposalStore();
   const { config } = store;
 
-  // [핵심] Store의 중앙 계산 로직 결과 가져오기 (참조용)
+  // [핵심] Store의 중앙 계산 로직 결과 가져오기
   const results = store.getSimulationResults();
 
   const [showExpansion, setShowExpansion] = useState(false);
@@ -31,12 +31,10 @@ export default function PreviewSummary() {
   // ----------------------------------------------------------------
   const capacity = store.capacityKw;
 
-  // RE100 달성률 계산
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
-  // (주의) RE100 달성률은 발전량이 변하는게 아니라면 체크박스 영향 없음
   const re100Rate =
     totalUsage > 0 ? (results.initialAnnualGen / totalUsage) * 100 : 0;
 
@@ -45,7 +43,6 @@ export default function PreviewSummary() {
     0
   );
 
-  // 전기요금 절감액 계산 (Store 로직과 동일)
   let totalBillSavings = 0;
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
@@ -84,10 +81,10 @@ export default function PreviewSummary() {
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
   // ----------------------------------------------------------------
-  // 2. 시나리오 데이터 구성 (동적 계산 적용)
+  // 2. 시나리오 데이터 구성
   // ----------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
-    // 1) EC 적용 여부에 따른 트럭 수 결정 (체크박스 값 applyEc 사용)
+    // 1) EC 적용 여부에 따른 트럭 수 결정
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
@@ -106,11 +103,13 @@ export default function PreviewSummary() {
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-    // 3) 단가 결정 (Standard vs Premium)
+    // 3) 단가 결정 (Standard vs Premium) - 수익 모델 차이만 반영 (투자비 영향 X)
     const targetEcPrice = isPremium
       ? config.unit_price_ec_5_0
       : config.unit_price_ec_1_5;
-    const modelName = isPremium ? 'REC 5.0' : 'REC 1.5';
+    const modelName = isPremium
+      ? 'REC 5.0 (예상 인센티브)'
+      : 'REC 1.5 (현행 기준)';
 
     // 4) 수익 계산
     const revenue_saving =
@@ -133,18 +132,12 @@ export default function PreviewSummary() {
 
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // 6) 투자비 계산
+    // 6) 투자비 계산 (모듈 등급 통일)
     let solarPrice = config.price_solar_standard;
-    if (isPremium) {
-      solarPrice = config.price_solar_premium;
-    } else {
-      // Standard Plan일 때는 Store에 설정된 모듈 등급을 따라가거나 Standard 가격 적용
-      if (store.moduleTier === 'PREMIUM')
-        solarPrice = config.price_solar_premium;
-      else if (store.moduleTier === 'ECONOMY')
-        solarPrice = config.price_solar_economy;
-      else solarPrice = config.price_solar_standard;
-    }
+    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
+    else if (store.moduleTier === 'ECONOMY')
+      solarPrice = config.price_solar_economy;
+    // else: STANDARD
 
     const solarCost = (capacity / 100) * solarPrice;
     const ecCost = activeTruckCount * config.price_ec_unit;
@@ -168,8 +161,8 @@ export default function PreviewSummary() {
 
     return {
       title: isPremium
-        ? 'TYPE B. Premium Plan (수익 극대화형)'
-        : 'TYPE A. Standard Plan (안정형)',
+        ? 'TYPE B. Premium Plan (정책 인센티브 확대 시)'
+        : 'TYPE A. Standard Plan (현행 기준)',
       invest: investUk,
       ecCount: activeTruckCount,
       annualProfit: annualNetProfitWon / 100000000,
