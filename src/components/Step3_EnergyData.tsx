@@ -3,10 +3,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useProposalStore, MonthlyData } from '../lib/store';
 import styles from './Step3_EnergyData.module.css';
-import { LucideCopy, LucideTable, LucideUpload } from 'lucide-react';
-import * as XLSX from 'xlsx'; // 엑셀 파싱 라이브러리
+import {
+  LucideCopy,
+  LucideTable,
+  LucideUpload,
+  LucideArrowDownToLine,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-// [Helper Component] NumberInput (기존과 동일)
+// ... (NumberInput 컴포넌트는 기존과 동일하므로 생략하거나 그대로 유지) ...
 interface NumberInputProps {
   value: number;
   onChange: (val: number) => void;
@@ -96,7 +101,24 @@ export default function Step3_EnergyData() {
     store.updateMonthlyData(month, field, value);
   };
 
-  // [NEW] 엑셀 파일 처리 핸들러
+  // [NEW] 일괄적용 버튼 컴포넌트 (테이블 헤더용)
+  const BatchButton = ({
+    field,
+    label = '[일괄]',
+  }: {
+    field: keyof MonthlyData;
+    label?: string;
+  }) => (
+    <button
+      onClick={() => store.copyFieldToAll(field)}
+      className="ml-1 px-1 py-0.5 text-[10px] leading-none bg-slate-200 hover:bg-blue-100 text-slate-600 hover:text-blue-700 border border-slate-300 rounded transition-colors"
+      title="1번째 행 값을 아래로 모두 복사"
+    >
+      {label}
+    </button>
+  );
+
+  // 엑셀 업로드 핸들러
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -107,48 +129,40 @@ export default function Step3_EnergyData() {
       const wb = XLSX.read(bstr, { type: 'binary' });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
-
-      // JSON으로 변환 (첫 줄은 헤더로 인식)
-      // 예상 엑셀 포맷: [연월, 사용전력량, 자가소비, 피크치, 전기요금, 기본요금]
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
-      // 데이터 파싱 및 매핑
-      // 헤더 제외하고 데이터 행부터 시작 (보통 2번째 줄부터)
       const newData: MonthlyData[] = [];
-
-      // 데이터 행 순회 (최대 12개)
       let count = 0;
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (!row || row.length === 0 || count >= 12) continue;
 
-        // 엑셀의 '연월' 컬럼 (예: "2025년 08월" or "2025-08") 파싱
         const yearMonthStr = String(row[0]);
         let year = 2025;
-        let month = count + 1; // 기본값
+        let month = count + 1;
 
-        // "2025년 08월" 형식 파싱 시도
         const yearMatch = yearMonthStr.match(/(\d{4})/);
-        const monthMatch = yearMonthStr.match(/(\d{1,2})월/);
+        const monthMatch = yearMonthStr.match(/(\d{1,2})월/); // 예: 08월
 
         if (yearMatch) year = parseInt(yearMatch[1]);
+        // 엑셀 서식에 따라 "8" 또는 "08" 등 다양하므로 유연하게 처리 필요
+        // 여기선 단순화: 엑셀 첫열이 '2024년 8월' 같은 포맷이라 가정
         if (monthMatch) month = parseInt(monthMatch[1]);
-        // "2025-08" 등 다른 형식일 경우 추가 로직 필요하나 일단 단순화
+        else if (!isNaN(parseInt(yearMonthStr))) month = parseInt(yearMonthStr); // 그냥 숫자만 있을 경우
 
         newData.push({
           month: month,
-          year: year, // [NEW] 년도 저장 (store 타입에 year 추가 필요)
+          year: year,
           usageKwh: Number(row[1]) || 0,
           selfConsumption: Number(row[2]) || 0,
           peakKw: Number(row[3]) || 0,
           totalBill: Number(row[4]) || 0,
           baseBill: Number(row[5]) || 0,
-          solarGeneration: 0, // 엑셀에 없으면 0 (자동계산됨)
+          solarGeneration: 0,
         });
         count++;
       }
 
-      // 12개월치가 안 되면 나머지는 빈 값으로 채움
       while (newData.length < 12) {
         newData.push({
           month: newData.length + 1,
@@ -162,20 +176,14 @@ export default function Step3_EnergyData() {
         });
       }
 
-      // Store 업데이트 (setMonthlyData 액션 필요)
-      // 만약 setMonthlyData가 없다면 monthlyData를 map으로 하나씩 업데이트해야 함
-      // 여기서는 store.ts에 setMonthlyData가 있다고 가정하거나, 임시로 하나씩 업데이트
       if (store.setMonthlyData) {
         store.setMonthlyData(newData);
-      } else {
-        // fallback: 기존 데이터 덮어쓰기 (약간 비효율적)
-        alert('Store에 setMonthlyData 액션을 추가해주세요!');
       }
     };
     reader.readAsBinaryString(file);
   };
 
-  // 1. 비율 계산
+  // 계산 로직 (기존 유지)
   const totalUsageInput = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
@@ -187,7 +195,6 @@ export default function Step3_EnergyData() {
   const dynamicPeakRatio =
     totalUsageInput > 0 ? totalSelfConsumptionInput / totalUsageInput : 0;
 
-  // 2. 데이터 계산
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
@@ -195,11 +202,9 @@ export default function Step3_EnergyData() {
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
-
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
-
     let baseBillSavings = 0;
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
@@ -209,7 +214,6 @@ export default function Step3_EnergyData() {
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
     }
-
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
     const unitPriceSell = store.unitPriceSell || 192.79;
@@ -228,7 +232,6 @@ export default function Step3_EnergyData() {
     };
   });
 
-  // 3. 합계 계산
   const totals = computedData.reduce(
     (acc, cur) => ({
       usageKwh: acc.usageKwh + cur.usageKwh,
@@ -270,7 +273,6 @@ export default function Step3_EnergyData() {
           <span className={styles.stepBadge}>3</span> 전력 데이터 (Sheet 4, 5)
         </h3>
 
-        {/* [NEW] 엑셀 업로드 버튼 */}
         <div className="flex gap-2">
           <input
             type="file"
@@ -289,7 +291,6 @@ export default function Step3_EnergyData() {
       </div>
 
       <div className={styles.card}>
-        {/* 상단 컨트롤 */}
         <div className={styles.grid2}>
           <div>
             <label className={styles.label}>계약 종별</label>
@@ -339,13 +340,12 @@ export default function Step3_EnergyData() {
           <button
             onClick={store.copyJanToAll}
             className={styles.copyButton}
-            title="1월 값 복사"
+            title="1월 값 전체 복사"
           >
-            <LucideCopy size={14} /> 1월 값 일괄 적용
+            <LucideCopy size={14} /> 1월 값 전체 일괄 적용
           </button>
         </div>
 
-        {/* 테이블 */}
         <div className={styles.tableWrapper}>
           <table className={styles.complexTable} style={{ minWidth: '1600px' }}>
             <thead>
@@ -370,49 +370,58 @@ export default function Step3_EnergyData() {
                 </th>
               </tr>
               <tr>
+                {/* [수정] 입력 헤더에 각각 일괄 버튼 추가 */}
                 <th className={`${styles.headerBlue} min-w-[120px]`}>
-                  사용량
-                  <br />
-                  (kWh)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>사용량(kWh)</span>
+                    <BatchButton field="usageKwh" />
+                  </div>
                 </th>
                 <th
                   className={`${styles.headerBlue} ${styles.textBlue} min-w-[120px]`}
                 >
-                  자가소비
-                  <br />
-                  (kWh)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>자가소비(kWh)</span>
+                    <BatchButton field="selfConsumption" />
+                  </div>
                 </th>
                 <th
                   className={`${styles.headerBlue} ${styles.textOrange} min-w-[120px]`}
                 >
-                  피크치
-                  <br />
-                  (kW)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>피크치(kW)</span>
+                    <BatchButton field="peakKw" />
+                  </div>
                 </th>
                 <th
                   className={`${styles.headerBlue} ${styles.textBlue} min-w-[120px]`}
                 >
-                  발전량
-                  <br />
-                  (E열)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>발전량(E열)</span>
+                    <BatchButton field="solarGeneration" />
+                  </div>
                 </th>
                 <th className={`${styles.headerBlue} min-w-[120px]`}>
                   잉여전력
                   <br />
                   (F열)
                 </th>
+
                 <th className={`${styles.headerOrange} min-w-[140px]`}>
-                  전기요금
-                  <br />
-                  (A)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>전기요금(A)</span>
+                    <BatchButton field="totalBill" />
+                  </div>
                 </th>
                 <th
                   className={`${styles.headerOrange} ${styles.textOrange} min-w-[140px]`}
                 >
-                  기본요금
-                  <br />
-                  (설치전)
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span>기본요금(설치전)</span>
+                    <BatchButton field="baseBill" />
+                  </div>
                 </th>
+
                 <th
                   className={`${styles.headerOrange} ${styles.textOrange} min-w-[130px]`}
                 >
@@ -456,12 +465,12 @@ export default function Step3_EnergyData() {
                   key={`${row.year}-${row.month}`}
                   className={styles.tableRow}
                 >
-                  {/* [수정] 동적 년월 표시 */}
                   <td className={styles.stickyCol}>
                     {row.year ? `${String(row.year).slice(2)}년 ` : ''}
                     {row.month}월
                   </td>
 
+                  {/* 사용량 */}
                   <td>
                     <NumberInput
                       value={row.usageKwh}
@@ -471,7 +480,8 @@ export default function Step3_EnergyData() {
                       placeholder="0"
                     />
                   </td>
-                  {/* ... (나머지 셀들은 기존과 동일) ... */}
+
+                  {/* 자가소비 */}
                   <td className={styles.bgBlueLight}>
                     <NumberInput
                       value={row.selfConsumption}
@@ -481,6 +491,8 @@ export default function Step3_EnergyData() {
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 피크치 */}
                   <td style={{ background: '#fffbeb' }}>
                     <NumberInput
                       value={row.peakKw}
@@ -488,6 +500,8 @@ export default function Step3_EnergyData() {
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 발전량 */}
                   <td
                     className={`${styles.resultCell} ${styles.textBlue} ${styles.bold}`}
                   >
@@ -502,9 +516,13 @@ export default function Step3_EnergyData() {
                       className={styles.textBlue}
                     />
                   </td>
+
+                  {/* 잉여전력 */}
                   <td className={styles.resultCell}>
                     {Math.round(row.surplusPower).toLocaleString()}
                   </td>
+
+                  {/* 전체요금 */}
                   <td>
                     <NumberInput
                       value={row.totalBill}
@@ -514,6 +532,8 @@ export default function Step3_EnergyData() {
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 기본요금 */}
                   <td className={styles.bgOrangeLight}>
                     <NumberInput
                       value={row.baseBill}
@@ -523,6 +543,8 @@ export default function Step3_EnergyData() {
                       placeholder="0"
                     />
                   </td>
+
+                  {/* 결과 필드들 */}
                   <td className={`${styles.resultCell} ${styles.textOrange}`}>
                     {Math.round(row.maxLoadSavings).toLocaleString()}
                   </td>
@@ -546,7 +568,6 @@ export default function Step3_EnergyData() {
                   </td>
                 </tr>
               ))}
-              {/* 소계 행 (기존과 동일) */}
               <tr
                 style={{
                   borderTop: '2px solid #cbd5e1',
@@ -606,7 +627,7 @@ export default function Step3_EnergyData() {
           </table>
         </div>
 
-        {/* 배지 및 비고 (기존과 동일) */}
+        {/* 하단 배지 및 비고 영역은 기존과 동일 */}
         <div
           style={{
             display: 'flex',

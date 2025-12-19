@@ -165,6 +165,7 @@ interface ProposalState {
   recAveragePrice: number;
 
   // --- Actions ---
+  copyFieldToAll: (field: keyof MonthlyData) => void;
   setMonthlyData: (data: MonthlyData[]) => void; // [NEW] 전체 데이터 교체 액션
   setClientName: (name: string) => void;
   setTargetDate: (date: string) => void;
@@ -311,6 +312,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   recAveragePrice: 80,
 
   // --- Actions ---
+  copyFieldToAll: (field) =>
+    set((state) => {
+      const firstVal = state.monthlyData[0][field];
+      const newData = state.monthlyData.map((d, i) =>
+        i === 0 ? d : { ...d, [field]: firstVal }
+      );
+      return { monthlyData: newData };
+    }),
   setMonthlyData: (data) => set({ monthlyData: data }),
   setClientName: (name) => set({ clientName: name }),
   setTargetDate: (date) => set({ targetDate: date }),
