@@ -12,8 +12,8 @@ import PreviewFinancialTable from './preview/PreviewFinancialTable';
 import PreviewModelVisual from './preview/PreviewModelVisual';
 import PreviewComparisonTable from './preview/PreviewComparisonTable';
 import PreviewSummary from './preview/PreviewSummary';
-// [NEW] 새로 만든 컴포넌트 임포트
 import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
+import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -35,7 +35,6 @@ export default function PreviewPanel() {
   const store = useProposalStore();
   const { config, rationalization, truckCount } = store;
 
-  // 프린트 핸들러
   const handlePrint = () => {
     window.print();
   };
@@ -43,22 +42,18 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산 (PreviewChart, PreviewDetailTable 용으로 유지)
+  // [1] 월별 데이터 계산
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
     const dailyGenHours = 3.64;
-
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
-
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
-
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
-
     const totalUsage = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -81,8 +76,6 @@ export default function PreviewPanel() {
 
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
-
-    // 단순 표기용 잉여수익 (EC 고려 안 된 개별 월 데이터)
     const unitPriceSell = store.unitPriceSell || 192.79;
     const surplusRevenue = surplusPower * unitPriceSell;
 
@@ -132,7 +125,6 @@ export default function PreviewPanel() {
 
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
-
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
@@ -154,8 +146,7 @@ export default function PreviewPanel() {
             onClick={handlePrint}
             className={`${styles.printButton} no-print`}
           >
-            <LucidePrinter size={18} />
-            PDF 저장 / 인쇄
+            <LucidePrinter size={18} /> PDF 저장 / 인쇄
           </button>
         </div>
 
@@ -179,11 +170,18 @@ export default function PreviewPanel() {
         <div style={{ width: '100%', marginTop: '20px' }}>
           <PreviewSummary />
         </div>
-        {/* <div style={{ height: '100%' }}></div> */}
         <PageFooter page={1} />
       </div>
 
-      {/* [페이지 2] 차트 */}
+      {/* [페이지 2] 설치 공간 분석 (이미지 포함) */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
+        <div style={{ width: '100%' }}>
+          <PreviewSiteAnalysis />
+        </div>
+        <PageFooter page={2} />
+      </div>
+
+      {/* [페이지 3] 차트 (기존 2페이지에서 밀림) */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewChart
@@ -193,12 +191,13 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
+        {/* CSS에서 footer absolute 처리했으므로 빈 div는 선택사항입니다 */}
         <p>　</p>
         <div style={{ height: '100%' }}></div>
-        <PageFooter page={2} />
+        <PageFooter page={3} />
       </div>
 
-      {/* [페이지 3] 상세 데이터 테이블 */}
+      {/* [페이지 4] 상세 데이터 테이블 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewDetailTable
@@ -212,44 +211,38 @@ export default function PreviewPanel() {
         <p>　</p>
         <p>　</p>
         <div style={{ height: '100%' }}></div>
-        <PageFooter page={3} />
+        <PageFooter page={4} />
       </div>
 
-      {/* [페이지 4] 투자 및 수익 분석 */}
+      {/* [페이지 5] 투자 및 수익 분석 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewFinancialTable />
         </div>
-        {/* <div style={{ height: '100%' }}></div> */}
-        <PageFooter page={4} />
+        <PageFooter page={5} />
       </div>
 
-      {/* [페이지 5] 모델 비주얼 */}
+      {/* [페이지 6] 모델 비주얼 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewModelVisual />
         </div>
-        {/* <div style={{ height: '100%' }}></div> */}
         <p>　</p>
-        <PageFooter page={5} />
+        <PageFooter page={6} />
       </div>
 
-      {/* [페이지 6] 비교 테이블 (수익성 분석) */}
+      {/* [페이지 7] 비교 테이블 (수익성 분석) */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
         </div>
-        {/* <div style={{ height: '100%' }}></div> */}
-        <PageFooter page={6} />
+        <PageFooter page={7} />
       </div>
 
-      {/* [NEW] [페이지 7] 사업 조건 및 구비 서류 + 최종 푸터 */}
+      {/* [페이지 8] 사업 조건 및 구비 서류 + 최종 푸터 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
-          {/* 구비서류 테이블 */}
           <PreviewRequirementsTable />
-
-          {/* 연락처 푸터 (마지막 페이지로 이동) */}
           <div className={styles.footer} style={{ marginTop: '60px' }}>
             <div className={styles.contactInfo}>
               <div>김 종 우 &nbsp;|&nbsp; 010.5617.9500</div>
@@ -258,8 +251,7 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
-        {/* <div style={{ height: '100%' }}></div> */}
-        <PageFooter page={7} />
+        <PageFooter page={8} />
       </div>
     </div>
   );

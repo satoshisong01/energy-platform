@@ -134,6 +134,7 @@ type SimulationResult = {
 };
 
 interface ProposalState {
+  siteImage: string | null;
   proposalId: number | null;
   proposalName: string;
   clientName: string;
@@ -165,6 +166,7 @@ interface ProposalState {
   recAveragePrice: number;
 
   // --- Actions ---
+  setSiteImage: (img: string | null) => void;
   setClientName: (name: string) => void;
   setTargetDate: (date: string) => void;
   setAddress: (addr: string) => void;
@@ -239,6 +241,7 @@ const PMT = (rate: number, nper: number, pv: number) => {
 };
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
+  siteImage: null, // [NEW]
   proposalId: null,
   proposalName: '',
   clientName: '(주)회사명',
@@ -318,6 +321,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   recAveragePrice: 80, // [NEW] 초기값
 
   // --- Actions ---
+  setSiteImage: (img) => set({ siteImage: img }), // [NEW]
   setClientName: (name) => set({ clientName: name }),
   setTargetDate: (date) => set({ targetDate: date }),
   setAddress: (addr) => set({ address: addr }),
@@ -515,6 +519,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       config: state.config,
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
+      siteImage: state.siteImage, // [NEW] 저장 시 포함
     };
 
     try {
@@ -673,6 +678,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
+        siteImage: data.input_data.siteImage || null, // [NEW]
       });
       get().recalculateCapacity(data.input_data.roofAreas);
       get().recalculateInvestment();
@@ -695,6 +701,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
   resetProposal: () => {
     set({
+      siteImage: null,
       proposalId: null,
       proposalName: '',
       clientName: '',
