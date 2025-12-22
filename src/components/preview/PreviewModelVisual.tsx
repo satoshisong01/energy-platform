@@ -58,10 +58,10 @@ export default function PreviewModelVisual() {
 
   return (
     <div className={styles.container}>
-      <h3 className={styles.title}>RE100 에너지 발전 수익 모델 (개념도)</h3>
+      <h3 className={styles.title}>RE100 에너지 발전 수익 분석 그래프</h3>
 
       <div className={styles.chartBox}>
-        <h4 className={styles.chartTitle}>시간대별 전력 수급 패턴 (예시)</h4>
+        <h4 className={styles.chartTitle}>시간대별 전력 수급</h4>
         <div style={{ height: 350 }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart

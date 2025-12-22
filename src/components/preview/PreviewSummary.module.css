@@ -20,9 +20,16 @@
 }
 
 .headerTitle {
-  font-size: 1.2rem; /* 폰트 축소 */
+  background-color: #1e40af; /* Deep Blue */
+  color: white;
+  padding: 0.6rem 1.5rem;
+  border-radius: 9999px; /* Pill shape */
+  font-size: 1.1rem;
   font-weight: 800;
-  color: #1e293b;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  /* margin-top: 3rem; */
 }
 
 .expandBtn {

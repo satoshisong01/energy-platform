@@ -13,7 +13,7 @@ export type RoofArea = {
 
 export type MonthlyData = {
   month: number;
-  year?: number; // [NEW] 엑셀 업로드 시 연도 저장을 위해 추가
+  year?: number;
   usageKwh: number;
   selfConsumption: number;
   totalBill: number;
@@ -24,6 +24,23 @@ export type MonthlyData = {
 
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
 export type BusinessModel = 'KEPCO' | 'RE100' | 'REC5';
+
+// 금융 상세 설정 인터페이스 추가
+export interface FinancialSettings {
+  rps: {
+    loanRatio: number; // 대출 비율 (%)
+    equityRatio: number; // 자기자본 비율 (%)
+    interestRate: number; // 연 이자율 (%)
+    gracePeriod: number; // 거치 기간 (년)
+    repaymentPeriod: number; // 상환 기간 (년)
+  };
+  factoring: {
+    loanRatio: number; // 대출 비율 (%)
+    interestRate: number; // 연 이자율 (%)
+    gracePeriod: number; // 거치 기간 (년)
+    repaymentPeriod: number; // 상환 기간 (년)
+  };
+}
 
 export type SystemConfig = {
   price_solar_premium: number;
@@ -37,8 +54,8 @@ export type SystemConfig = {
   unit_price_savings: number;
   unit_price_ec_1_5: number;
   unit_price_ec_5_0: number;
-  loan_rate_rps: number;
-  loan_rate_factoring: number;
+  loan_rate_rps: number; // 하위 호환성을 위해 유지 (실제 계산은 financialSettings 사용)
+  loan_rate_factoring: number; // 하위 호환성을 위해 유지
   rental_price_per_kw: number;
   subscription_price_per_kw: number;
   sub_price_self: number;
@@ -120,7 +137,6 @@ type SimulationResult = {
   rec_1000_rent: number;
   rec_1000_sub: number;
 
-  // [NEW] 연간 REC 수익
   rec_annual_common: number;
   rec_annual_rent: number;
   rec_annual_sub: number;
@@ -153,6 +169,7 @@ interface ProposalState {
   energyNote: string;
   rationalization: RationalizationData;
   config: SystemConfig;
+  financialSettings: FinancialSettings; // [NEW] 금융 설정 추가
   tariffPresets: TariffPreset[];
   selectedModel: BusinessModel;
   moduleTier: ModuleTier;
@@ -162,7 +179,6 @@ interface ProposalState {
   degradationRate: number;
   totalInvestment: number;
 
-  // [NEW] REC 평균 가격
   recAveragePrice: number;
 
   // --- Actions ---
@@ -191,7 +207,6 @@ interface ProposalState {
     value: number
   ) => void;
 
-  // [NEW] 엑셀 업로드 및 일괄 적용용
   setMonthlyData: (data: MonthlyData[]) => void;
   copyJanToAll: () => void;
   copyFieldToAll: (field: keyof MonthlyData) => void;
@@ -204,6 +219,7 @@ interface ProposalState {
   setSimulationOption: (field: any, value: any) => void;
   setTruckCount: (count: number) => void;
   updateConfig: (field: keyof SystemConfig, value: number) => void;
+  setFinancialSettings: (settings: Partial<FinancialSettings>) => void; // [NEW] 설정 함수
   updateTariffPreset: (
     index: number,
     field: keyof TariffPreset,
@@ -211,17 +227,14 @@ interface ProposalState {
   ) => void;
   recalculateInvestment: () => void;
 
-  // [NEW] 용량 수동 설정 및 REC 가격 설정
   setCapacityKw: (val: number) => void;
   setRecAveragePrice: (price: number) => void;
 
-  // [NEW] 파일명 자동 생성 Getter
   getProposalFileName: () => string;
 
   // DB Actions
   checkDuplicateName: (name: string, excludeId?: number) => Promise<boolean>;
   saveProposal: (customName?: string) => Promise<boolean>;
-  // [NEW] 다른 이름으로 저장
   saveAsProposal: (customName: string) => Promise<boolean>;
   renameProposal: (id: number, newName: string) => Promise<boolean>;
   fetchProposalList: () => Promise<ProposalMeta[]>;
@@ -241,7 +254,7 @@ const PMT = (rate: number, nper: number, pv: number) => {
 };
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
-  siteImage: null, // [NEW]
+  siteImage: null,
   proposalId: null,
   proposalName: '',
   clientName: '(주)회사명',
@@ -300,6 +313,22 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     sub_price_self: 150,
     sub_price_surplus: 50,
   },
+  // [NEW] 엑셀 수식 기반 초기값 설정
+  financialSettings: {
+    rps: {
+      loanRatio: 80,
+      equityRatio: 20,
+      interestRate: 1.75,
+      gracePeriod: 5,
+      repaymentPeriod: 10,
+    },
+    factoring: {
+      loanRatio: 100,
+      interestRate: 5.1,
+      gracePeriod: 1,
+      repaymentPeriod: 9, // 기존 코드 로직상 1년 거치 + 9년 상환 = 10년 주기 (또는 20년 기준 나머지)
+    },
+  },
   tariffPresets: [
     { id: 1, name: '산업용(을) 고압A - 선택2', baseRate: 8320, savings: 210.5 },
     {
@@ -318,10 +347,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   maintenanceRate: 25.0,
   degradationRate: 0.5,
   totalInvestment: 0,
-  recAveragePrice: 80, // [NEW] 초기값
+  recAveragePrice: 80,
 
   // --- Actions ---
-  setSiteImage: (img) => set({ siteImage: img }), // [NEW]
+  setSiteImage: (img) => set({ siteImage: img }),
   setClientName: (name) => set({ clientName: name }),
   setTargetDate: (date) => set({ targetDate: date }),
   setAddress: (addr) => set({ address: addr }),
@@ -363,7 +392,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ),
     })),
 
-  // [NEW] 전체 데이터 교체 (엑셀 업로드용)
   setMonthlyData: (data) => set({ monthlyData: data }),
 
   copyJanToAll: () =>
@@ -385,7 +413,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return { monthlyData: newData };
     }),
 
-  // [NEW] 특정 필드 일괄 복사
   copyFieldToAll: (field) =>
     set((state) => {
       const firstVal = state.monthlyData[0][field];
@@ -416,6 +443,19 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => ({ config: { ...state.config, [field]: value } }));
     get().recalculateInvestment();
   },
+  // [NEW] 설정 변경 액션 추가 (Nested 객체 업데이트)
+  setFinancialSettings: (settings) =>
+    set((state) => ({
+      financialSettings: {
+        ...state.financialSettings,
+        ...settings,
+        rps: { ...state.financialSettings.rps, ...(settings.rps || {}) },
+        factoring: {
+          ...state.financialSettings.factoring,
+          ...(settings.factoring || {}),
+        },
+      },
+    })),
   updateTariffPreset: (index, field, value) => {
     set((state) => {
       const newPresets = [...state.tariffPresets];
@@ -446,14 +486,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set({ totalInvestment: solarCost + ecCost + tractorCost + platformCost });
   },
 
-  // [NEW] 용량 및 REC 가격 설정
   setCapacityKw: (val) => {
     set({ capacityKw: val });
     get().recalculateInvestment();
   },
   setRecAveragePrice: (price) => set({ recAveragePrice: price }),
 
-  // [NEW] 자동 파일명 생성
   getProposalFileName: () => {
     const state = get();
     const date = new Date();
@@ -517,9 +555,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       maintenanceRate: state.maintenanceRate,
       degradationRate: state.degradationRate,
       config: state.config,
+      financialSettings: state.financialSettings, // [NEW] 저장 시 포함
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
-      siteImage: state.siteImage, // [NEW] 저장 시 포함
+      siteImage: state.siteImage,
     };
 
     try {
@@ -563,7 +602,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [NEW] 다른 이름으로 저장 (복제)
   saveAsProposal: async (customName) => {
     const state = get();
 
@@ -593,6 +631,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       maintenanceRate: state.maintenanceRate,
       degradationRate: state.degradationRate,
       config: state.config,
+      financialSettings: state.financialSettings,
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
     };
@@ -677,8 +716,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
+        financialSettings:
+          data.input_data.financialSettings || get().financialSettings, // 없을 경우 기본값
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
-        siteImage: data.input_data.siteImage || null, // [NEW]
+        siteImage: data.input_data.siteImage || null,
       });
       get().recalculateCapacity(data.input_data.roofAreas);
       get().recalculateInvestment();
@@ -738,6 +779,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: 3,
       totalInvestment: 0,
       recAveragePrice: 80,
+      // financialSettings는 초기값 유지 (또는 별도 리셋 로직 필요시 추가)
     });
   },
 
@@ -754,6 +796,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       capacityKw,
       selectedModel,
       useEc,
+      financialSettings, // [NEW] 설정값 사용
     } = state;
 
     // 1. 투자비 (원 단위 변환)
@@ -776,7 +819,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     let totalRationalizationSavings = 0;
 
     if (selectedModel === 'KEPCO') {
-      // [KEPCO 모델] 전량 판매 (자가소비 없음)
       volume_self = 0;
       rawSurplus = initialAnnualGen;
       volume_ec = 0;
@@ -784,7 +826,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       revenue_saving = 0;
       totalRationalizationSavings = 0;
     } else {
-      // [RE100 / REC5 모델] 자가소비 우선
       const annualSelfConsumption = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
         0
@@ -792,26 +833,19 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
       rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
-      // EC 운용량 계산
       const ecCapacityAnnual = truckCount * 100 * 4 * 365;
       if (useEc) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
       volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-      // 자가소비 절감 수익
       const appliedSavingsPrice =
         state.unitPriceSavings || config.unit_price_savings;
       revenue_saving = volume_self * appliedSavingsPrice;
 
-      // [수정됨] 전기요금 합리화 절감액 계산 (Step 4와 동일한 공식 적용)
       const isEul = state.contractType.includes('(을)');
-
-      // 1) 기본료 절감액: (을 - 갑) * 300 * 12
       const saving_base =
         (rationalization.base_eul - rationalization.base_gap) * 300 * 12;
-
-      // 2) 전력량 요금 절감액
       const saving_light =
         (rationalization.light_eul - rationalization.light_gap) *
         rationalization.light_usage;
@@ -856,34 +890,41 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
-    // 등비수열 합 공식 이용
     const self_final_profit =
       (annualOperatingProfit * (1 - Math.pow(R, n))) / (1 - R);
 
-    // 8. 금융 모델별 계산 (RPS)
-    const rps_rate = config.loan_rate_rps / 100;
-    const rps_loan = totalInvestment * 0.8;
-    const rps_equity = totalInvestment * 0.2;
-    const rps_interest_only = rps_loan * rps_rate; // 거치기간 이자
-    const rps_pmt = PMT(rps_rate, 10, -rps_loan); // 상환기간 연간 불입액
+    // 8. 금융 모델별 계산 (RPS) - [NEW] financialSettings 사용
+    const rps = financialSettings.rps;
+    const rps_rate = rps.interestRate / 100;
+    const rps_loan = totalInvestment * (rps.loanRatio / 100); // 설정된 대출 비율 사용
+    const rps_equity = totalInvestment * (rps.equityRatio / 100); // 설정된 자기자본 비율 사용
+    const rps_interest_only = rps_loan * rps_rate;
+    const rps_pmt = PMT(rps_rate, rps.repaymentPeriod, -rps_loan); // 상환기간 사용
 
-    // RPS 최종 수익: (20년 총수익) - (5년 거치이자) - (10년 원리금상환)
+    // RPS 최종 수익: (20년 총수익) - (거치기간 이자) - (상환기간 원리금상환)
     const rps_final_profit =
-      self_final_profit - rps_interest_only * 5 - Math.abs(rps_pmt) * 10;
-    const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
-    const rps_net_6_15 = annualOperatingProfit + rps_pmt; // pmt가 음수이므로 +
+      self_final_profit -
+      rps_interest_only * rps.gracePeriod -
+      Math.abs(rps_pmt) * rps.repaymentPeriod;
 
-    // 9. 금융 모델별 계산 (팩토링)
-    const fac_rate = config.loan_rate_factoring / 100;
-    const fac_loan = totalInvestment; // 100% 대출
+    const rps_net_1_5 = annualOperatingProfit - rps_interest_only; // 거치기간 순수익
+    const rps_net_6_15 = annualOperatingProfit + rps_pmt; // 상환기간 순수익 (pmt가 음수이므로 +)
+
+    // 9. 금융 모델별 계산 (팩토링) - [NEW] financialSettings 사용
+    const fac = financialSettings.factoring;
+    const fac_rate = fac.interestRate / 100;
+    const fac_loan = totalInvestment * (fac.loanRatio / 100);
     const fac_interest_only = fac_loan * fac_rate;
-    const fac_pmt = PMT(fac_rate, 9, -fac_loan);
+    const fac_pmt = PMT(fac_rate, fac.repaymentPeriod, -fac_loan);
 
-    // 팩토링 최종 수익: (20년 총수익) - (1년 거치이자) - (9년 원리금상환)
+    // 팩토링 최종 수익: (20년 총수익) - (거치기간 이자) - (상환기간 원리금상환)
     const fac_final_profit =
-      self_final_profit - fac_interest_only * 1 - Math.abs(fac_pmt) * 9;
-    const fac_net_1 = annualOperatingProfit - fac_interest_only;
-    const fac_net_2_10 = annualOperatingProfit + fac_pmt;
+      self_final_profit -
+      fac_interest_only * fac.gracePeriod -
+      Math.abs(fac_pmt) * fac.repaymentPeriod;
+
+    const fac_net_1 = annualOperatingProfit - fac_interest_only; // 거치기간 순수익
+    const fac_net_2_10 = annualOperatingProfit + fac_pmt; // 상환기간 순수익
 
     // 10. 무투자 모델 (임대형, 구독형)
     const rental_revenue_yr =
@@ -909,12 +950,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     // 11. REC 데이터 계산
     const recPrice = state.recAveragePrice || 80;
 
-    // 1 REC (1000kW 기준 가치)
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * 0.2 * 3.64 * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
 
-    // 연간 REC 수익 (환산 금액)
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;
     const rec_annual_sub = rec_1000_sub * recPrice * 1000;

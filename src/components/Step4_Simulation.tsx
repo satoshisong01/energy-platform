@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   useProposalStore,
   ModuleTier,
@@ -27,6 +27,9 @@ export default function Step4_Simulation() {
   const { config, rationalization, truckCount } = store;
 
   const [showRationalization, setShowRationalization] = useState(false);
+
+  // [NEW] 알림 중복 방지를 위한 ref
+  const isCheckingCostRef = useRef(false);
 
   // 시뮬레이션 옵션 변경 시 투자비 재계산
   useEffect(() => {
@@ -72,11 +75,9 @@ export default function Step4_Simulation() {
   const isEul = store.contractType.includes('(을)');
 
   // 합리화 절감액 (KEPCO 모델은 미사용, 그 외는 사용)
-  // 1. 기본료 절감액 (자동 계산: 차이 * 300 * 12)
   const diff_base = rationalization.base_eul - rationalization.base_gap;
   const saving_base = diff_base * 300 * 12;
 
-  // 2. 전력량 요금 절감액
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
@@ -85,7 +86,6 @@ export default function Step4_Simulation() {
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
 
-  // 3. 총 절감액 합계
   const totalRationalizationSavings = isEul
     ? saving_base + saving_light + saving_mid + saving_max
     : 0;
@@ -123,6 +123,46 @@ export default function Step4_Simulation() {
     volume_surplus = Math.max(0, rawSurplus - volume_ec);
   }
 
+  // ----------------------------------------------------------------
+  // [NEW] 일일 잉여 전력량 및 자동 대수 추천 로직
+  // ----------------------------------------------------------------
+  const dailySurplus = rawSurplus / 365;
+
+  // 체크박스 핸들러: 체크 시 최적 대수 자동 설정
+  const handleEcToggle = (checked: boolean) => {
+    store.setSimulationOption('useEc', checked);
+
+    if (checked) {
+      let optimalCount = 1;
+      if (dailySurplus >= 1200) {
+        optimalCount = 3;
+      } else if (dailySurplus >= 800) {
+        optimalCount = 2;
+      } else {
+        optimalCount = 1; // 800 미만이라도 기본 1대 설정 (경고는 표시됨)
+      }
+      store.setTruckCount(optimalCount);
+    }
+  };
+
+  // 추천 가이드 텍스트 생성
+  let ecRecommendation = '';
+  let ecRecColor = 'text-gray-500';
+
+  if (dailySurplus < 800) {
+    ecRecommendation = '(일일 잉여 부족 - EC 비추천)';
+    ecRecColor = 'text-red-500 font-bold';
+  } else if (dailySurplus >= 800 && dailySurplus < 1200) {
+    ecRecommendation = '(추천: 2대)';
+    ecRecColor = 'text-blue-600 font-bold';
+  } else if (dailySurplus >= 1200) {
+    ecRecommendation = '(추천: 3대 이상)';
+    ecRecColor = 'text-blue-600 font-bold';
+  }
+
+  // ----------------------------------------------------------------
+  // 수익 및 비용 계산
+  // ----------------------------------------------------------------
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
   let appliedSellPrice = config.unit_price_kepco;
@@ -141,9 +181,6 @@ export default function Step4_Simulation() {
     revenue_surplus +
     (isKepco ? 0 : totalRationalizationSavings);
 
-  // --------------------------------------------------------------------------
-  // [2] 비용 및 투자비 계산
-  // --------------------------------------------------------------------------
   const laborCostWon =
     truckCount > 0 && store.useEc && !isKepco
       ? config.price_labor_ec * 100000000
@@ -185,6 +222,57 @@ export default function Step4_Simulation() {
   const tractorSplit = round2(tractorCost / 20);
   const platformSplit = round2(platformCost / 20);
   const maintenanceSplit = round2(maintenanceTableValue);
+
+  // --------------------------------------------------------------------------
+  // [NEW] 비용 초과 체크 및 자동 조정 로직
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    // 8,000만 원 초과 체크 (단위: 원)
+    const MAX_COST_LIMIT = 80000000;
+
+    if (totalAnnualCost > MAX_COST_LIMIT && !isCheckingCostRef.current) {
+      // 이미 체크 중이면 패스 (무한루프 방지)
+      isCheckingCostRef.current = true;
+
+      // 목표 O&M 비용 = 8000만 - 인건비
+      const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
+
+      // 목표 비율 계산
+      let targetRate = 0;
+      if (totalRevenue > 0) {
+        targetRate = (targetMaintenanceCost / totalRevenue) * 100;
+      }
+
+      // 소수점 2자리까지만
+      const formattedTargetRate = Math.floor(targetRate * 100) / 100;
+
+      // 알림 메시지 구성
+      const currentCostEok = (totalAnnualCost / 100000000).toFixed(2);
+      const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
+
+      const confirmMsg = `[비용 조정 알림]
+현재 유지보수 및 운영비용 합계가 ${currentCostEok}억원입니다.
+설정된 제한선(${limitCostEok}억원)을 초과하였습니다.
+
+O&M 비율을 현재 ${store.maintenanceRate}%에서 ${formattedTargetRate}%로 조정하여
+총 비용을 8,000만원 이하로 맞추시겠습니까?`;
+
+      if (window.confirm(confirmMsg)) {
+        store.setSimulationOption('maintenanceRate', formattedTargetRate);
+      }
+
+      // 체크 완료 후 플래그 해제
+      setTimeout(() => {
+        isCheckingCostRef.current = false;
+      }, 500);
+    }
+  }, [
+    totalAnnualCost,
+    totalRevenue,
+    laborCostWon,
+    store.maintenanceRate,
+    store,
+  ]);
 
   // --------------------------------------------------------------------------
   // [3] ROI 및 어드바이스
@@ -298,36 +386,49 @@ export default function Step4_Simulation() {
       </div>
 
       {!isKepco && (
-        <div className={styles.toggleRow}>
-          <div className="flex items-center gap-2">
-            <LucideTruck size={18} className="text-blue-600" />
-            <span className={styles.toggleLabel}>에너지 캐리어(EC) 운용</span>
+        <div
+          className={styles.toggleRow}
+          style={{ flexDirection: 'column', alignItems: 'flex-start' }}
+        >
+          <div className="flex justify-between w-full items-center">
+            <div className="flex items-center gap-2">
+              <LucideTruck size={18} className="text-blue-600" />
+              <span className={styles.toggleLabel}>에너지 캐리어(EC) 운용</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-5 h-5 text-blue-600 cursor-pointer"
+                checked={store.useEc}
+                // [수정] 체크 시 자동 계산 로직 실행
+                onChange={(e) => handleEcToggle(e.target.checked)}
+              />
+              {store.useEc && (
+                <select
+                  className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={truckCount}
+                  onChange={(e) => store.setTruckCount(Number(e.target.value))}
+                >
+                  <option value={1}>1대 (100kW)</option>
+                  <option value={2}>2대 (200kW)</option>
+                  <option value={3}>3대 (300kW)</option>
+                </select>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              className="w-5 h-5 text-blue-600 cursor-pointer"
-              checked={store.useEc}
-              onChange={(e) =>
-                store.setSimulationOption('useEc', e.target.checked)
-              }
-            />
-            {store.useEc && (
-              <select
-                className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                value={truckCount}
-                onChange={(e) => store.setTruckCount(Number(e.target.value))}
-              >
-                <option value={1}>1대 (100kW)</option>
-                <option value={2}>2대 (200kW)</option>
-                <option value={3}>3대 (300kW)</option>
-              </select>
-            )}
+
+          {/* [NEW] 일일 잉여 전력량 및 추천 가이드 표시 */}
+          <div className="w-full mt-2 pl-6 text-xs text-slate-500 flex justify-between items-center bg-slate-50 p-2 rounded">
+            <span>
+              일일 잉여 전력:{' '}
+              <b>{Math.round(dailySurplus).toLocaleString()} kWh</b>
+            </span>
+            <span className={ecRecColor}>{ecRecommendation}</span>
           </div>
         </div>
       )}
 
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center text-xs text-slate-500">
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center text-xs text-slate-500 mt-2">
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
           <span>
@@ -386,7 +487,7 @@ export default function Step4_Simulation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* 기본료 행 */}
+                  {/* 기본료 */}
                   <tr>
                     <td className="p-2 font-bold bg-slate-50 border-r">
                       기본료

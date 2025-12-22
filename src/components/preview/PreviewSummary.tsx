@@ -26,9 +26,7 @@ export default function PreviewSummary() {
     setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
   }, [store.useEc, store.selectedModel]);
 
-  // ----------------------------------------------------------------
-  // 1. 공통 데이터
-  // ----------------------------------------------------------------
+  // ... (공통 데이터 계산 로직은 기존과 동일하여 생략, 아래 return 부분만 수정됨) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -75,36 +73,27 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  // ----------------------------------------------------------------
-  // [NEW] 한전 장기 계약 (Baseline) 데이터 계산
-  // ----------------------------------------------------------------
+  // 한전 데이터 계산
   const calculateKepcoData = () => {
-    // 1. 투자비 (모듈 등급에 따름, 공통)
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     else if (store.moduleTier === 'ECONOMY')
       solarPrice = config.price_solar_economy;
 
     const solarCost = (capacity / 100) * solarPrice;
-    // 한전형은 EC, 트랙터 등 불필요
     const investWon = solarCost * 100000000;
     const investUk = solarCost;
 
-    // 2. 수익 (전량 한전 판매)
     const annualGen = results.initialAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
-
-    // 3. 비용 (유지보수비만)
     const maintenanceCost = annualRevenue * (store.maintenanceRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
 
-    // 4. 20년 수익
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const totalNet20Won = (annualNetProfit * (1 - Math.pow(R, n))) / (1 - R);
 
-    // ROI
     const roiYears = annualNetProfit > 0 ? investWon / annualNetProfit : 0;
     const profitRate =
       (totalNet20Won / (investWon + maintenanceCost * 20)) * 100;
@@ -115,7 +104,7 @@ export default function PreviewSummary() {
       capacity: capacity,
       annualGen: annualGen,
       annualProfitUk: annualNetProfit / 100000000,
-      annualRevenueRatio: (annualNetProfit / investWon) * 100, // 연 수익률
+      annualRevenueRatio: (annualNetProfit / investWon) * 100,
       totalProfit20Uk: totalNet20Won / 100000000,
       totalProfitRatio: profitRate,
       roiYears: roiYears,
@@ -123,9 +112,7 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // ----------------------------------------------------------------
-  // 2. 시나리오 데이터 구성 (Type A / B)
-  // ----------------------------------------------------------------
+  // 시나리오 데이터 구성
   const getScenarioData = (isPremium: boolean) => {
     const activeTruckCount = applyEc
       ? store.truckCount > 0
@@ -164,7 +151,6 @@ export default function PreviewSummary() {
       (grossRevenue * store.maintenanceRate) / 100 + laborCostWon;
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // 투자비 (공통 단가 적용)
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     else if (store.moduleTier === 'ECONOMY')
@@ -222,7 +208,7 @@ export default function PreviewSummary() {
 
   const toUk = (val: number) => val.toFixed(2);
 
-  // [렌더링] 시나리오 카드
+  // 시나리오 카드 렌더링
   const renderRow = (d: typeof stdData) => (
     <div className={`${styles.flowContainer} ${d.isPro ? styles.proRow : ''}`}>
       {/* 투자 */}
@@ -291,7 +277,6 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 중간 연결부 (간소화) */}
       <div className={styles.middleConnect}>
         <div className={styles.connectContent}>
           <div className={styles.connectItem}>
@@ -377,7 +362,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* [NEW] 한전 장기 계약 섹션 (타이트한 가로형 바) */}
+      {/* [수정] 한전 장기 계약 섹션 (ROI 위치 변경) */}
       <div className={styles.kepcoSection}>
         <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
         <div className={styles.kepcoContent}>
@@ -391,6 +376,7 @@ export default function PreviewSummary() {
           <div className={styles.kArrow}>
             <LucideArrowRight size={14} />
           </div>
+
           <div className={styles.kepcoItem}>
             <span className={styles.kLabel}>연간 발전량</span>
             <span className={styles.kValueSm}>
@@ -400,6 +386,7 @@ export default function PreviewSummary() {
           <div className={styles.kArrow}>
             <LucideArrowRight size={14} />
           </div>
+
           <div className={styles.kepcoItem}>
             <span className={styles.kLabel}>연간 수익/수익률</span>
             <div className="flex gap-2">
@@ -414,19 +401,22 @@ export default function PreviewSummary() {
           <div className={styles.kArrow}>
             <LucideArrowRight size={14} />
           </div>
+
+          {/* [핵심 수정] ROI를 별도 배지가 아닌, 20년간 수익 항목 내부 하단으로 이동 */}
           <div className={styles.kepcoItem}>
             <span className={styles.kLabel}>20년간 수익</span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <span className={styles.kValue}>
                 {kepcoData.totalProfit20Uk.toFixed(2)} 억
               </span>
               <span className={styles.kSubBlue}>
-                {kepcoData.totalProfitRatio.toFixed(2)}%
+                {kepcoData.totalProfitRatio.toFixed(0)}%
               </span>
             </div>
-          </div>
-          <div className={styles.kepcoRoiBadge}>
-            {kepcoData.roiYears.toFixed(2)} 년
+            {/* ROI 표시를 아래 카드 스타일(roiBox)과 비슷하게 구현 */}
+            <div className="mt-1 px-2 py-0.5 bg-slate-100 rounded text-xs font-bold text-slate-500 text-center">
+              ROI {kepcoData.roiYears.toFixed(2)}년
+            </div>
           </div>
         </div>
       </div>
