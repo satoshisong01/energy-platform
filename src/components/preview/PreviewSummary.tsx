@@ -17,6 +17,14 @@ export default function PreviewSummary() {
 
   const results = store.getSimulationResults();
 
+  // [핵심 수정] Step4_Simulation.tsx와 동일한 방식의 발전량 계산 (엑셀 로직 기준)
+  // store의 getSimulationResults()는 업로드된 데이터를 우선하지만,
+  // Step4는 용량 기반 단순 계산을 강제하므로 이를 따름
+  const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
+    const days = new Date(2025, cur.month, 0).getDate();
+    return acc + store.capacityKw * 3.64 * days;
+  }, 0);
+
   const [showExpansion, setShowExpansion] = useState(false);
   const [applyEc, setApplyEc] = useState(
     store.useEc && store.selectedModel !== 'KEPCO'
@@ -26,14 +34,92 @@ export default function PreviewSummary() {
     setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
   }, [store.useEc, store.selectedModel]);
 
-  // ... (공통 데이터 계산 로직은 기존과 동일하여 생략, 아래 return 부분만 수정됨) ...
+  // --------------------------------------------------------------------------
+  // EC 체크 토글 핸들러 (비용 자동 보정 로직 포함)
+  // --------------------------------------------------------------------------
+  const handleEcToggle = (checked: boolean) => {
+    // 1. 상태 업데이트
+    setApplyEc(checked);
+    store.setSimulationOption('useEc', checked);
+
+    // 2. 비용 보정 시뮬레이션
+    const activeTruckCount = checked
+      ? store.truckCount > 0
+        ? store.truckCount
+        : 3
+      : 0;
+
+    const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
+
+    // [수정] Step4와 동일한 발전량 사용
+    const annualGen = simpleAnnualGen;
+
+    const annualSelf = store.monthlyData.reduce(
+      (acc, cur) => acc + cur.selfConsumption,
+      0
+    );
+    const rawSurplus = Math.max(0, annualGen - annualSelf);
+    const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
+    const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
+
+    // 모델별 단가 적용 (Step4와 동일)
+    let appliedSellPrice = config.unit_price_kepco;
+    if (store.selectedModel === 'RE100')
+      appliedSellPrice = config.unit_price_ec_1_5;
+    if (store.selectedModel === 'REC5')
+      appliedSellPrice = config.unit_price_ec_5_0;
+
+    const revenue_saving =
+      Math.min(annualGen, annualSelf) *
+      (store.unitPriceSavings || config.unit_price_savings);
+
+    const revenue_ec = volume_ec * appliedSellPrice;
+    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
+
+    // 총 매출 (Gross)
+    const grossRevenue =
+      revenue_saving +
+      revenue_ec +
+      revenue_surplus +
+      results.totalRationalizationSavings;
+
+    // 인건비 (Labor)
+    const laborCostWon =
+      activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
+
+    // 3. 한도 체크 및 비율 조정 (8,000만 원)
+    const MAX_LIMIT = 80000000;
+
+    if (checked) {
+      const currentRateCost =
+        grossRevenue * (store.maintenanceRate / 100) + laborCostWon;
+
+      if (currentRateCost > MAX_LIMIT) {
+        const targetMaintenance = Math.max(0, MAX_LIMIT - laborCostWon);
+        let newRate = 0;
+        if (grossRevenue > 0) {
+          newRate = (targetMaintenance / grossRevenue) * 100;
+        }
+        store.setSimulationOption(
+          'maintenanceRate',
+          Math.floor(newRate * 100) / 100
+        );
+      }
+    } else {
+      store.setSimulationOption('maintenanceRate', 25.0);
+    }
+  };
+
+  // ... (공통 데이터 계산) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
-  const re100Rate =
-    totalUsage > 0 ? (results.initialAnnualGen / totalUsage) * 100 : 0;
+
+  // [수정] RE100 비율 계산 시에도 simpleAnnualGen 사용
+  const re100Rate = totalUsage > 0 ? (simpleAnnualGen / totalUsage) * 100 : 0;
+
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
     0
@@ -43,7 +129,10 @@ export default function PreviewSummary() {
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
     const autoGen = capacity * 3.64 * days;
-    const solarGen = data.solarGeneration > 0 ? data.solarGeneration : autoGen;
+
+    // [수정] 발전량 계산 로직 통일 (단순 계산 사용)
+    const solarGen = autoGen;
+
     const selfConsum = data.selfConsumption;
     const usageSaving =
       Math.min(solarGen, selfConsum) *
@@ -84,7 +173,9 @@ export default function PreviewSummary() {
     const investWon = solarCost * 100000000;
     const investUk = solarCost;
 
-    const annualGen = results.initialAnnualGen;
+    // [수정] Step4 방식의 발전량 사용
+    const annualGen = simpleAnnualGen;
+
     const annualRevenue = annualGen * config.unit_price_kepco;
     const maintenanceCost = annualRevenue * (store.maintenanceRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
@@ -120,7 +211,10 @@ export default function PreviewSummary() {
         : 3
       : 0;
     const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
-    const annualGen = results.initialAnnualGen;
+
+    // [수정] Step4 방식의 발전량 사용
+    const annualGen = simpleAnnualGen;
+
     const annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
@@ -347,7 +441,7 @@ export default function PreviewSummary() {
               type="checkbox"
               className="w-3 h-3"
               checked={applyEc}
-              onChange={(e) => setApplyEc(e.target.checked)}
+              onChange={(e) => handleEcToggle(e.target.checked)}
             />
             <span className="font-bold text-slate-700">EC 적용</span>
           </label>
@@ -362,7 +456,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* [수정] 한전 장기 계약 섹션 (ROI 위치 변경) */}
+      {/* 한전 장기 계약 섹션 (ROI 위치 변경) */}
       <div className={styles.kepcoSection}>
         <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
         <div className={styles.kepcoContent}>
@@ -402,7 +496,7 @@ export default function PreviewSummary() {
             <LucideArrowRight size={14} />
           </div>
 
-          {/* [핵심 수정] ROI를 별도 배지가 아닌, 20년간 수익 항목 내부 하단으로 이동 */}
+          {/* ROI를 별도 배지가 아닌 20년간 수익 항목 내부 하단으로 이동 */}
           <div className={styles.kepcoItem}>
             <span className={styles.kLabel}>20년간 수익</span>
             <div className="flex items-center gap-2">
@@ -413,7 +507,6 @@ export default function PreviewSummary() {
                 {kepcoData.totalProfitRatio.toFixed(0)}%
               </span>
             </div>
-            {/* ROI 표시를 아래 카드 스타일(roiBox)과 비슷하게 구현 */}
             <div className="mt-1 px-2 py-0.5 bg-slate-100 rounded text-xs font-bold text-slate-500 text-center">
               ROI {kepcoData.roiYears.toFixed(2)}년
             </div>

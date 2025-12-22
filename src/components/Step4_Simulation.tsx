@@ -31,6 +31,9 @@ export default function Step4_Simulation() {
   // [NEW] 알림 중복 방지를 위한 ref
   const isCheckingCostRef = useRef(false);
 
+  // 중앙 계산 결과 사용 (Preview와 데이터 일치)
+  const results = store.getSimulationResults();
+
   // 시뮬레이션 옵션 변경 시 투자비 재계산
   useEffect(() => {
     store.recalculateInvestment();
@@ -74,7 +77,6 @@ export default function Step4_Simulation() {
   const isKepco = store.selectedModel === 'KEPCO';
   const isEul = store.contractType.includes('(을)');
 
-  // 합리화 절감액 (KEPCO 모델은 미사용, 그 외는 사용)
   const diff_base = rationalization.base_eul - rationalization.base_gap;
   const saving_base = diff_base * 300 * 12;
 
@@ -91,105 +93,46 @@ export default function Step4_Simulation() {
     : 0;
 
   // --------------------------------------------------------------------------
-  // [1] 물량 및 수익 계산
+  // [1] 물량 및 수익 데이터 (from store results)
   // --------------------------------------------------------------------------
-  const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
-    const days = new Date(2025, cur.month, 0).getDate();
-    return acc + store.capacityKw * 3.64 * days;
-  }, 0);
+  const initialAnnualGen = results.initialAnnualGen;
+  const volume_self = results.volume_self;
+  const volume_ec = results.volume_ec;
+  const volume_surplus = results.volume_surplus_final;
 
-  let volume_self = 0;
-  let volume_ec = 0;
-  let volume_surplus = 0;
-  let rawSurplus = 0;
-
-  if (isKepco) {
-    volume_self = 0;
-    rawSurplus = initialAnnualGen;
-    volume_ec = 0;
-    volume_surplus = initialAnnualGen;
-  } else {
-    const annualSelfConsumption = store.monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0
-    );
-    volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-    rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
-
-    const ecCapacityAnnual = truckCount * 100 * 4 * 365;
-    if (store.useEc) {
-      volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
-    }
-    volume_surplus = Math.max(0, rawSurplus - volume_ec);
-  }
-
-  // ----------------------------------------------------------------
-  // [NEW] 일일 잉여 전력량 및 자동 대수 추천 로직
-  // ----------------------------------------------------------------
+  const annualSelfConsumption = store.monthlyData.reduce(
+    (acc, cur) => acc + cur.selfConsumption,
+    0
+  );
+  const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
   const dailySurplus = rawSurplus / 365;
 
-  // 체크박스 핸들러: 체크 시 최적 대수 자동 설정
-  const handleEcToggle = (checked: boolean) => {
-    store.setSimulationOption('useEc', checked);
-
-    if (checked) {
-      let optimalCount = 1;
-      if (dailySurplus >= 1200) {
-        optimalCount = 3;
-      } else if (dailySurplus >= 800) {
-        optimalCount = 2;
-      } else {
-        optimalCount = 1;
-      }
-      store.setTruckCount(optimalCount);
-    }
-  };
-
-  // 추천 가이드 텍스트 생성
-  let ecRecommendation = '';
-  let ecRecColor = 'text-gray-500';
-
-  if (dailySurplus < 800) {
-    ecRecommendation = '(일일 잉여 부족 - EC 비추천)';
-    ecRecColor = 'text-red-500 font-bold';
-  } else if (dailySurplus >= 800 && dailySurplus < 1200) {
-    ecRecommendation = '(추천: 2대)';
-    ecRecColor = 'text-blue-600 font-bold';
-  } else if (dailySurplus >= 1200) {
-    ecRecommendation = '(추천: 3대 이상)';
-    ecRecColor = 'text-blue-600 font-bold';
-  }
-
-  // ----------------------------------------------------------------
-  // 수익 및 비용 계산
-  // ----------------------------------------------------------------
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
+
   let appliedSellPrice = config.unit_price_kepco;
   if (store.selectedModel === 'RE100')
     appliedSellPrice = config.unit_price_ec_1_5;
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  const revenue_saving = volume_self * appliedSavingsPrice;
-  const revenue_ec = volume_ec * appliedSellPrice;
-  const revenue_surplus = volume_surplus * config.unit_price_kepco;
-
+  const revenue_saving = results.revenue_saving;
+  const revenue_ec = results.revenue_ec;
+  const revenue_surplus = results.revenue_surplus;
+  // const totalRevenue = results.annualGrossRevenue;
+  // ↑ 주의: results.annualGrossRevenue는 현재 maintenanceRate로 계산된 결과일 수 있음.
+  // 비용 역산을 위해 순수 매출(Gross)이 필요하므로 직접 참조
   const totalRevenue =
-    revenue_saving +
-    revenue_ec +
-    revenue_surplus +
-    (isKepco ? 0 : totalRationalizationSavings);
+    revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
 
-  const laborCostWon =
-    truckCount > 0 && store.useEc && !isKepco
-      ? config.price_labor_ec * 100000000
-      : 0;
-
+  // 비용 계산 (현재 비율 기준)
+  const laborCostWon = results.laborCostWon;
+  // O&M 비용 = 매출 * 비율
   const maintenanceBase = totalRevenue * (store.maintenanceRate / 100);
   const totalAnnualCost = maintenanceBase + laborCostWon;
   const netProfit = totalRevenue - totalAnnualCost;
 
+  // 투자비 데이터
   let solarPrice = config.price_solar_standard;
   if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
   if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
@@ -204,8 +147,7 @@ export default function Step4_Simulation() {
   const platformCost =
     !isKepco && truckCount > 0 && store.useEc ? 1 * config.price_platform : 0;
 
-  const totalInitialInvestment =
-    solarCost + ecCost + tractorCost + platformCost;
+  const totalInitialInvestment = results.totalInvestment / 100000000;
   const maintenanceTableValue = totalAnnualCost / 100000000;
 
   let totalInvestment20Years = 0;
@@ -223,97 +165,48 @@ export default function Step4_Simulation() {
   const platformSplit = round2(platformCost / 20);
   const maintenanceSplit = round2(maintenanceTableValue);
 
-  // --------------------------------------------------------------------------
-  // [수정됨] 비용 체크 및 자동 조정/복구 로직
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    // 8,000만 원 (단위: 원)
-    const MAX_COST_LIMIT = 80000000;
-    // 기본 유지보수 비율
-    const DEFAULT_MAINTENANCE_RATE = 25;
-
-    // 중복 실행 방지
-    if (isCheckingCostRef.current) return;
-
-    // 1. 비용 초과 시 (인건비 포함) -> 비율 낮추기 제안
-    if (totalAnnualCost > MAX_COST_LIMIT) {
-      isCheckingCostRef.current = true;
-
-      const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
-      let targetRate = 0;
-      if (totalRevenue > 0) {
-        targetRate = (targetMaintenanceCost / totalRevenue) * 100;
-      }
-      const formattedTargetRate = Math.floor(targetRate * 100) / 100;
-
-      const currentCostEok = (totalAnnualCost / 100000000).toFixed(2);
-      const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
-
-      const confirmMsg = `[비용 조정 알림]
-현재 유지보수 및 운영비용 합계가 ${currentCostEok}억원입니다.
-설정된 제한선(${limitCostEok}억원)을 초과하였습니다.
-
-O&M 비율을 현재 ${store.maintenanceRate}%에서 ${formattedTargetRate}%로 조정하여
-총 비용을 8,000만원 이하로 맞추시겠습니까?`;
-
-      if (window.confirm(confirmMsg)) {
-        store.setSimulationOption('maintenanceRate', formattedTargetRate);
-      }
-
-      setTimeout(() => {
-        isCheckingCostRef.current = false;
-      }, 500);
-    }
-    // 2. 비용이 안정권이고 비율이 낮아져 있는 경우 -> 25% 복구 제안 (EC 해제 시 등)
-    else {
-      // 현재 비율이 기본값(25%)보다 낮고,
-      // 기본값(25%)으로 복구해도 8,000만원을 넘지 않는지 확인
-      const costWithDefaultRate =
-        totalRevenue * (DEFAULT_MAINTENANCE_RATE / 100) + laborCostWon;
-
-      if (
-        store.maintenanceRate < DEFAULT_MAINTENANCE_RATE &&
-        costWithDefaultRate <= MAX_COST_LIMIT
-      ) {
-        isCheckingCostRef.current = true;
-
-        // 사용자가 귀찮아할 수 있으니 confirm 없이 자동 복구하거나, 짧은 알림 후 복구할 수 있음.
-        // 여기서는 명확하게 알려주고 복구하는 방식 적용 (또는 조용히 복구하려면 confirm 제거)
-        const recoverMsg = `[비용 자동 복구]
-운영 비용이 안정화되어(EC 미사용 등),
-O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
-
-        // 자동 복구 (알림은 선택사항, 여기서는 alert로 한 번 알려줌)
-        // alert(recoverMsg);
-        store.setSimulationOption('maintenanceRate', DEFAULT_MAINTENANCE_RATE);
-
-        setTimeout(() => {
-          isCheckingCostRef.current = false;
-        }, 500);
-      }
-    }
-  }, [
-    totalAnnualCost,
-    totalRevenue,
-    laborCostWon,
-    store.maintenanceRate,
-    store,
-  ]);
-
-  // --------------------------------------------------------------------------
-  // [3] ROI 및 어드바이스
-  // --------------------------------------------------------------------------
-  const degradationRateDecimal = -(store.degradationRate / 100);
-  const R = 1 + degradationRateDecimal;
-  const n = 20;
-  const totalNetProfit20Years = (netProfit * (1 - Math.pow(R, n))) / (1 - R);
-
-  const roiYears =
-    netProfit > 0 ? totalInitialInvestment / (netProfit / 100000000) : 0;
+  const totalNetProfit20Years = results.self_final_profit;
+  const roiYears = results.self_roi_years;
   const roiPercent =
     totalInvestment20Years > 0
       ? (totalNetProfit20Years / 100000000 / totalInvestment20Years) * 100
       : 0;
+
+  // ----------------------------------------------------------------
+  // [NEW] EC 체크 토글 핸들러
+  // ----------------------------------------------------------------
+  const handleEcToggle = (checked: boolean) => {
+    store.setSimulationOption('useEc', checked);
+
+    if (checked) {
+      let optimalCount = 1;
+      if (dailySurplus >= 1200) {
+        optimalCount = 3;
+      } else if (dailySurplus >= 800) {
+        optimalCount = 2;
+      } else {
+        optimalCount = 1;
+      }
+      store.setTruckCount(optimalCount);
+    } else {
+      store.setSimulationOption('maintenanceRate', 25.0);
+      isCheckingCostRef.current = false;
+    }
+  };
+
+  let ecRecommendation = '';
+  let ecRecColor = 'text-gray-500';
+
+  if (dailySurplus < 800) {
+    ecRecommendation = '(일일 잉여 부족 - EC 비추천)';
+    ecRecColor = 'text-red-500 font-bold';
+  } else if (dailySurplus >= 800 && dailySurplus < 1200) {
+    ecRecommendation = '(추천: 2대)';
+    ecRecColor = 'text-blue-600 font-bold';
+  } else if (dailySurplus >= 1200) {
+    ecRecommendation = '(추천: 3대 이상)';
+    ecRecColor = 'text-blue-600 font-bold';
+  }
 
   let adviceMessage = null;
   let adviceType = 'info';
@@ -346,6 +239,89 @@ O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
       );
     }
   }
+
+  // --------------------------------------------------------------------------
+  // [비용 체크 및 자동 조정 로직 (트럭 대수 변경 대응 포함)]
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const MAX_COST_LIMIT = 80000000;
+    const DEFAULT_RATE = 25.0;
+
+    // 계산에 필요한 값이 아직 없으면 패스
+    if (!totalRevenue || totalRevenue === 0) return;
+
+    if (isCheckingCostRef.current) return;
+
+    // 1. 현재 비용 계산
+    const currentCost = totalAnnualCost; // (매출 * 현재%) + 인건비
+
+    // 2. 비용 초과 시 -> 낮추기
+    if (currentCost > MAX_COST_LIMIT) {
+      isCheckingCostRef.current = true;
+
+      const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
+      const targetRate = (targetMaintenanceCost / totalRevenue) * 100;
+      const formattedTargetRate = Math.floor(targetRate * 100) / 100;
+
+      const currentCostEok = (currentCost / 100000000).toFixed(2);
+      const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
+
+      const confirmMsg = `[비용 조정 알림]
+현재 운영비용(${currentCostEok}억원)이 한도(${limitCostEok}억원)를 초과했습니다.
+
+O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하여
+비용을 맞추시겠습니까?`;
+
+      setTimeout(() => {
+        if (window.confirm(confirmMsg)) {
+          store.setSimulationOption('maintenanceRate', formattedTargetRate);
+        }
+        setTimeout(() => {
+          isCheckingCostRef.current = false;
+        }, 500);
+      }, 100);
+    }
+    // 3. 비용 여유 발생 시 (트럭 줄임 등) -> 비율 다시 올리기 (최대 25%)
+    else if (store.maintenanceRate < DEFAULT_RATE) {
+      // 25%로 올렸을 때의 예상 비용 계산
+      const potentialCost = totalRevenue * (DEFAULT_RATE / 100) + laborCostWon;
+
+      // 25%로 올려도 한도 내라면 -> 25% 복구
+      if (potentialCost <= MAX_COST_LIMIT) {
+        isCheckingCostRef.current = true;
+        // 사용자에게 묻지 않고 자동 복구 (또는 필요시 confirm 추가)
+        // 트럭 줄였을 때 혜택을 바로 체감하게 하기 위해 자동 복구 추천
+        store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
+        setTimeout(() => {
+          isCheckingCostRef.current = false;
+        }, 500);
+      }
+      // 25%는 안 되지만 현재보다는 올릴 수 있는 경우 (중간값)
+      else {
+        isCheckingCostRef.current = true;
+        const targetMaintenanceCost = Math.max(
+          0,
+          MAX_COST_LIMIT - laborCostWon
+        );
+        const maxPossibleRate = (targetMaintenanceCost / totalRevenue) * 100;
+        const formattedMaxRate = Math.floor(maxPossibleRate * 100) / 100;
+
+        // 현재 비율과 목표 비율 차이가 유의미할 때만 조정 (0.5% 이상)
+        if (formattedMaxRate > store.maintenanceRate + 0.5) {
+          store.setSimulationOption('maintenanceRate', formattedMaxRate);
+        }
+        setTimeout(() => {
+          isCheckingCostRef.current = false;
+        }, 500);
+      }
+    }
+  }, [
+    totalAnnualCost,
+    totalRevenue,
+    laborCostWon,
+    store.maintenanceRate,
+    store,
+  ]);
 
   // --------------------------------------------------------------------------
   // UI 렌더링
@@ -426,7 +402,6 @@ O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
                 type="checkbox"
                 className="w-5 h-5 text-blue-600 cursor-pointer"
                 checked={store.useEc}
-                // [수정] 체크 시 자동 계산 로직 실행
                 onChange={(e) => handleEcToggle(e.target.checked)}
               />
               {store.useEc && (
@@ -443,7 +418,6 @@ O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
             </div>
           </div>
 
-          {/* [NEW] 일일 잉여 전력량 및 추천 가이드 표시 */}
           <div className="w-full mt-2 pl-6 text-xs text-slate-500 flex justify-between items-center bg-slate-50 p-2 rounded">
             <span>
               일일 잉여 전력:{' '}
@@ -799,7 +773,6 @@ O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
                 </span>
               </div>
               <div className={`${styles.row} ${styles.bgPink}`}>
-                {/* [수정됨] 잉여 전력량 표시를 'net surplus (raw - ec)'로 변경 */}
                 <span className={styles.dLabel}>잉여 전력량 (년)</span>
                 <span>
                   <span className={styles.dVal}>

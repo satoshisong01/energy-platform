@@ -803,11 +803,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
-    // 2. 발전량 총합 계산
+    // 2. 발전량 총합 계산 (엑셀 로직과 일치시키기 위해 단순 계산 사용)
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
-      const autoGen = capacityKw * 3.64 * days;
-      return acc + (cur.solarGeneration > 0 ? cur.solarGeneration : autoGen);
+      return acc + capacityKw * 3.64 * days;
     }, 0);
 
     // 3. 모델별 물량 및 수익 배분
@@ -886,7 +885,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
     const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
-    // 7. 20년 수익 시뮬레이션 (자기자본)
+    // 7. 20년 수익 시뮬레이션 (자가자본)
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
