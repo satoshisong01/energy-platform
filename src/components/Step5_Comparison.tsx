@@ -10,9 +10,10 @@ const toWon = (val: number) => Math.round(val).toLocaleString();
 
 export default function Step5_Comparison() {
   const store = useProposalStore();
-  const { config } = store;
+  // [수정] financialSettings 추가 가져오기
+  const { config, financialSettings } = store;
 
-  // [핵심] 중앙 계산 로직 호출
+  // [핵심] 중앙 계산 로직 호출 (store.ts에서 이미 financialSettings가 반영된 결과임)
   const results = store.getSimulationResults();
 
   // 20년 수익 평균치 계산
@@ -20,11 +21,27 @@ export default function Step5_Comparison() {
   const rps_avg = results.rps_final_profit / 20;
   const fac_avg = results.fac_final_profit / 20;
 
+  // [수정] 금융 설정값 안전하게 가져오기 (없을 경우 기본값)
+  const rps = financialSettings?.rps || {
+    loanRatio: 80,
+    equityRatio: 20,
+    interestRate: 1.75,
+    gracePeriod: 5,
+    repaymentPeriod: 10,
+  };
+
+  const fac = financialSettings?.factoring || {
+    loanRatio: 100,
+    interestRate: 5.1,
+    gracePeriod: 1,
+    repaymentPeriod: 9,
+  };
+
   // AI 분석 멘트 생성
   const models = [
     {
       id: 'self',
-      name: '자가자본',
+      name: '자기자본',
       profit: results.self_final_profit,
       invest: results.totalInvestment,
     },
@@ -37,11 +54,11 @@ export default function Step5_Comparison() {
     { id: 'fac', name: '팩토링', profit: results.fac_final_profit, invest: 0 },
     {
       id: 'rent',
-      name: '임대형',
+      name: 'RE100연계',
       profit: results.rental_final_profit,
       invest: 0,
     },
-    { id: 'sub', name: '구독형', profit: results.sub_final_profit, invest: 0 },
+    { id: 'sub', name: '구독', profit: results.sub_final_profit, invest: 0 },
   ];
 
   const bestProfitModel = models.reduce((prev, current) =>
@@ -54,7 +71,7 @@ export default function Step5_Comparison() {
 
   let aiRecommendation = '';
   if (bestProfitModel.id === 'self') {
-    aiRecommendation = `[자가자본 투자] 시 20년 기준 가장 높은 수익(${(
+    aiRecommendation = `[자기자본 투자] 시 20년 기준 가장 높은 수익(${(
       bestProfitModel.profit / 100000000
     ).toFixed(1)}억원)이 예상됩니다.`;
   } else if (bestProfitModel.invest === 0) {
@@ -67,6 +84,15 @@ export default function Step5_Comparison() {
   const comparisonText = `(무투자 모델 대비 +${(profitDiff / 100000000).toFixed(
     1
   )}억 이득)`;
+
+  // [Helper] 빈 셀 스타일 컴포넌트 (회색 배경 적용)
+  const EmptyCell = () => (
+    <td
+      className={`${styles.val} bg-gray-300 text-gray-400 cursor-not-allowed`}
+    >
+      -
+    </td>
+  );
 
   return (
     <div className="mt-8">
@@ -83,29 +109,28 @@ export default function Step5_Comparison() {
             <tr>
               <th className={styles.colLabel}>구분</th>
               <th className={styles.colSelf}>
-                자가자본
+                자기자본
                 <br />
                 <span className={styles.subText}>(전액투자)</span>
               </th>
+              {/* [수정] 동적 이자율 표시 */}
               <th className={styles.colRps}>
                 RPS 정책자금
                 <br />
-                <span className={styles.subText}>{config.loan_rate_rps}%</span>
+                <span className={styles.subText}>{rps.interestRate}%</span>
               </th>
               <th className={styles.colFac}>
                 팩토링
                 <br />
-                <span className={styles.subText}>
-                  {config.loan_rate_factoring}%
-                </span>
+                <span className={styles.subText}>{fac.interestRate}%</span>
               </th>
               <th className={styles.colRental}>
-                임대형
+                RE100연계
                 <br />
-                <span className={styles.subText}>부지임대</span>
+                <span className={styles.subText}>임대형</span>
               </th>
               <th className={styles.colSub}>
-                구독형
+                구독
                 <br />
                 <span className={styles.subText}>서비스</span>
               </th>
@@ -123,15 +148,20 @@ export default function Step5_Comparison() {
               <td className={styles.val}>
                 {toWon(results.totalInvestment)} 원
                 <br />
-                <span className="text-[10px] text-blue-600">(자부담 20%)</span>
+                {/* [수정] 동적 비율 표시 */}
+                <span className="text-[10px] text-blue-600">
+                  (자부담 {rps.equityRatio}%)
+                </span>
               </td>
               <td className={styles.val}>
                 {toWon(results.totalInvestment)} 원
                 <br />
-                <span className="text-[10px] text-blue-600">(자부담 0%)</span>
+                <span className="text-[10px] text-blue-600">
+                  (자부담 {100 - fac.loanRatio}%)
+                </span>
               </td>
-              <td className={styles.val}>-</td>
-              <td className={styles.val}>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
 
             {/* 2. 연간 수입 (Gross) */}
@@ -164,8 +194,8 @@ export default function Step5_Comparison() {
               <td className={styles.valRed}>
                 -{toWon(results.annualMaintenanceCost)} 원
               </td>
-              <td className={styles.val}>-</td>
-              <td className={styles.val}>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
 
             {/* 3. 연간 영업 이익 (Net) */}
@@ -190,84 +220,107 @@ export default function Step5_Comparison() {
 
             {/* 4. 금융 비용 및 구간별 수익 */}
             <tr>
-              <td className={styles.rowLabel}>RPS / 연 이자 (1~5년)</td>
-              <td>-</td>
+              {/* [수정] 동적 기간 라벨 */}
+              <td className={styles.rowLabel}>
+                RPS / 연 이자 (1~{rps.gracePeriod}년)
+              </td>
+              <EmptyCell />
               <td className={styles.valRed}>
                 -{toWon(results.rps_interest_only)} 원
               </td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>RPS / 연 상환액 (6~15년)</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                RPS / 연 상환액 ({rps.gracePeriod + 1}~
+                {rps.gracePeriod + rps.repaymentPeriod}년)
+              </td>
+              <EmptyCell />
               <td className={styles.valRed}>
                 -{toWon(Math.abs(results.rps_pmt))} 원
               </td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>팩토링 / 연 이자 (1년)</td>
-              <td>-</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                팩토링 / 연 이자 (
+                {fac.gracePeriod === 1 ? '1' : `1~${fac.gracePeriod}`}년)
+              </td>
+              <EmptyCell />
+              <EmptyCell />
               <td className={styles.valRed}>
                 -{toWon(results.fac_interest_only)} 원
               </td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>팩토링 / 연 상환액 (2~10년)</td>
-              <td>-</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                팩토링 / 연 상환액 ({fac.gracePeriod + 1}~
+                {fac.gracePeriod + fac.repaymentPeriod}년)
+              </td>
+              <EmptyCell />
+              <EmptyCell />
               <td className={styles.valRed}>
                 -{toWon(Math.abs(results.fac_pmt))} 원
               </td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
 
             {/* 순수익 구간 */}
             <tr className={styles.rowGroupStart}>
-              <td className={styles.rowLabel}>RPS / 순수익 (1~5년)</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                RPS / 순수익 (1~{rps.gracePeriod}년)
+              </td>
+              <EmptyCell />
               <td className={styles.valBlue}>
                 {toWon(results.rps_net_1_5)} 원
               </td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>RPS / 순수익 (6~15년)</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                RPS / 순수익 ({rps.gracePeriod + 1}~
+                {rps.gracePeriod + rps.repaymentPeriod}년)
+              </td>
+              <EmptyCell />
               <td className={styles.valBlue}>
                 {toWon(results.rps_net_6_15)} 원
               </td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>팩토링 / 순수익 (1년)</td>
-              <td>-</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                팩토링 / 순수익 (
+                {fac.gracePeriod === 1 ? '1' : `1~${fac.gracePeriod}`}년)
+              </td>
+              <EmptyCell />
+              <EmptyCell />
               <td className={styles.valBlue}>{toWon(results.fac_net_1)} 원</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
             <tr>
-              <td className={styles.rowLabel}>팩토링 / 순수익 (2~10년)</td>
-              <td>-</td>
-              <td>-</td>
+              <td className={styles.rowLabel}>
+                팩토링 / 순수익 ({fac.gracePeriod + 1}~
+                {fac.gracePeriod + fac.repaymentPeriod}년)
+              </td>
+              <EmptyCell />
+              <EmptyCell />
               <td className={styles.valBlue}>
                 {toWon(results.fac_net_2_10)} 원
               </td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
 
             {/* 1 REC */}
@@ -286,7 +339,7 @@ export default function Step5_Comparison() {
               <td className={styles.val}>{results.rec_1000_sub.toFixed(2)}</td>
             </tr>
 
-            {/* [NEW] REC 수익/연간 */}
+            {/* REC 수익/연간 */}
             <tr className="bg-white border-b-2 border-slate-300 font-bold">
               <td className={styles.rowHeader} style={{ color: '#1d4ed8' }}>
                 REC수익/연간
@@ -320,14 +373,14 @@ export default function Step5_Comparison() {
               <td>{(results.sub_final_profit / 100000000).toFixed(2)} 억원</td>
             </tr>
 
-            {/* [NEW] 20년 수익 평균치 */}
+            {/* 20년 수익 평균치 */}
             <tr className="bg-slate-100 text-sm">
               <td className={styles.rowLabel}>20년 수익 평균치</td>
               <td className={styles.val}>{toWon(self_avg)} 원</td>
               <td className={styles.val}>{toWon(rps_avg)} 원</td>
               <td className={styles.val}>{toWon(fac_avg)} 원</td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
 
             {/* ROI */}
@@ -342,8 +395,8 @@ export default function Step5_Comparison() {
               <td className={styles.val}>
                 {results.fac_roi_years.toFixed(2)} 년
               </td>
-              <td>-</td>
-              <td>-</td>
+              <EmptyCell />
+              <EmptyCell />
             </tr>
           </tbody>
         </table>

@@ -21,7 +21,7 @@ export default function PreviewRequirementsTable() {
             <tr>
               <th className={styles.colLabel}>구분</th>
               <th className={styles.colSelf}>
-                자가자본
+                자기자본
                 <br />
                 <span className={styles.subText}>(전액투자)</span>
               </th>
@@ -126,7 +126,7 @@ export default function PreviewRequirementsTable() {
                 (자격요건)
               </td>
 
-              {/* 자가자본 */}
+              {/* 자기자본 */}
               <td className={styles.val}>-</td>
 
               {/* RPS */}

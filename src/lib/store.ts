@@ -886,7 +886,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
     const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
-    // 7. 20년 수익 시뮬레이션 (자가자본)
+    // 7. 20년 수익 시뮬레이션 (자기자본)
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;

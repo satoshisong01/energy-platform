@@ -254,7 +254,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           store={store}
                         />
                         <ConfigInput
-                          label="구독형 단가 (연간/kW)"
+                          label="지붕임대 단가 (연간/kW)"
                           field="subscription_price_per_kw"
                           store={store}
                         />

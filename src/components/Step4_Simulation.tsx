@@ -139,7 +139,7 @@ export default function Step4_Simulation() {
       } else if (dailySurplus >= 800) {
         optimalCount = 2;
       } else {
-        optimalCount = 1; // 800 미만이라도 기본 1대 설정 (경고는 표시됨)
+        optimalCount = 1;
       }
       store.setTruckCount(optimalCount);
     }
@@ -224,29 +224,28 @@ export default function Step4_Simulation() {
   const maintenanceSplit = round2(maintenanceTableValue);
 
   // --------------------------------------------------------------------------
-  // [NEW] 비용 초과 체크 및 자동 조정 로직
+  // [수정됨] 비용 체크 및 자동 조정/복구 로직
   // --------------------------------------------------------------------------
   useEffect(() => {
-    // 8,000만 원 초과 체크 (단위: 원)
+    // 8,000만 원 (단위: 원)
     const MAX_COST_LIMIT = 80000000;
+    // 기본 유지보수 비율
+    const DEFAULT_MAINTENANCE_RATE = 25;
 
-    if (totalAnnualCost > MAX_COST_LIMIT && !isCheckingCostRef.current) {
-      // 이미 체크 중이면 패스 (무한루프 방지)
+    // 중복 실행 방지
+    if (isCheckingCostRef.current) return;
+
+    // 1. 비용 초과 시 (인건비 포함) -> 비율 낮추기 제안
+    if (totalAnnualCost > MAX_COST_LIMIT) {
       isCheckingCostRef.current = true;
 
-      // 목표 O&M 비용 = 8000만 - 인건비
       const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
-
-      // 목표 비율 계산
       let targetRate = 0;
       if (totalRevenue > 0) {
         targetRate = (targetMaintenanceCost / totalRevenue) * 100;
       }
-
-      // 소수점 2자리까지만
       const formattedTargetRate = Math.floor(targetRate * 100) / 100;
 
-      // 알림 메시지 구성
       const currentCostEok = (totalAnnualCost / 100000000).toFixed(2);
       const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
 
@@ -261,10 +260,37 @@ O&M 비율을 현재 ${store.maintenanceRate}%에서 ${formattedTargetRate}%로 
         store.setSimulationOption('maintenanceRate', formattedTargetRate);
       }
 
-      // 체크 완료 후 플래그 해제
       setTimeout(() => {
         isCheckingCostRef.current = false;
       }, 500);
+    }
+    // 2. 비용이 안정권이고 비율이 낮아져 있는 경우 -> 25% 복구 제안 (EC 해제 시 등)
+    else {
+      // 현재 비율이 기본값(25%)보다 낮고,
+      // 기본값(25%)으로 복구해도 8,000만원을 넘지 않는지 확인
+      const costWithDefaultRate =
+        totalRevenue * (DEFAULT_MAINTENANCE_RATE / 100) + laborCostWon;
+
+      if (
+        store.maintenanceRate < DEFAULT_MAINTENANCE_RATE &&
+        costWithDefaultRate <= MAX_COST_LIMIT
+      ) {
+        isCheckingCostRef.current = true;
+
+        // 사용자가 귀찮아할 수 있으니 confirm 없이 자동 복구하거나, 짧은 알림 후 복구할 수 있음.
+        // 여기서는 명확하게 알려주고 복구하는 방식 적용 (또는 조용히 복구하려면 confirm 제거)
+        const recoverMsg = `[비용 자동 복구]
+운영 비용이 안정화되어(EC 미사용 등),
+O&M 비율을 기본값인 ${DEFAULT_MAINTENANCE_RATE}%로 복구합니다.`;
+
+        // 자동 복구 (알림은 선택사항, 여기서는 alert로 한 번 알려줌)
+        // alert(recoverMsg);
+        store.setSimulationOption('maintenanceRate', DEFAULT_MAINTENANCE_RATE);
+
+        setTimeout(() => {
+          isCheckingCostRef.current = false;
+        }, 500);
+      }
     }
   }, [
     totalAnnualCost,
