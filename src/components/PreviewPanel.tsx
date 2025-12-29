@@ -9,7 +9,11 @@ import { LucidePrinter } from 'lucide-react';
 import PreviewChart from './preview/PreviewChart';
 import PreviewDetailTable from './preview/PreviewDetailTable';
 import PreviewFinancialTable from './preview/PreviewFinancialTable';
-import PreviewModelVisual from './preview/PreviewModelVisual';
+// [수정] PreviewModelVisual에서 분리된 두 컴포넌트를 가져옵니다.
+import {
+  PreviewModelGraph,
+  PreviewModelImage,
+} from './preview/PreviewModelVisual';
 import PreviewComparisonTable from './preview/PreviewComparisonTable';
 import PreviewSummary from './preview/PreviewSummary';
 import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
@@ -42,7 +46,7 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산
+  // [1] 월별 데이터 계산 (기존 코드 유지)
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
@@ -173,7 +177,7 @@ export default function PreviewPanel() {
         <PageFooter page={1} />
       </div>
 
-      {/* [페이지 2] 설치 공간 분석 (이미지 포함) */}
+      {/* [페이지 2] 설치 공간 분석 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewSiteAnalysis />
@@ -181,7 +185,7 @@ export default function PreviewPanel() {
         <PageFooter page={2} />
       </div>
 
-      {/* [페이지 3] 차트 (기존 2페이지에서 밀림) */}
+      {/* [페이지 3] 차트 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewChart
@@ -191,7 +195,6 @@ export default function PreviewPanel() {
             baseRate={store.baseRate}
           />
         </div>
-        {/* CSS에서 footer absolute 처리했으므로 빈 div는 선택사항입니다 */}
         <p>　</p>
         <div style={{ height: '100%' }}></div>
         <PageFooter page={3} />
@@ -222,24 +225,33 @@ export default function PreviewPanel() {
         <PageFooter page={5} />
       </div>
 
-      {/* [페이지 6] 모델 비주얼 */}
+      {/* [페이지 6] 모델 비주얼 - 그래프 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
-          <PreviewModelVisual />
+          <PreviewModelGraph /> {/* 그래프 컴포넌트 */}
         </div>
         <p>　</p>
         <PageFooter page={6} />
       </div>
 
-      {/* [페이지 7] 비교 테이블 (수익성 분석) */}
+      {/* [페이지 7] 모델 비주얼 - 이미지/영상 */}
+      <div className="print-page-center" style={{ position: 'relative' }}>
+        <div style={{ width: '100%' }}>
+          <PreviewModelImage /> {/* 이미지 컴포넌트 */}
+        </div>
+        <p>　</p>
+        <PageFooter page={7} />
+      </div>
+
+      {/* [페이지 8] 비교 테이블 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
         </div>
-        <PageFooter page={7} />
+        <PageFooter page={8} />
       </div>
 
-      {/* [페이지 8] 사업 조건 및 구비 서류 + 최종 푸터 */}
+      {/* [페이지 9] 사업 조건 및 구비 서류 */}
       <div className="print-page-center" style={{ position: 'relative' }}>
         <div style={{ width: '100%' }}>
           <PreviewRequirementsTable />
@@ -251,7 +263,7 @@ export default function PreviewPanel() {
             </div>
           </div>
         </div>
-        <PageFooter page={8} />
+        <PageFooter page={9} />
       </div>
     </div>
   );
