@@ -403,7 +403,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
 
           <div className="w-full mt-2 pl-6 text-xs text-slate-500 flex justify-between items-center bg-slate-50 p-2 rounded">
             <span>
-              일일 잉여 전력:{' '}
+              일일 잉여 전력:
               <b>{Math.round(dailySurplus).toLocaleString()} kWh</b>
             </span>
             <span className={ecRecColor}>{ecRecommendation}</span>
@@ -415,7 +415,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
           <span>
-            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소{' '}
+            적용 기준: 유지보수 <b>{store.maintenanceRate}%</b> / 발전감소
             <b>-{store.degradationRate}%</b>
           </span>
         </div>
@@ -458,57 +458,63 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
 
           {showRationalization && (
             <div className="p-4 bg-white text-xs">
-              <table className="w-full text-center border-collapse">
+              <table className="w-full text-center border-collapse border border-slate-300">
+                {/* table 전체 테두리 추가 */}
                 <thead>
-                  <tr className="bg-slate-50 text-slate-600 border-b">
-                    <th className="p-2 border-r">구분</th>
-                    <th className="p-2 border-r">을 (원)</th>
-                    <th className="p-2 border-r">갑 (원)</th>
-                    <th className="p-2 border-r bg-yellow-50">차이</th>
-                    <th className="p-2 border-r">연간사용량 (kW)</th>
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
+                    {/* 헤더 행 테두리 색상 명시 */}
+                    <th className="p-2 border-r border-slate-300">구분</th>
+                    {/* 각 셀 테두리 색상 명시 */}
+                    <th className="p-2 border-r border-slate-300">을 (원)</th>
+                    <th className="p-2 border-r border-slate-300">갑 (원)</th>
+                    <th className="p-2 border-r border-slate-300 bg-yellow-50">
+                      차이
+                    </th>
+                    <th className="p-2 border-r border-slate-300">
+                      연간사용량 (kW)
+                    </th>
                     <th className="p-2 bg-blue-50">절감액 (원)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {/* 기본료 */}
-                  <tr>
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  <tr className="border-b border-slate-300">
+                    {/* 행 테두리 추가 */}
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                      {/* 각 셀 테두리 추가 */}
                       기본료
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('base_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('base_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold text-red-500 bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
                       {(
                         rationalization.base_eul - rationalization.base_gap
                       ).toLocaleString()}
                     </td>
-
-                    {/* [수정됨] 고정 텍스트 -> 입력 필드로 변경 */}
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('base_usage', '연간사용량')}
                     </td>
-
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_base).toLocaleString()}
                     </td>
                   </tr>
 
                   {/* 경부하 */}
-                  <tr>
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       경부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.light_eul - rationalization.light_gap
                       ).toLocaleString(undefined, {
@@ -516,25 +522,26 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_light).toLocaleString()}
                     </td>
                   </tr>
+
                   {/* 중간부하 */}
-                  <tr>
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       중간부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.mid_eul - rationalization.mid_gap
                       ).toLocaleString(undefined, {
@@ -542,25 +549,26 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_mid).toLocaleString()}
                     </td>
                   </tr>
+
                   {/* 최대부하 */}
-                  <tr>
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       최대부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.max_eul - rationalization.max_gap
                       ).toLocaleString(undefined, {
@@ -568,17 +576,19 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_max).toLocaleString()}
                     </td>
                   </tr>
+
+                  {/* 합계 */}
                   <tr className="border-t-2 border-slate-300">
                     <td
                       colSpan={5}
-                      className="p-2 font-bold text-right bg-slate-100"
+                      className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
                     >
                       합계 (절감액)
                     </td>
@@ -595,10 +605,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
 
       {/* 투자비 테이블 */}
       <div className="mt-6">
-        {' '}
         {/* [수정] mt-4 -> mt-6 (위쪽 간격 증가) */}
         <div className="flex items-center gap-2 mb-3 text-blue-800">
-          {' '}
           {/* [수정] mb-2 -> mb-3 (제목-테이블 간격) */}
           <LucideTable size={16} />
           <span className="text-sm font-bold">초기 투자비 상세 (VAT 별도)</span>
@@ -746,7 +754,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {config.unit_price_kepco.toLocaleString()}
-                  </span>{' '}
+                  </span>
                   원
                 </span>
               </div>
@@ -756,7 +764,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {(totalRevenue / 100000000).toFixed(2)}
-                  </span>{' '}
+                  </span>
                   억원
                 </span>
               </div>
@@ -768,7 +776,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {Math.round(volume_self).toLocaleString()}
-                  </span>{' '}
+                  </span>
                   kWh
                 </span>
               </div>
@@ -777,7 +785,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {Math.round(volume_surplus).toLocaleString()}
-                  </span>{' '}
+                  </span>
                   kWh
                 </span>
               </div>
@@ -786,7 +794,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {Math.round(volume_ec).toLocaleString()}
-                  </span>{' '}
+                  </span>
                   kWh
                 </span>
               </div>
@@ -802,7 +810,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {appliedSavingsPrice.toLocaleString()}
-                  </span>{' '}
+                  </span>
                   원
                 </span>
               </div>
@@ -811,7 +819,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {config.unit_price_kepco.toLocaleString()}
-                  </span>{' '}
+                  </span>
                   원
                 </span>
               </div>
@@ -820,7 +828,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {appliedSellPrice.toLocaleString()}
-                  </span>{' '}
+                  </span>
                   원
                 </span>
               </div>
@@ -832,7 +840,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                 <span>
                   <span className={styles.dVal}>
                     {(totalRevenue / 100000000).toFixed(2)}
-                  </span>{' '}
+                  </span>
                   억원
                 </span>
               </div>
@@ -901,7 +909,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
           </div>
 
           <div className="bg-yellow-400 text-black font-bold text-center py-2">
-            수익률 (ROI) {roiPercent.toFixed(1)}% (회수{' '}
+            수익률 (ROI) {roiPercent.toFixed(1)}% (회수
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)
           </div>
         </div>
