@@ -13,13 +13,13 @@ export default function PreviewSummary() {
   const store = useProposalStore();
   const { config, rationalization } = store;
 
-  // 합리화 절감액 직접 계산 (Step4 선택 무시 및 독립성 확보)
+  // [수정] 합리화 절감액 직접 계산 (Step4 선택 무시 및 독립성 확보)
   const calculateRationalizationSavings = () => {
     const isEul = store.contractType.includes('(을)');
     if (!isEul) return 0;
 
-    const diff_base = rationalization.base_eul - rationalization.base_gap;
-    const saving_base = diff_base * (rationalization.base_usage || 0);
+    // Step4와 동일하게 manual 값 우선 적용
+    const saving_base = rationalization.base_savings_manual || 0;
 
     const diff_light = rationalization.light_eul - rationalization.light_gap;
     const saving_light = diff_light * rationalization.light_usage;
@@ -110,10 +110,14 @@ export default function PreviewSummary() {
   const MAX_LIMIT = 80000000;
 
   // --------------------------------------------------------------------------
-  // [1] 한전 데이터 독립 계산 (Step4와 동일한 반올림 로직 적용)
+  // [1] 한전 데이터 독립 계산
   // --------------------------------------------------------------------------
   const calculateKepcoData = () => {
-    const solarPrice = config.price_solar_standard;
+    // 한전도 Step4에서 선택한 모듈 가격을 그대로 사용 (독립적이지만 기준은 통일)
+    let solarPrice = config.price_solar_standard;
+    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
+    else if (store.moduleTier === 'ECONOMY')
+      solarPrice = config.price_solar_economy;
 
     const solarCost = (capacity / 100) * solarPrice;
     const investWon = solarCost * 100000000;
@@ -123,16 +127,14 @@ export default function PreviewSummary() {
     // 수익
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // 유지보수 비용 (기본 25%)
+    // 유지보수 비용 (기본 25%) - 8천만원 한도 적용
     const KEPCO_DEFAULT_RATE = 25.0;
     let appliedRate = KEPCO_DEFAULT_RATE;
     let tempCost = annualRevenue * (appliedRate / 100);
 
-    // 한도 체크 및 반올림 적용 (Step4와 통일)
     if (tempCost > MAX_LIMIT) {
       if (annualRevenue > 0) {
         const rawRate = (MAX_LIMIT / annualRevenue) * 100;
-        // [수정] 소수점 둘째 자리 버림 (Step4와 동일하게)
         appliedRate = Math.floor(rawRate * 100) / 100;
       } else {
         appliedRate = 0;
@@ -165,7 +167,7 @@ export default function PreviewSummary() {
   const kepcoData = calculateKepcoData();
 
   // --------------------------------------------------------------------------
-  // [2] 시나리오별 데이터 독립 계산 (Step4와 동일한 반올림 로직 적용)
+  // [2] 시나리오별 데이터 독립 계산
   // --------------------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
     const forcedTruckCount = store.truckCount > 0 ? store.truckCount : 3;
@@ -182,16 +184,22 @@ export default function PreviewSummary() {
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
     let targetEcPrice = 0;
-    let targetSolarPrice = 0;
     let modelName = '';
 
+    // [중요] 모듈 가격(투자비)은 1.5든 5.0이든 Step4에서 선택한 것과 '동일'하게 적용
+    let currentSolarPrice = config.price_solar_standard;
+    if (store.moduleTier === 'PREMIUM')
+      currentSolarPrice = config.price_solar_premium;
+    else if (store.moduleTier === 'ECONOMY')
+      currentSolarPrice = config.price_solar_economy;
+
     if (isPremium) {
+      // 5.0 모델: 단가만 변경, 투자비는 동일
       targetEcPrice = config.unit_price_ec_5_0;
-      targetSolarPrice = config.price_solar_premium;
       modelName = 'REC 5.0 (예상)';
     } else {
+      // 1.5 모델: 현행 단가
       targetEcPrice = config.unit_price_ec_1_5;
-      targetSolarPrice = config.price_solar_standard;
       modelName = 'REC 1.5 (현행)';
     }
 
@@ -201,6 +209,7 @@ export default function PreviewSummary() {
     const revenue_ec = volume_ec * targetEcPrice;
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
+    // [중요] fixedRationalizationSavings 사용 (Step4 수동입력 연동)
     const grossRevenue =
       revenue_saving +
       revenue_ec +
@@ -210,7 +219,7 @@ export default function PreviewSummary() {
     const laborCostWon =
       forcedTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
 
-    // [자동 보정 로직] 8천만원 한도 체크 및 반올림 적용
+    // [자동 보정 로직] 8천만원 한도
     const DEFAULT_RATE = 25.0;
     let scenarioMaintenanceRate = DEFAULT_RATE;
     let tempTotalCost =
@@ -220,7 +229,7 @@ export default function PreviewSummary() {
       const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
       if (grossRevenue > 0) {
         const rawRate = (targetMaintenanceCost / grossRevenue) * 100;
-        // [수정] 소수점 둘째 자리 버림 (Step4와 동일하게)
+        // 소수점 버림 처리 (Step4와 동일)
         scenarioMaintenanceRate = Math.floor(rawRate * 100) / 100;
       } else {
         scenarioMaintenanceRate = 0;
@@ -231,7 +240,8 @@ export default function PreviewSummary() {
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    const solarCost = (capacity / 100) * targetSolarPrice;
+    // 투자비 계산 (공통 모듈 가격 적용)
+    const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = forcedTruckCount * config.price_ec_unit;
     const infraCost =
       forcedTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
@@ -239,6 +249,7 @@ export default function PreviewSummary() {
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
+    // 20년 수익 및 ROI
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
@@ -249,10 +260,11 @@ export default function PreviewSummary() {
     const profitRate =
       totalCost20 > 0 ? (totalNet20Won / totalCost20) * 100 : 0;
 
+    // [수정] 타이틀 변경: 하드웨어 구분이 아닌 REC 구분으로 명시
     return {
       title: isPremium
-        ? 'TYPE B. Premium Plan (수익 극대화)'
-        : 'TYPE A. Standard Plan (자가소비형)',
+        ? 'TYPE B. REC 5.0 Plan (수익 극대화)'
+        : 'TYPE A. REC 1.5 Plan (자가소비형)',
       invest: investUk,
       ecCount: forcedTruckCount,
       annualProfit: annualNetProfitWon / 100000000,
@@ -267,6 +279,7 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
+  // 하단 무투자 모델
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
@@ -281,6 +294,7 @@ export default function PreviewSummary() {
   const subSavingRate =
     totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
 
+  // REC 값
   const simpleRec = 0.0;
   const re100Rec = results.rec_1000_rent;
   const subRec = results.rec_1000_sub;
