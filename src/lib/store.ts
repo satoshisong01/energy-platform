@@ -761,7 +761,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       rationalization: {
         base_eul: 8320,
         base_gap: 7470,
-        base_usage: 0,
+        base_usage: 3600,
         base_savings_manual: 0,
         light_eul: 113.23,
         light_gap: 93.27,
@@ -858,7 +858,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       // 합리화 절감액 계산
       const isEul = state.contractType.includes('(을)');
       const saving_base =
-        (rationalization.base_eul - rationalization.base_gap) * 300 * 12;
+        (rationalization.base_eul - rationalization.base_gap) *
+        (rationalization.base_usage || 0);
       const saving_light =
         (rationalization.light_eul - rationalization.light_gap) *
         rationalization.light_usage;

@@ -81,7 +81,7 @@ export default function Step4_Simulation() {
 
   // 1. 합리화 절감액 (UI 표시용 계산)
   const diff_base = rationalization.base_eul - rationalization.base_gap;
-  const saving_base = diff_base * 300 * 12;
+  const saving_base = diff_base * (rationalization.base_usage || 0);
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
@@ -486,9 +486,12 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                         rationalization.base_eul - rationalization.base_gap
                       ).toLocaleString()}
                     </td>
-                    <td className="p-1 border-r text-gray-500">
-                      3,600 (300×12)
+
+                    {/* [수정됨] 고정 텍스트 -> 입력 필드로 변경 */}
+                    <td className="p-1 border-r">
+                      {renderRationalizationInput('base_usage', '연간사용량')}
                     </td>
+
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_base).toLocaleString()}
                     </td>
