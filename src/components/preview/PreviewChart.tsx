@@ -69,8 +69,8 @@ export default function PreviewChart({
               stroke="#94a3b8"
             />
             <Tooltip
-              formatter={(value: number) => [
-                `${Math.round(value).toLocaleString()} 만원`,
+              formatter={(value: any) => [
+                `${Math.round(Number(value || 0)).toLocaleString()} 만원`,
                 '',
               ]}
             />
