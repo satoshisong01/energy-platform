@@ -1,3 +1,4 @@
+// src/components/preview/PreviewModelVisual.tsx
 'use client';
 
 import React from 'react';
@@ -15,7 +16,7 @@ import {
 } from 'recharts';
 import styles from './PreviewModelVisual.module.css';
 
-// [공통] 차트 데이터 생성 로직 (Hook으로 분리하거나 내부에서 사용)
+// [공통] 차트 데이터 생성 로직
 const useChartData = () => {
   const store = useProposalStore();
   const totalUsage = store.monthlyData.reduce(
@@ -115,7 +116,6 @@ export function PreviewModelGraph() {
                 formatter={(val: any, name: any) => {
                   if (name === 'range' || name === 'surplusRange')
                     return [null, null];
-                  // name이 undefined일 경우를 대비해 안전하게 처리하거나 그대로 둡니다.
                   return [`${Number(val).toFixed(1)} kW`, name];
                 }}
                 filterNull={true}
@@ -179,20 +179,29 @@ export function PreviewModelGraph() {
 }
 
 // -----------------------------------------------------------
-// [컴포넌트 2] 이미지/영상 부분 (7페이지용)
+// [컴포넌트 2] 이미지/영상 부분 (7페이지용) - 수정됨
 // -----------------------------------------------------------
 export function PreviewModelImage() {
   const store = useProposalStore();
   const isKepco = store.selectedModel === 'KEPCO';
+  const truckCount = store.truckCount; // Step4에서 선택한 트럭 대수
 
-  // 경로 설정 (파일명 확인 필요)
-  const videoSrc = isKepco ? '/videos/direct.mp4' : '/videos/egc.mp4';
-  const imageSrc = isKepco
-    ? '/images/direct_capture.png'
-    : '/images/egc_capture.png';
-  const videoTitle = isKepco
+  // [수정 1] 트럭 대수에 따른 영상 및 캡처 이미지 경로 설정
+  const videoSrc =
+    truckCount === 2
+      ? '/videos/direct.mp4' // 2대일 때 (구 한전 영상)
+      : '/videos/egc.mp4'; // 3대 이상일 때 (구 RE100 영상)
+
+  const videoCaptureImage =
+    truckCount === 2 ? '/images/direct_capture.png' : '/images/egc_capture.png';
+
+  // [수정 2] 한전 모델일 경우 고정 이미지 경로 설정
+  const kepcoImageSrc = '/images/direct_sale.jpg';
+
+  // 제목 설정
+  const title = isKepco
     ? '한전 판매형 프로세스'
-    : '에너지 캐리어(EC) 운송 프로세스';
+    : `에너지 캐리어(EC) 운송 프로세스 (${truckCount}대 운용)`;
 
   return (
     <div className={styles.container}>
@@ -213,35 +222,47 @@ export function PreviewModelImage() {
 
       <div className={styles.videoBox} style={{ marginTop: 0 }}>
         <h4 className={styles.videoTitle} style={{ marginBottom: '20px' }}>
-          {videoTitle}
+          {title}
         </h4>
         <div className={styles.videoWrapper} style={{ height: '500px' }}>
-          {' '}
-          {/* 이미지 잘 보이라고 높이 키움 */}
-          {/* 화면용: 비디오 */}
-          <video
-            src={videoSrc}
-            className="w-full h-full object-contain rounded-lg print-hide"
-            autoPlay
-            loop
-            muted
-            playsInline
-          />
-          {/* 인쇄용: 이미지 */}
-          <img
-            src={imageSrc}
-            className="w-full h-full object-contain rounded-lg print-show"
-            alt="Process Diagram"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+          {/* [수정 3] 조건부 렌더링: 한전이면 이미지, 아니면 비디오 */}
+          {isKepco ? (
+            // [CASE 1] 한전 모델: 화면/인쇄 모두 이미지 표시
+            <img
+              src={kepcoImageSrc}
+              className="w-full h-full object-contain rounded-lg"
+              alt="한전 판매 프로세스"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            // [CASE 2] RE100/REC5 모델: 화면은 비디오, 인쇄는 캡처 이미지
+            <>
+              {/* 화면용: 비디오 */}
+              <video
+                src={videoSrc}
+                className="w-full h-full object-contain rounded-lg print-hide"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              {/* 인쇄용: 캡처 이미지 */}
+              <img
+                src={videoCaptureImage}
+                className="w-full h-full object-contain rounded-lg print-show"
+                alt="EC 운송 프로세스 캡처"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// 기존 default export는 제거하거나 두 컴포넌트를 묶어서 내보낼 수 있지만,
-// PreviewPanel에서 분리해서 쓰기 위해 각각 Named Export 했습니다.
 export default PreviewModelGraph;

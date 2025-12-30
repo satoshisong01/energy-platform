@@ -7,24 +7,46 @@ import {
   LucideArrowRight,
   LucideWallet,
   LucideChevronsDown,
-  LucideTruck,
-  LucideZap,
 } from 'lucide-react';
 
 export default function PreviewSummary() {
   const store = useProposalStore();
-  const { config } = store;
+  const { config, rationalization } = store;
 
-  // Store의 중앙 계산 결과를 가져옵니다 (현재 선택된 옵션 기준)
+  // 합리화 절감액 직접 계산 (Step4 선택 무시 및 독립성 확보)
+  const calculateRationalizationSavings = () => {
+    const isEul = store.contractType.includes('(을)');
+    if (!isEul) return 0;
+
+    const diff_base = rationalization.base_eul - rationalization.base_gap;
+    const saving_base = diff_base * (rationalization.base_usage || 0);
+
+    const diff_light = rationalization.light_eul - rationalization.light_gap;
+    const saving_light = diff_light * rationalization.light_usage;
+
+    const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
+    const saving_mid = diff_mid * rationalization.mid_usage;
+
+    const diff_max = rationalization.max_eul - rationalization.max_gap;
+    const saving_max = diff_max * rationalization.max_usage;
+
+    return saving_base + saving_light + saving_mid + saving_max;
+  };
+
+  const fixedRationalizationSavings = calculateRationalizationSavings();
+
+  // Store 결과 (참고용)
   const results = store.getSimulationResults();
 
-  // [발전량] 엑셀 로직 기준 단순 계산
+  // [공통] 발전량 (단순 계산)
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
   }, 0);
 
   const [showExpansion, setShowExpansion] = useState(false);
+
+  // EC 적용 여부 (Preview 내부용)
   const [applyEc, setApplyEc] = useState(
     store.useEc && store.selectedModel !== 'KEPCO'
   );
@@ -33,14 +55,12 @@ export default function PreviewSummary() {
     setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
   }, [store.useEc, store.selectedModel]);
 
-  // EC 토글 핸들러 (Store 옵션 변경)
   const handleEcToggle = (checked: boolean) => {
     setApplyEc(checked);
     store.setSimulationOption('useEc', checked);
-    // EC 변경 시 Store 내부 로직에 의해 유지보수비 등은 자동 업데이트됨
   };
 
-  // ... (공통 데이터 계산) ...
+  // ... (기초 데이터) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -52,16 +72,15 @@ export default function PreviewSummary() {
     0
   );
 
-  // 예상 절감액 계산
   let totalBillSavings = 0;
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
     const autoGen = capacity * 3.64 * days;
-    const solarGen = autoGen;
     const selfConsum = data.selfConsumption;
     const usageSaving =
-      Math.min(solarGen, selfConsum) *
+      Math.min(autoGen, selfConsum) *
       (store.unitPriceSavings || config.unit_price_savings);
+
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -87,22 +106,40 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  // [한전 데이터 계산]
+  // [상수] 비용 한도
+  const MAX_LIMIT = 80000000;
+
+  // --------------------------------------------------------------------------
+  // [1] 한전 데이터 독립 계산 (Step4와 동일한 반올림 로직 적용)
+  // --------------------------------------------------------------------------
   const calculateKepcoData = () => {
-    let solarPrice = config.price_solar_standard;
-    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
-    else if (store.moduleTier === 'ECONOMY')
-      solarPrice = config.price_solar_economy;
+    const solarPrice = config.price_solar_standard;
 
     const solarCost = (capacity / 100) * solarPrice;
     const investWon = solarCost * 100000000;
     const investUk = solarCost;
     const annualGen = simpleAnnualGen;
+
+    // 수익
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // 한전 모델은 현재 설정된 유지보수 비율을 따름 (보통 고정값이거나 낮음)
-    // 필요하다면 여기서도 독립 계산 가능
-    const maintenanceCost = annualRevenue * (store.maintenanceRate / 100);
+    // 유지보수 비용 (기본 25%)
+    const KEPCO_DEFAULT_RATE = 25.0;
+    let appliedRate = KEPCO_DEFAULT_RATE;
+    let tempCost = annualRevenue * (appliedRate / 100);
+
+    // 한도 체크 및 반올림 적용 (Step4와 통일)
+    if (tempCost > MAX_LIMIT) {
+      if (annualRevenue > 0) {
+        const rawRate = (MAX_LIMIT / annualRevenue) * 100;
+        // [수정] 소수점 둘째 자리 버림 (Step4와 동일하게)
+        appliedRate = Math.floor(rawRate * 100) / 100;
+      } else {
+        appliedRate = 0;
+      }
+    }
+
+    const maintenanceCost = annualRevenue * (appliedRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
 
     const degradationRateDecimal = -(store.degradationRate / 100);
@@ -128,92 +165,80 @@ export default function PreviewSummary() {
   const kepcoData = calculateKepcoData();
 
   // --------------------------------------------------------------------------
-  // [핵심] 시나리오별 데이터 독립 계산 (유지보수 비율 자동 보정 포함)
+  // [2] 시나리오별 데이터 독립 계산 (Step4와 동일한 반올림 로직 적용)
   // --------------------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
-    // 1. EC 대수 설정 (체크 여부에 따라)
-    const activeTruckCount = applyEc
-      ? store.truckCount > 0
-        ? store.truckCount
-        : 3
-      : 0;
-    const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
+    const forcedTruckCount = store.truckCount > 0 ? store.truckCount : 3;
+    const ecCapacityAnnual = forcedTruckCount * 100 * 4 * 365;
 
-    // 2. 발전량 및 물량 배분
     const annualGen = simpleAnnualGen;
     const annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
     );
     const rawSurplus = Math.max(0, annualGen - annualSelf);
+
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-    // 3. 시나리오별 판매 단가
-    const targetEcPrice = isPremium
-      ? config.unit_price_ec_5_0
-      : config.unit_price_ec_1_5;
-    const modelName = isPremium ? 'REC 5.0 (예상)' : 'REC 1.5 (현행)';
+    let targetEcPrice = 0;
+    let targetSolarPrice = 0;
+    let modelName = '';
 
-    // 4. 매출 계산 (Gross)
+    if (isPremium) {
+      targetEcPrice = config.unit_price_ec_5_0;
+      targetSolarPrice = config.price_solar_premium;
+      modelName = 'REC 5.0 (예상)';
+    } else {
+      targetEcPrice = config.unit_price_ec_1_5;
+      targetSolarPrice = config.price_solar_standard;
+      modelName = 'REC 1.5 (현행)';
+    }
+
     const revenue_saving =
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
     const revenue_ec = volume_ec * targetEcPrice;
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
 
-    // 합리화 절감액은 Store 계산값 재활용 (시나리오별로 다르지 않음)
     const grossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
-      results.totalRationalizationSavings;
+      fixedRationalizationSavings;
 
-    // 5. 비용 계산 (인건비 + 유지보수비)
     const laborCostWon =
-      activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
+      forcedTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
 
-    // [자동 보정 로직] 해당 시나리오 매출 기준 적정 유지보수 비율 계산
-    const MAX_LIMIT = 80000000; // 8천만원 한도
-    const DEFAULT_RATE = 25.0; // 기본 비율
-
-    // (1) 일단 기본 25%로 계산해 봄
+    // [자동 보정 로직] 8천만원 한도 체크 및 반올림 적용
+    const DEFAULT_RATE = 25.0;
     let scenarioMaintenanceRate = DEFAULT_RATE;
     let tempTotalCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
 
-    // (2) 한도 초과 시 비율 낮춤
     if (tempTotalCost > MAX_LIMIT) {
       const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
       if (grossRevenue > 0) {
-        scenarioMaintenanceRate = (targetMaintenanceCost / grossRevenue) * 100;
+        const rawRate = (targetMaintenanceCost / grossRevenue) * 100;
+        // [수정] 소수점 둘째 자리 버림 (Step4와 동일하게)
+        scenarioMaintenanceRate = Math.floor(rawRate * 100) / 100;
       } else {
         scenarioMaintenanceRate = 0;
       }
     }
-    // (만약 한도 이하라면 기본 25% 유지 - Step4 로직과 동일)
 
-    // 최종 유지보수 비용 확정
     const maintenanceCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
-
-    // 6. 순수익 (Net)
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // 7. 투자비
-    let solarPrice = config.price_solar_standard;
-    if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
-    else if (store.moduleTier === 'ECONOMY')
-      solarPrice = config.price_solar_economy;
-
-    const solarCost = (capacity / 100) * solarPrice;
-    const ecCost = activeTruckCount * config.price_ec_unit;
+    const solarCost = (capacity / 100) * targetSolarPrice;
+    const ecCost = forcedTruckCount * config.price_ec_unit;
     const infraCost =
-      activeTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
+      forcedTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
+
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
-    // 8. 20년 수익 및 ROI
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
@@ -229,22 +254,19 @@ export default function PreviewSummary() {
         ? 'TYPE B. Premium Plan (수익 극대화)'
         : 'TYPE A. Standard Plan (자가소비형)',
       invest: investUk,
-      ecCount: activeTruckCount,
+      ecCount: forcedTruckCount,
       annualProfit: annualNetProfitWon / 100000000,
       totalProfit20: totalNet20Won / 100000000,
       roiYears: roiYears,
       profitRate: profitRate,
       isPro: isPremium,
       modelName: modelName,
-      // 디버깅용: 적용된 비율 확인 가능
-      // maintenanceRateApplied: scenarioMaintenanceRate
     };
   };
 
-  const stdData = getScenarioData(false); // 1.5 시나리오 (자동보정 적용)
-  const expData = getScenarioData(true); // 5.0 시나리오 (자동보정 적용)
+  const stdData = getScenarioData(false);
+  const expData = getScenarioData(true);
 
-  // 하단 무투자 모델
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
@@ -259,12 +281,14 @@ export default function PreviewSummary() {
   const subSavingRate =
     totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
 
+  const simpleRec = 0.0;
+  const re100Rec = results.rec_1000_rent;
+  const subRec = results.rec_1000_sub;
+
   const toUk = (val: number) => val.toFixed(2);
 
-  // 시나리오 카드 렌더링
   const renderRow = (d: typeof stdData) => (
     <div className={`${styles.flowContainer} ${d.isPro ? styles.proRow : ''}`}>
-      {/* 투자 */}
       <div className={`${styles.card} ${styles.cardInvest}`}>
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -303,7 +327,6 @@ export default function PreviewSummary() {
         />
       </div>
 
-      {/* 연간 수익 */}
       <div className={`${styles.card} ${styles.cardAnnual}`}>
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -350,7 +373,6 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 20년 수익 */}
       <div
         className={`${styles.card} ${styles.cardTotal} ${
           d.isPro ? styles.cardHighlight : ''
@@ -499,10 +521,14 @@ export default function PreviewSummary() {
           <LucideWallet size={14} /> 초기 투자가 없는 모델 (연간 수익 / 절감율)
         </div>
         <div className={styles.compGrid}>
+          {/* 단순 지붕 임대 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>단순 지붕 임대</span>
             <span className={styles.compValue}>
               {simpleRentalRevenueUk.toFixed(2)} 억
+            </span>
+            <span className="text-xs font-bold text-slate-500 mx-2">
+              REC {simpleRec.toFixed(1)}
             </span>
             <span className={styles.compSub}>
               (절감{' '}
@@ -512,10 +538,15 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
+
+          {/* RE100 임대 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>RE100 임대</span>
             <span className={styles.compValue}>
               {re100RentalRevenueUk.toFixed(2)} 억
+            </span>
+            <span className="text-xs font-bold text-blue-600 mx-2">
+              REC {re100Rec.toFixed(1)}
             </span>
             <span className={styles.compSub}>
               (절감{' '}
@@ -525,10 +556,15 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
+
+          {/* 구독 서비스 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>구독 서비스</span>
             <span className={styles.compValue}>
               {subRevenueUk.toFixed(2)} 억
+            </span>
+            <span className="text-xs font-bold text-blue-600 mx-2">
+              REC {subRec.toFixed(1)}
             </span>
             <span className={styles.compSub}>
               (절감{' '}

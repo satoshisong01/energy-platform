@@ -857,9 +857,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       // 합리화 절감액 계산
       const isEul = state.contractType.includes('(을)');
-      const saving_base =
-        (rationalization.base_eul - rationalization.base_gap) *
-        (rationalization.base_usage || 0);
+      const saving_base =rationalization.base_savings_manual || 0;
       const saving_light =
         (rationalization.light_eul - rationalization.light_gap) *
         rationalization.light_usage;

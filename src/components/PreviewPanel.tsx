@@ -139,8 +139,8 @@ export default function PreviewPanel() {
   return (
     <div className={styles.a4Page} id="print-area">
       {/* [페이지 1] 표지 + 요약 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
-        <div className={styles.header} style={{ width: '100%' }}>
+      <div className="print-page-center" style={{ position: 'relative', marginTop: '10px'  }}>
+        <div className={styles.header} style={{ width: '100%'}}>
           <div className={styles.logoBox}>FIRST C&D</div>
           <div className={styles.companyInfo}>
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>

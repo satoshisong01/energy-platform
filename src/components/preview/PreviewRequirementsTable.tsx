@@ -69,12 +69,12 @@ export default function PreviewRequirementsTable() {
                 </span>
               </th>
               <th style={{ ...headerStyle, width: '14%' }}>
-                임대형
+                RE100연계
                 <br />
-                <span className={styles.subText}>부지임대</span>
+                <span className={styles.subText}>임대형</span>
               </th>
               <th style={{ ...headerStyle, width: '20%', borderRight: 'none' }}>
-                구독형
+                구독
                 <br />
                 <span className={styles.subText}>서비스</span>
               </th>
