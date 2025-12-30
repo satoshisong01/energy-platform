@@ -112,9 +112,10 @@ export function PreviewModelGraph() {
               <Tooltip
                 labelStyle={{ color: '#334155', fontWeight: 'bold' }}
                 itemStyle={{ fontSize: '0.85rem' }}
-                formatter={(val: any, name: string) => {
+                formatter={(val: any, name: any) => {
                   if (name === 'range' || name === 'surplusRange')
                     return [null, null];
+                  // name이 undefined일 경우를 대비해 안전하게 처리하거나 그대로 둡니다.
                   return [`${Number(val).toFixed(1)} kW`, name];
                 }}
                 filterNull={true}
