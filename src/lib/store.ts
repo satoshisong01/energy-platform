@@ -25,7 +25,7 @@ export type MonthlyData = {
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
 export type BusinessModel = 'KEPCO' | 'RE100' | 'REC5';
 
-// 금융 상세 설정 인터페이스 추가
+// 금융 상세 설정 인터페이스
 export interface FinancialSettings {
   rps: {
     loanRatio: number; // 대출 비율 (%)
@@ -54,7 +54,7 @@ export type SystemConfig = {
   unit_price_savings: number;
   unit_price_ec_1_5: number;
   unit_price_ec_5_0: number;
-  loan_rate_rps: number; // 하위 호환성을 위해 유지 (실제 계산은 financialSettings 사용)
+  loan_rate_rps: number; // 하위 호환성을 위해 유지
   loan_rate_factoring: number; // 하위 호환성을 위해 유지
   rental_price_per_kw: number;
   subscription_price_per_kw: number;
@@ -169,7 +169,7 @@ interface ProposalState {
   energyNote: string;
   rationalization: RationalizationData;
   config: SystemConfig;
-  financialSettings: FinancialSettings; // [NEW] 금융 설정 추가
+  financialSettings: FinancialSettings;
   tariffPresets: TariffPreset[];
   selectedModel: BusinessModel;
   moduleTier: ModuleTier;
@@ -219,7 +219,7 @@ interface ProposalState {
   setSimulationOption: (field: any, value: any) => void;
   setTruckCount: (count: number) => void;
   updateConfig: (field: keyof SystemConfig, value: number) => void;
-  setFinancialSettings: (settings: Partial<FinancialSettings>) => void; // [NEW] 설정 함수
+  setFinancialSettings: (settings: Partial<FinancialSettings>) => void;
   updateTariffPreset: (
     index: number,
     field: keyof TariffPreset,
@@ -313,7 +313,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     sub_price_self: 150,
     sub_price_surplus: 50,
   },
-  // [NEW] 엑셀 수식 기반 초기값 설정
   financialSettings: {
     rps: {
       loanRatio: 80,
@@ -326,7 +325,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       loanRatio: 100,
       interestRate: 5.1,
       gracePeriod: 1,
-      repaymentPeriod: 9, // 기존 코드 로직상 1년 거치 + 9년 상환 = 10년 주기 (또는 20년 기준 나머지)
+      repaymentPeriod: 9,
     },
   },
   tariffPresets: [
@@ -443,7 +442,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => ({ config: { ...state.config, [field]: value } }));
     get().recalculateInvestment();
   },
-  // [NEW] 설정 변경 액션 추가 (Nested 객체 업데이트)
   setFinancialSettings: (settings) =>
     set((state) => ({
       financialSettings: {
@@ -555,7 +553,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       maintenanceRate: state.maintenanceRate,
       degradationRate: state.degradationRate,
       config: state.config,
-      financialSettings: state.financialSettings, // [NEW] 저장 시 포함
+      financialSettings: state.financialSettings,
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
       siteImage: state.siteImage,
@@ -717,7 +715,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
         financialSettings:
-          data.input_data.financialSettings || get().financialSettings, // 없을 경우 기본값
+          data.input_data.financialSettings || get().financialSettings,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
       });
@@ -779,12 +777,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: 3,
       totalInvestment: 0,
       recAveragePrice: 80,
-      // financialSettings는 초기값 유지 (또는 별도 리셋 로직 필요시 추가)
     });
   },
 
   // =================================================================
-  // [핵심] 중앙 계산 로직
+  // [핵심 수정] 중앙 계산 로직 (Store)
   // =================================================================
   getSimulationResults: () => {
     const state = get();
@@ -796,41 +793,53 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       capacityKw,
       selectedModel,
       useEc,
-      financialSettings, // [NEW] 설정값 사용
+      financialSettings,
     } = state;
 
     // 1. 투자비 (원 단위 변환)
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
-    // 2. 발전량 총합 계산 (엑셀 로직과 일치시키기 위해 단순 계산 사용)
+    // 2. 발전량 총합 계산 (단순 방식: 용량 * 3.64 * 일수)
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
       return acc + capacityKw * 3.64 * days;
     }, 0);
 
-    // 3. 모델별 물량 및 수익 배분
+    // 3. 변수 선언
     let volume_self = 0;
-    let rawSurplus = 0;
     let volume_ec = 0;
     let volume_surplus_final = 0;
+
     let revenue_saving = 0;
+    let revenue_ec = 0;
+    let revenue_surplus = 0;
     let totalRationalizationSavings = 0;
 
+    let annualGrossRevenue = 0; // 최종 연간 수익
+
+    // 4. 모델별 분기 처리
     if (selectedModel === 'KEPCO') {
+      // [KEPCO]: 100% 잉여 판매 (자가소비 0, EC 0, 합리화 0)
       volume_self = 0;
-      rawSurplus = initialAnnualGen;
       volume_ec = 0;
-      volume_surplus_final = initialAnnualGen;
+      volume_surplus_final = initialAnnualGen; // 전량 판매
+
       revenue_saving = 0;
+      revenue_ec = 0;
+      revenue_surplus = initialAnnualGen * config.unit_price_kepco;
       totalRationalizationSavings = 0;
+
+      // KEPCO 총 수익 = 오직 잉여 판매 수익만
+      annualGrossRevenue = revenue_surplus;
     } else {
+      // [RE100 / REC5]
       const annualSelfConsumption = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
         0
       );
       volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-      rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
+      const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
 
       const ecCapacityAnnual = truckCount * 100 * 4 * 365;
       if (useEc) {
@@ -838,10 +847,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       }
       volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
+      // 단가 적용
       const appliedSavingsPrice =
         state.unitPriceSavings || config.unit_price_savings;
-      revenue_saving = volume_self * appliedSavingsPrice;
+      let appliedSellPrice = config.unit_price_kepco;
+      if (selectedModel === 'RE100')
+        appliedSellPrice = config.unit_price_ec_1_5;
+      if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
 
+      // 합리화 절감액 계산
       const isEul = state.contractType.includes('(을)');
       const saving_base =
         (rationalization.base_eul - rationalization.base_gap) * 300 * 12;
@@ -858,24 +872,21 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalRationalizationSavings = isEul
         ? saving_base + saving_light + saving_mid + saving_max
         : 0;
+
+      // 수익 항목 계산
+      revenue_saving = volume_self * appliedSavingsPrice;
+      revenue_ec = volume_ec * appliedSellPrice;
+      revenue_surplus = volume_surplus_final * config.unit_price_kepco;
+
+      // 총 수익 합산
+      annualGrossRevenue =
+        revenue_saving +
+        revenue_ec +
+        revenue_surplus +
+        totalRationalizationSavings;
     }
 
-    // 4. 판매 단가 적용
-    let appliedSellPrice = config.unit_price_kepco;
-    if (selectedModel === 'RE100') appliedSellPrice = config.unit_price_ec_1_5;
-    if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
-
-    const revenue_ec = volume_ec * appliedSellPrice;
-    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
-
-    // 5. 연간 총 수익 (Gross)
-    const annualGrossRevenue =
-      revenue_saving +
-      revenue_ec +
-      revenue_surplus +
-      totalRationalizationSavings;
-
-    // 6. 비용 및 순수익 (Net)
+    // 5. 비용 및 순수익 (Net)
     const laborCostWon =
       truckCount > 0 && useEc && selectedModel !== 'KEPCO'
         ? config.price_labor_ec * 100000000
@@ -885,52 +896,43 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
     const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
-    // 7. 20년 수익 시뮬레이션 (자가자본)
+    // 6. 20년 수익 시뮬레이션
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const self_final_profit =
       (annualOperatingProfit * (1 - Math.pow(R, n))) / (1 - R);
 
-    // 8. 금융 모델별 계산 (RPS) - [NEW] financialSettings 사용
+    // 7. 금융 모델 및 ROI (기존 로직 유지)
     const rps = financialSettings.rps;
     const rps_rate = rps.interestRate / 100;
-    const rps_loan = totalInvestment * (rps.loanRatio / 100); // 설정된 대출 비율 사용
-    const rps_equity = totalInvestment * (rps.equityRatio / 100); // 설정된 자기자본 비율 사용
+    const rps_loan = totalInvestment * (rps.loanRatio / 100);
+    const rps_equity = totalInvestment * (rps.equityRatio / 100);
     const rps_interest_only = rps_loan * rps_rate;
-    const rps_pmt = PMT(rps_rate, rps.repaymentPeriod, -rps_loan); // 상환기간 사용
-
-    // RPS 최종 수익: (20년 총수익) - (거치기간 이자) - (상환기간 원리금상환)
+    const rps_pmt = PMT(rps_rate, rps.repaymentPeriod, -rps_loan);
     const rps_final_profit =
       self_final_profit -
       rps_interest_only * rps.gracePeriod -
       Math.abs(rps_pmt) * rps.repaymentPeriod;
+    const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
+    const rps_net_6_15 = annualOperatingProfit + rps_pmt;
 
-    const rps_net_1_5 = annualOperatingProfit - rps_interest_only; // 거치기간 순수익
-    const rps_net_6_15 = annualOperatingProfit + rps_pmt; // 상환기간 순수익 (pmt가 음수이므로 +)
-
-    // 9. 금융 모델별 계산 (팩토링) - [NEW] financialSettings 사용
     const fac = financialSettings.factoring;
     const fac_rate = fac.interestRate / 100;
     const fac_loan = totalInvestment * (fac.loanRatio / 100);
     const fac_interest_only = fac_loan * fac_rate;
     const fac_pmt = PMT(fac_rate, fac.repaymentPeriod, -fac_loan);
-
-    // 팩토링 최종 수익: (20년 총수익) - (거치기간 이자) - (상환기간 원리금상환)
     const fac_final_profit =
       self_final_profit -
       fac_interest_only * fac.gracePeriod -
       Math.abs(fac_pmt) * fac.repaymentPeriod;
+    const fac_net_1 = annualOperatingProfit - fac_interest_only;
+    const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
-    const fac_net_1 = annualOperatingProfit - fac_interest_only; // 거치기간 순수익
-    const fac_net_2_10 = annualOperatingProfit + fac_pmt; // 상환기간 순수익
-
-    // 10. 무투자 모델 (임대형, 구독형)
     const rental_revenue_yr =
       capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365 +
       capacityKw * 0.8 * config.rental_price_per_kw;
     const rental_final_profit = rental_revenue_yr * 20;
-
     const price_standard = 210.5;
     const annualSelfConsumptionForSub = monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
@@ -946,18 +948,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
-    // 11. REC 데이터 계산
     const recPrice = state.recAveragePrice || 80;
-
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * 0.2 * 3.64 * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
-
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;
     const rec_annual_sub = rec_1000_sub * recPrice * 1000;
 
-    // 12. ROI (회수기간)
     const self_roi_years =
       annualOperatingProfit > 0 ? totalInvestment / annualOperatingProfit : 0;
     const rps_roi_years =
@@ -973,7 +971,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         selectedModel === 'KEPCO'
           ? 0
           : monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0),
-      annualSurplus: rawSurplus,
+      annualSurplus:
+        selectedModel === 'KEPCO'
+          ? initialAnnualGen
+          : Math.max(
+              0,
+              initialAnnualGen -
+                monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0)
+            ),
       volume_self,
       volume_ec,
       volume_surplus_final,

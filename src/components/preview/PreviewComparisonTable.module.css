@@ -17,10 +17,15 @@
 }
 
 .title {
-  font-size: 1rem;
+  background-color: #1e40af; /* Deep Blue */
+  color: white;
+  padding: 0.6rem 1.5rem;
+  border-radius: 9999px; /* Pill shape */
+  font-size: 1.1rem;
   font-weight: 800;
-  color: #1e293b;
-  margin: 0;
+  display: inline-block;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
   margin-top: 3rem;
 }
 
@@ -36,6 +41,7 @@
   font-size: 0.65rem; /* 데이터가 많으므로 폰트 크기 최적화 */
   text-align: right;
   table-layout: fixed;
+  border: 1px solid #e2e8f0;
 }
 
 .compTable th {

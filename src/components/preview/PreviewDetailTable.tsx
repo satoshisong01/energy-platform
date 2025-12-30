@@ -25,10 +25,7 @@ export default function PreviewDetailTable({
 
   return (
     <div>
-      <div className={styles.tableHeader}>
-        <LucideTable size={16} className="text-blue-600" /> 월별 상세 분석
-        데이터
-      </div>
+      <div className={styles.tableHeader}>03. 월별 상세 분석 데이터</div>
       <table className={styles.table}>
         <thead>
           <tr>

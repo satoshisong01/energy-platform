@@ -15,11 +15,10 @@ export default function PreviewSummary() {
   const store = useProposalStore();
   const { config } = store;
 
+  // Store의 중앙 계산 결과를 가져옵니다 (현재 선택된 옵션 기준)
   const results = store.getSimulationResults();
 
-  // [핵심 수정] Step4_Simulation.tsx와 동일한 방식의 발전량 계산 (엑셀 로직 기준)
-  // store의 getSimulationResults()는 업로드된 데이터를 우선하지만,
-  // Step4는 용량 기반 단순 계산을 강제하므로 이를 따름
+  // [발전량] 엑셀 로직 기준 단순 계산
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
@@ -34,80 +33,11 @@ export default function PreviewSummary() {
     setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
   }, [store.useEc, store.selectedModel]);
 
-  // --------------------------------------------------------------------------
-  // EC 체크 토글 핸들러 (비용 자동 보정 로직 포함)
-  // --------------------------------------------------------------------------
+  // EC 토글 핸들러 (Store 옵션 변경)
   const handleEcToggle = (checked: boolean) => {
-    // 1. 상태 업데이트
     setApplyEc(checked);
     store.setSimulationOption('useEc', checked);
-
-    // 2. 비용 보정 시뮬레이션
-    const activeTruckCount = checked
-      ? store.truckCount > 0
-        ? store.truckCount
-        : 3
-      : 0;
-
-    const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
-
-    // [수정] Step4와 동일한 발전량 사용
-    const annualGen = simpleAnnualGen;
-
-    const annualSelf = store.monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0
-    );
-    const rawSurplus = Math.max(0, annualGen - annualSelf);
-    const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
-    const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
-
-    // 모델별 단가 적용 (Step4와 동일)
-    let appliedSellPrice = config.unit_price_kepco;
-    if (store.selectedModel === 'RE100')
-      appliedSellPrice = config.unit_price_ec_1_5;
-    if (store.selectedModel === 'REC5')
-      appliedSellPrice = config.unit_price_ec_5_0;
-
-    const revenue_saving =
-      Math.min(annualGen, annualSelf) *
-      (store.unitPriceSavings || config.unit_price_savings);
-
-    const revenue_ec = volume_ec * appliedSellPrice;
-    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
-
-    // 총 매출 (Gross)
-    const grossRevenue =
-      revenue_saving +
-      revenue_ec +
-      revenue_surplus +
-      results.totalRationalizationSavings;
-
-    // 인건비 (Labor)
-    const laborCostWon =
-      activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
-
-    // 3. 한도 체크 및 비율 조정 (8,000만 원)
-    const MAX_LIMIT = 80000000;
-
-    if (checked) {
-      const currentRateCost =
-        grossRevenue * (store.maintenanceRate / 100) + laborCostWon;
-
-      if (currentRateCost > MAX_LIMIT) {
-        const targetMaintenance = Math.max(0, MAX_LIMIT - laborCostWon);
-        let newRate = 0;
-        if (grossRevenue > 0) {
-          newRate = (targetMaintenance / grossRevenue) * 100;
-        }
-        store.setSimulationOption(
-          'maintenanceRate',
-          Math.floor(newRate * 100) / 100
-        );
-      }
-    } else {
-      store.setSimulationOption('maintenanceRate', 25.0);
-    }
+    // EC 변경 시 Store 내부 로직에 의해 유지보수비 등은 자동 업데이트됨
   };
 
   // ... (공통 데이터 계산) ...
@@ -116,23 +46,18 @@ export default function PreviewSummary() {
     (acc, cur) => acc + cur.usageKwh,
     0
   );
-
-  // [수정] RE100 비율 계산 시에도 simpleAnnualGen 사용
   const re100Rate = totalUsage > 0 ? (simpleAnnualGen / totalUsage) * 100 : 0;
-
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
     0
   );
 
+  // 예상 절감액 계산
   let totalBillSavings = 0;
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
     const autoGen = capacity * 3.64 * days;
-
-    // [수정] 발전량 계산 로직 통일 (단순 계산 사용)
     const solarGen = autoGen;
-
     const selfConsum = data.selfConsumption;
     const usageSaving =
       Math.min(solarGen, selfConsum) *
@@ -162,7 +87,7 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  // 한전 데이터 계산
+  // [한전 데이터 계산]
   const calculateKepcoData = () => {
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -172,11 +97,11 @@ export default function PreviewSummary() {
     const solarCost = (capacity / 100) * solarPrice;
     const investWon = solarCost * 100000000;
     const investUk = solarCost;
-
-    // [수정] Step4 방식의 발전량 사용
     const annualGen = simpleAnnualGen;
-
     const annualRevenue = annualGen * config.unit_price_kepco;
+
+    // 한전 모델은 현재 설정된 유지보수 비율을 따름 (보통 고정값이거나 낮음)
+    // 필요하다면 여기서도 독립 계산 가능
     const maintenanceCost = annualRevenue * (store.maintenanceRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
 
@@ -184,7 +109,6 @@ export default function PreviewSummary() {
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const totalNet20Won = (annualNetProfit * (1 - Math.pow(R, n))) / (1 - R);
-
     const roiYears = annualNetProfit > 0 ? investWon / annualNetProfit : 0;
     const profitRate =
       (totalNet20Won / (investWon + maintenanceCost * 20)) * 100;
@@ -203,8 +127,11 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // 시나리오 데이터 구성
+  // --------------------------------------------------------------------------
+  // [핵심] 시나리오별 데이터 독립 계산 (유지보수 비율 자동 보정 포함)
+  // --------------------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
+    // 1. EC 대수 설정 (체크 여부에 따라)
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
@@ -212,9 +139,8 @@ export default function PreviewSummary() {
       : 0;
     const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
 
-    // [수정] Step4 방식의 발전량 사용
+    // 2. 발전량 및 물량 배분
     const annualGen = simpleAnnualGen;
-
     const annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
@@ -223,28 +149,58 @@ export default function PreviewSummary() {
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
+    // 3. 시나리오별 판매 단가
     const targetEcPrice = isPremium
       ? config.unit_price_ec_5_0
       : config.unit_price_ec_1_5;
     const modelName = isPremium ? 'REC 5.0 (예상)' : 'REC 1.5 (현행)';
 
+    // 4. 매출 계산 (Gross)
     const revenue_saving =
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
     const revenue_ec = volume_ec * targetEcPrice;
     const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
+
+    // 합리화 절감액은 Store 계산값 재활용 (시나리오별로 다르지 않음)
     const grossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
       results.totalRationalizationSavings;
 
+    // 5. 비용 계산 (인건비 + 유지보수비)
     const laborCostWon =
       activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
+
+    // [자동 보정 로직] 해당 시나리오 매출 기준 적정 유지보수 비율 계산
+    const MAX_LIMIT = 80000000; // 8천만원 한도
+    const DEFAULT_RATE = 25.0; // 기본 비율
+
+    // (1) 일단 기본 25%로 계산해 봄
+    let scenarioMaintenanceRate = DEFAULT_RATE;
+    let tempTotalCost =
+      (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
+
+    // (2) 한도 초과 시 비율 낮춤
+    if (tempTotalCost > MAX_LIMIT) {
+      const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
+      if (grossRevenue > 0) {
+        scenarioMaintenanceRate = (targetMaintenanceCost / grossRevenue) * 100;
+      } else {
+        scenarioMaintenanceRate = 0;
+      }
+    }
+    // (만약 한도 이하라면 기본 25% 유지 - Step4 로직과 동일)
+
+    // 최종 유지보수 비용 확정
     const maintenanceCost =
-      (grossRevenue * store.maintenanceRate) / 100 + laborCostWon;
+      (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
+
+    // 6. 순수익 (Net)
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
+    // 7. 투자비
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     else if (store.moduleTier === 'ECONOMY')
@@ -257,6 +213,7 @@ export default function PreviewSummary() {
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
+    // 8. 20년 수익 및 ROI
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
@@ -279,11 +236,13 @@ export default function PreviewSummary() {
       profitRate: profitRate,
       isPro: isPremium,
       modelName: modelName,
+      // 디버깅용: 적용된 비율 확인 가능
+      // maintenanceRateApplied: scenarioMaintenanceRate
     };
   };
 
-  const stdData = getScenarioData(false);
-  const expData = getScenarioData(true);
+  const stdData = getScenarioData(false); // 1.5 시나리오 (자동보정 적용)
+  const expData = getScenarioData(true); // 5.0 시나리오 (자동보정 적용)
 
   // 하단 무투자 모델
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
@@ -456,7 +415,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 한전 장기 계약 섹션 (ROI 위치 변경) */}
+      {/* 한전 장기 계약 섹션 */}
       <div className={styles.kepcoSection}>
         <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
         <div className={styles.kepcoContent}>
@@ -496,7 +455,6 @@ export default function PreviewSummary() {
             <LucideArrowRight size={14} />
           </div>
 
-          {/* ROI를 별도 배지가 아닌 20년간 수익 항목 내부 하단으로 이동 */}
           <div className={styles.kepcoItem}>
             <span className={styles.kLabel}>20년간 수익</span>
             <div className="flex items-center gap-2">

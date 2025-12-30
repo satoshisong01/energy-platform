@@ -45,10 +45,7 @@ export default function PreviewFinancialTable() {
 
   return (
     <div className={styles.financialSection}>
-      <div className={styles.sectionTitle}>
-        <LucideBriefcase size={20} className="text-purple-600" />
-        투자 및 수익성 분석 상세
-      </div>
+      <div className={styles.tableHeader}>04. 투자 및 수익성 분석 상세</div>
 
       <div className={styles.summaryBox}>
         <div className={styles.summaryItem}>

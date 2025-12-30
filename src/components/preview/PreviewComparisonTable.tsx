@@ -56,7 +56,7 @@ export default function PreviewComparisonTable() {
           alignItems: 'center',
         }}
       >
-        <h3 className={styles.title}>5. 금융 모델별 수익성 비교 분석</h3>
+        <h3 className={styles.title}>05. 금융 모델별 수익성 비교 분석</h3>
 
         {/* [NEW] REC 평균가격 조정 입력 (인쇄 시 숨김) */}
         <div className="no-print flex items-center gap-2 text-xs bg-yellow-50 px-2 py-1 rounded border border-yellow-200">

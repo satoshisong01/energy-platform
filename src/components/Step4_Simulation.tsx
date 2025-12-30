@@ -31,10 +31,12 @@ export default function Step4_Simulation() {
   // [NEW] 알림 중복 방지를 위한 ref
   const isCheckingCostRef = useRef(false);
 
-  // 중앙 계산 결과 사용 (Preview와 데이터 일치)
+  // --------------------------------------------------------------------------
+  // [핵심] Store의 중앙 계산 결과 사용 (수익, 비용, 물량 등 모든 데이터)
+  // --------------------------------------------------------------------------
   const results = store.getSimulationResults();
 
-  // 시뮬레이션 옵션 변경 시 투자비 재계산
+  // 시뮬레이션 옵션 변경 시 투자비 재계산 (Store 상태 업데이트용)
   useEffect(() => {
     store.recalculateInvestment();
   }, [
@@ -72,67 +74,63 @@ export default function Step4_Simulation() {
   };
 
   // --------------------------------------------------------------------------
-  // [0] 기초 데이터 설정
+  // [1] 데이터 매핑 (Store Results -> UI 변수)
   // --------------------------------------------------------------------------
   const isKepco = store.selectedModel === 'KEPCO';
   const isEul = store.contractType.includes('(을)');
 
+  // 1. 합리화 절감액 (UI 표시용 계산)
   const diff_base = rationalization.base_eul - rationalization.base_gap;
   const saving_base = diff_base * 300 * 12;
-
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
-
   const saving_light = diff_light * rationalization.light_usage;
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
 
-  const totalRationalizationSavings = isEul
-    ? saving_base + saving_light + saving_mid + saving_max
-    : 0;
+  // Store에서 계산된 합리화 절감액 (KEPCO일 땐 0임)
+  const totalRationalizationSavings = results.totalRationalizationSavings;
 
-  // --------------------------------------------------------------------------
-  // [1] 물량 및 수익 데이터 (from store results)
-  // --------------------------------------------------------------------------
+  // 2. 물량 데이터
   const initialAnnualGen = results.initialAnnualGen;
   const volume_self = results.volume_self;
   const volume_ec = results.volume_ec;
   const volume_surplus = results.volume_surplus_final;
+  const rawSurplus = results.annualSurplus; // 잉여 전력량 (EC 판단용)
 
-  const annualSelfConsumption = store.monthlyData.reduce(
-    (acc, cur) => acc + cur.selfConsumption,
-    0
-  );
-  const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
-  const dailySurplus = rawSurplus / 365;
+  // 3. 수익 데이터 (Store에서 가져옴)
+  const revenue_saving = results.revenue_saving;
+  const revenue_ec = results.revenue_ec;
+  const revenue_surplus = results.revenue_surplus;
 
+  // [중요] 연간 총 수익 (Store가 모델별로 정확히 계산한 값)
+  const totalRevenue = results.annualGrossRevenue;
+
+  // 4. 비용 및 순이익
+  const laborCostWon = results.laborCostWon;
+  const totalAnnualCost = results.annualMaintenanceCost;
+  // 순수 O&M 비용 (인건비 제외, UI 표시용)
+  const maintenanceBase = totalAnnualCost - laborCostWon;
+  const netProfit = results.annualOperatingProfit;
+
+  // 5. 단가 표시용 (계산에는 안 쓰이고 UI에만 보여줌)
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
-
   let appliedSellPrice = config.unit_price_kepco;
   if (store.selectedModel === 'RE100')
     appliedSellPrice = config.unit_price_ec_1_5;
   if (store.selectedModel === 'REC5')
     appliedSellPrice = config.unit_price_ec_5_0;
 
-  const revenue_saving = results.revenue_saving;
-  const revenue_ec = results.revenue_ec;
-  const revenue_surplus = results.revenue_surplus;
-  // const totalRevenue = results.annualGrossRevenue;
-  // ↑ 주의: results.annualGrossRevenue는 현재 maintenanceRate로 계산된 결과일 수 있음.
-  // 비용 역산을 위해 순수 매출(Gross)이 필요하므로 직접 참조
-  const totalRevenue =
-    revenue_saving + revenue_ec + revenue_surplus + totalRationalizationSavings;
+  // --------------------------------------------------------------------------
+  // [2] 투자비 테이블 표시용 데이터 (단순 계산)
+  // --------------------------------------------------------------------------
+  // 전체 투자비 총액은 Store Results를 따름
+  const totalInitialInvestment = results.totalInvestment / 100000000; // 억 단위
+  const maintenanceTableValue = totalAnnualCost / 100000000; // 억 단위
 
-  // 비용 계산 (현재 비율 기준)
-  const laborCostWon = results.laborCostWon;
-  // O&M 비용 = 매출 * 비율
-  const maintenanceBase = totalRevenue * (store.maintenanceRate / 100);
-  const totalAnnualCost = maintenanceBase + laborCostWon;
-  const netProfit = totalRevenue - totalAnnualCost;
-
-  // 투자비 데이터
+  // 개별 항목 상세 (단가 * 수량) - UI 테이블용
   let solarPrice = config.price_solar_standard;
   if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
   if (store.moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
@@ -147,9 +145,6 @@ export default function Step4_Simulation() {
   const platformCost =
     !isKepco && truckCount > 0 && store.useEc ? 1 * config.price_platform : 0;
 
-  const totalInitialInvestment = results.totalInvestment / 100000000;
-  const maintenanceTableValue = totalAnnualCost / 100000000;
-
   let totalInvestment20Years = 0;
   if (isKepco) {
     const annualInvestSplit = totalInitialInvestment / 20;
@@ -159,12 +154,14 @@ export default function Step4_Simulation() {
       totalInitialInvestment + maintenanceTableValue * 20;
   }
 
+  // 분할 표시용
   const solarSplit = round2(solarCost / 20);
   const ecSplit = round2(ecCost / 20);
   const tractorSplit = round2(tractorCost / 20);
   const platformSplit = round2(platformCost / 20);
   const maintenanceSplit = round2(maintenanceTableValue);
 
+  // ROI 결과 (Store 사용)
   const totalNetProfit20Years = results.self_final_profit;
   const roiYears = results.self_roi_years;
   const roiPercent =
@@ -173,8 +170,10 @@ export default function Step4_Simulation() {
       : 0;
 
   // ----------------------------------------------------------------
-  // [NEW] EC 체크 토글 핸들러
+  // [3] EC 체크 및 비용 자동 조정 로직
   // ----------------------------------------------------------------
+  const dailySurplus = rawSurplus / 365;
+
   const handleEcToggle = (checked: boolean) => {
     store.setSimulationOption('useEc', checked);
 
@@ -240,25 +239,18 @@ export default function Step4_Simulation() {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // [비용 체크 및 자동 조정 로직 (트럭 대수 변경 대응 포함)]
-  // --------------------------------------------------------------------------
+  // 비용 체크 로직 (8천만원 한도)
   useEffect(() => {
     const MAX_COST_LIMIT = 80000000;
     const DEFAULT_RATE = 25.0;
 
-    // 계산에 필요한 값이 아직 없으면 패스
     if (!totalRevenue || totalRevenue === 0) return;
-
     if (isCheckingCostRef.current) return;
 
-    // 1. 현재 비용 계산
-    const currentCost = totalAnnualCost; // (매출 * 현재%) + 인건비
+    const currentCost = totalAnnualCost;
 
-    // 2. 비용 초과 시 -> 낮추기
     if (currentCost > MAX_COST_LIMIT) {
       isCheckingCostRef.current = true;
-
       const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
       const targetRate = (targetMaintenanceCost / totalRevenue) * 100;
       const formattedTargetRate = Math.floor(targetRate * 100) / 100;
@@ -280,24 +272,16 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
           isCheckingCostRef.current = false;
         }, 500);
       }, 100);
-    }
-    // 3. 비용 여유 발생 시 (트럭 줄임 등) -> 비율 다시 올리기 (최대 25%)
-    else if (store.maintenanceRate < DEFAULT_RATE) {
-      // 25%로 올렸을 때의 예상 비용 계산
+    } else if (store.maintenanceRate < DEFAULT_RATE) {
       const potentialCost = totalRevenue * (DEFAULT_RATE / 100) + laborCostWon;
 
-      // 25%로 올려도 한도 내라면 -> 25% 복구
       if (potentialCost <= MAX_COST_LIMIT) {
         isCheckingCostRef.current = true;
-        // 사용자에게 묻지 않고 자동 복구 (또는 필요시 confirm 추가)
-        // 트럭 줄였을 때 혜택을 바로 체감하게 하기 위해 자동 복구 추천
         store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
         setTimeout(() => {
           isCheckingCostRef.current = false;
         }, 500);
-      }
-      // 25%는 안 되지만 현재보다는 올릴 수 있는 경우 (중간값)
-      else {
+      } else {
         isCheckingCostRef.current = true;
         const targetMaintenanceCost = Math.max(
           0,
@@ -306,7 +290,6 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         const maxPossibleRate = (targetMaintenanceCost / totalRevenue) * 100;
         const formattedMaxRate = Math.floor(maxPossibleRate * 100) / 100;
 
-        // 현재 비율과 목표 비율 차이가 유의미할 때만 조정 (0.5% 이상)
         if (formattedMaxRate > store.maintenanceRate + 0.5) {
           store.setSimulationOption('maintenanceRate', formattedMaxRate);
         }
@@ -608,25 +591,30 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
       )}
 
       {/* 투자비 테이블 */}
-      <div className="mt-4">
-        <div className="flex items-center gap-2 mb-2 text-blue-800">
+      <div className="mt-6">
+        {' '}
+        {/* [수정] mt-4 -> mt-6 (위쪽 간격 증가) */}
+        <div className="flex items-center gap-2 mb-3 text-blue-800">
+          {' '}
+          {/* [수정] mb-2 -> mb-3 (제목-테이블 간격) */}
           <LucideTable size={16} />
           <span className="text-sm font-bold">초기 투자비 상세 (VAT 별도)</span>
         </div>
-
         {isKepco ? (
           <div className="border rounded-lg overflow-hidden text-xs bg-white">
             <table className="w-full text-center">
               <thead className="bg-blue-100 text-blue-900 font-bold border-b border-blue-200">
                 <tr>
-                  <th className="py-2">투자비용</th>
+                  {/* [수정] py-2 -> py-3 (헤더 높이 증가) */}
+                  <th className="py-3">투자비용</th>
                   <th>유지보수(년간)</th>
                   <th>20년 투자금</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="font-bold text-lg">
-                  <td className="py-3 text-blue-700">
+                  {/* [수정] py-3 -> py-5 (메인 숫자 행 높이 확 증가) */}
+                  <td className="py-5 text-blue-700">
                     {totalInitialInvestment.toFixed(2)} 억원
                   </td>
                   <td className="text-slate-600">{store.maintenanceRate}%</td>
@@ -634,8 +622,9 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                     {totalInvestment20Years.toFixed(2)} 억원
                   </td>
                 </tr>
+                {/* [수정] py-3 추가 (보조 설명 행 높이 증가) */}
                 <tr className="text-xs text-gray-400 bg-slate-50 border-t">
-                  <td>** 운영플랫폼 0.0 억원</td>
+                  <td className="py-3">** 운영플랫폼 0.0 억원</td>
                   <td>{maintenanceTableValue.toFixed(2)} 억원</td>
                   <td>(초기비 분할 + 유지보수)</td>
                 </tr>
@@ -647,7 +636,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
             <table className="w-full text-center">
               <thead className="bg-purple-100 text-purple-900 border-b border-purple-200 font-bold">
                 <tr>
-                  <th className="py-2">구분</th>
+                  {/* [수정] py-2 -> py-3 */}
+                  <th className="py-3">구분</th>
                   <th>태양광</th>
                   <th>에너지캐리어</th>
                   <th>이동트랙터</th>
@@ -657,7 +647,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
               </thead>
               <tbody className="divide-y divide-slate-100">
                 <tr className="bg-slate-50 text-slate-500">
-                  <td className="font-bold text-slate-700">용량/규격</td>
+                  {/* [수정] py-2 추가 */}
+                  <td className="font-bold text-slate-700 py-2">용량/규격</td>
                   <td>100 kW</td>
                   <td>100 kW</td>
                   <td>1 ton</td>
@@ -665,7 +656,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   <td>1 set</td>
                 </tr>
                 <tr>
-                  <td className="font-bold text-slate-700">수량</td>
+                  {/* [수정] py-2 추가 */}
+                  <td className="font-bold text-slate-700 py-2">수량</td>
                   <td className="text-blue-600 font-bold">
                     {solarCount.toFixed(2)} ea
                   </td>
@@ -675,7 +667,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   <td>1 set</td>
                 </tr>
                 <tr>
-                  <td className="font-bold text-slate-700">단가</td>
+                  {/* [수정] py-2 추가 */}
+                  <td className="font-bold text-slate-700 py-2">단가</td>
                   <td>{solarPrice.toFixed(2)} 억</td>
                   <td>{config.price_ec_unit.toFixed(2)} 억</td>
                   <td>{config.price_tractor.toFixed(2)} 억</td>
@@ -683,7 +676,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   <td>{maintenanceTableValue.toFixed(2)} 억</td>
                 </tr>
                 <tr className="font-bold text-slate-800 bg-slate-50">
-                  <td>합계</td>
+                  {/* [수정] py-3 추가 (중요 합계 행) */}
+                  <td className="py-3">합계</td>
                   <td>{solarCost.toFixed(2)} 억원</td>
                   <td>{ecCost.toFixed(2)} 억원</td>
                   <td>{tractorCost.toFixed(2)} 억원</td>
@@ -691,7 +685,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   <td>{maintenanceTableValue.toFixed(2)} 억원</td>
                 </tr>
                 <tr className="border-t-2 border-slate-300">
-                  <td className="font-bold py-2 text-blue-900">
+                  {/* [수정] py-2 -> py-4 (최종 합계 행 강조) */}
+                  <td className="font-bold py-4 text-blue-900">
                     초기투자비 합
                   </td>
                   <td
@@ -702,7 +697,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   </td>
                 </tr>
                 <tr className="text-gray-400 text-[10px]">
-                  <td>20년 분할(참고)</td>
+                  {/* [수정] py-2 추가 */}
+                  <td className="py-2">20년 분할(참고)</td>
                   <td>{solarSplit.toFixed(2)}</td>
                   <td>{ecSplit.toFixed(2)}</td>
                   <td>{tractorSplit.toFixed(2)}</td>
@@ -710,7 +706,8 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
                   <td>{maintenanceSplit.toFixed(2)}</td>
                 </tr>
                 <tr className="bg-purple-50 border-t border-purple-100 font-bold text-purple-900">
-                  <td className="py-2">20년 투자총액</td>
+                  {/* [수정] py-2 -> py-4 (맨 아래 총액 강조) */}
+                  <td className="py-4">20년 투자총액</td>
                   <td colSpan={5} className="text-center text-lg">
                     {totalInvestment20Years.toFixed(2)} 억원
                   </td>

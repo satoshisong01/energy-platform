@@ -1,0 +1,12 @@
+.headerTitle {
+  background-color: #1e40af; /* Deep Blue */
+  color: white;
+  padding: 0.6rem 1.5rem;
+  border-radius: 9999px; /* Pill shape */
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: inline-block;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  margin-top: 3rem;
+}
