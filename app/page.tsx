@@ -74,6 +74,9 @@ export default function Home() {
   // 입력창 너비 설정
   const PANEL_WIDTH = '800px';
 
+  // [수정 포인트] 모달이 하나라도 열려있는지 확인하는 변수 추가
+  const isAnyModalOpen = isConfigOpen || isLoadModalOpen;
+
   return (
     // [PDF 수정 1] print:h-auto 및 print:overflow-visible로 높이 제한 해제
     <main className="flex h-screen w-full overflow-hidden bg-slate-100 relative print:h-auto print:overflow-visible print:block">
@@ -170,26 +173,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 접기/펼치기 버튼 (인쇄 시 숨김) */}
-      <button
-        onClick={() => setIsInputOpen(!isInputOpen)}
-        className={`
-          absolute top-1/2 z-50 w-6 h-16 
-          flex items-center justify-center cursor-pointer 
-          bg-white border border-slate-200 border-l-0 rounded-r-lg shadow-md
-          text-slate-400 hover:bg-blue-50 hover:text-blue-600
-          transition-all duration-300 ease-in-out transform -translate-y-1/2
-          print:hidden
-        `}
-        style={{ left: isInputOpen ? PANEL_WIDTH : '0px' }}
-        title={isInputOpen ? '입력창 접기 (프리뷰 확대)' : '입력창 펼치기'}
-      >
-        {isInputOpen ? (
-          <LucideChevronLeft size={18} />
-        ) : (
-          <LucideChevronRight size={18} />
-        )}
-      </button>
+      {/* 접기/펼치기 버튼 (인쇄 시 숨김, 모달 열리면 숨김) */}
+      {!isAnyModalOpen && (
+        <button
+          onClick={() => setIsInputOpen(!isInputOpen)}
+          className={`
+            absolute top-1/2 z-50 w-6 h-16 
+            flex items-center justify-center cursor-pointer 
+            bg-white border border-slate-200 border-l-0 rounded-r-lg shadow-md
+            text-slate-400 hover:bg-blue-50 hover:text-blue-600
+            transition-all duration-300 ease-in-out transform -translate-y-1/2
+            print:hidden
+          `}
+          style={{ left: isInputOpen ? PANEL_WIDTH : '0px' }}
+          title={isInputOpen ? '입력창 접기 (프리뷰 확대)' : '입력창 펼치기'}
+        >
+          {isInputOpen ? (
+            <LucideChevronLeft size={18} />
+          ) : (
+            <LucideChevronRight size={18} />
+          )}
+        </button>
+      )}
 
       {/* 2. 오른쪽: 프리뷰 패널 */}
       <section

@@ -288,10 +288,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     light_gap: 93.27,
     light_usage: 0,
     mid_eul: 153.73,
-    mid_gap: 109.43,
+    mid_gap: 109.1,
     mid_usage: 0,
     max_eul: 210.5,
-    max_gap: 136.5,
+    max_gap: 136.47,
     max_usage: 0,
   },
   config: {
@@ -767,10 +767,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         light_gap: 93.27,
         light_usage: 0,
         mid_eul: 153.73,
-        mid_gap: 109.43,
+        mid_gap: 109.1,
         mid_usage: 0,
         max_eul: 210.5,
-        max_gap: 136.5,
+        max_gap: 136.47,
         max_usage: 0,
       },
       useEc: true,
@@ -857,7 +857,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       // 합리화 절감액 계산
       const isEul = state.contractType.includes('(을)');
-      const saving_base =rationalization.base_savings_manual || 0;
+      const saving_base = rationalization.base_savings_manual || 0;
       const saving_light =
         (rationalization.light_eul - rationalization.light_gap) *
         rationalization.light_usage;

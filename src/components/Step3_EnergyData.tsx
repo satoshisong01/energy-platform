@@ -153,11 +153,11 @@ export default function Step3_EnergyData() {
         newData.push({
           month: month,
           year: year,
-          usageKwh: Number(row[1]) || 0,
-          selfConsumption: Number(row[2]) || 0,
-          peakKw: Number(row[3]) || 0,
-          totalBill: Number(row[4]) || 0,
-          baseBill: Number(row[5]) || 0,
+          usageKwh: Math.round(Number(row[1]) || 0), // 사용량
+          selfConsumption: Math.round(Number(row[2]) || 0), // 자가소비
+          peakKw: Math.round(Number(row[3]) || 0), // 피크치
+          totalBill: Math.round(Number(row[4]) || 0), // 전기요금
+          baseBill: Math.round(Number(row[5]) || 0), // 기본요금
           solarGeneration: 0,
         });
         count++;
