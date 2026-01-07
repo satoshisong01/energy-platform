@@ -29,7 +29,10 @@ export default function Step4_Simulation() {
   const [showRationalization, setShowRationalization] = useState(false);
   const isCheckingCostRef = useRef(false);
 
-  // [NEW] 비용 조정 알림 억제(자동 적용) 상태
+  // [NEW] 모델 변경 감지용 Ref
+  const prevModelRef = useRef(store.selectedModel);
+
+  // [State] 비용 조정 알림 억제(자동 적용) 상태
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
 
   // Store의 중앙 계산 결과 사용
@@ -71,7 +74,6 @@ export default function Step4_Simulation() {
     );
   };
 
-  // [NEW] 기본료 전용 입력 핸들러
   const handleBaseUsageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/,/g, '');
     const usageVal = Number(rawValue);
@@ -84,7 +86,6 @@ export default function Step4_Simulation() {
     }
   };
 
-  // [NEW] 기본료 절감액 직접 입력 핸들러
   const handleBaseSavingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/,/g, '');
     const savingsVal = Number(rawValue);
@@ -97,13 +98,10 @@ export default function Step4_Simulation() {
   const isKepco = store.selectedModel === 'KEPCO';
   const isEul = store.contractType.includes('(을)');
 
-  // 합리화 절감액 (UI 표시용)
   const saving_base = rationalization.base_savings_manual || 0;
-
   const diff_light = rationalization.light_eul - rationalization.light_gap;
   const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
   const diff_max = rationalization.max_eul - rationalization.max_gap;
-
   const saving_light = diff_light * rationalization.light_usage;
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
@@ -111,7 +109,6 @@ export default function Step4_Simulation() {
   const totalRationalizationSavings =
     saving_base + saving_light + saving_mid + saving_max;
 
-  // 데이터 매핑
   const initialAnnualGen = results.initialAnnualGen;
   const volume_self = results.volume_self;
   const volume_ec = results.volume_ec;
@@ -235,43 +232,70 @@ export default function Step4_Simulation() {
     }
   }
 
-  // [수정] 비용 체크 로직 (알림 끄기 기능 적용)
+  // ================================================================
+  // [핵심 로직 개선] 비용 자동 조정 및 모델 변경 대응
+  // ================================================================
   useEffect(() => {
-    const MAX_COST_LIMIT = 80000000;
-    const DEFAULT_RATE = 25.0;
-
+    // 1. 계산에 필요한 데이터가 없으면 중단
     if (!totalRevenue || totalRevenue === 0) return;
+
+    const MAX_COST_LIMIT = 80000000;
+
+    // 2. 현재 조건에서 가능한 '최적 비율(Ideal Rate)' 계산
+    //    공식: (8천만원 - 인건비) / 매출 * 100, 단 최대 25%
+    const maxAllowedOandM = Math.max(0, MAX_COST_LIMIT - laborCostWon);
+    let calculatedRate = (maxAllowedOandM / totalRevenue) * 100;
+
+    // 25.0%를 넘지 않도록 제한 + 소수점 둘째 자리 버림
+    calculatedRate = Math.min(25.0, calculatedRate);
+    calculatedRate = Math.floor(calculatedRate * 100) / 100;
+
+    const currentRate = store.maintenanceRate;
+    const isModelChanged = prevModelRef.current !== store.selectedModel;
+
+    // --------------------------------------------------------
+    // CASE A: 모델이 변경된 경우 (강제 리셋)
+    // --------------------------------------------------------
+    if (isModelChanged) {
+      // 묻지도 따지지도 않고 최적 비율로 바로 적용
+      store.setSimulationOption('maintenanceRate', calculatedRate);
+
+      // 상태 업데이트
+      prevModelRef.current = store.selectedModel;
+      isCheckingCostRef.current = false;
+      return;
+    }
+
+    // 이미 체크 중이면 중복 실행 방지
     if (isCheckingCostRef.current) return;
 
-    const currentCost = totalAnnualCost;
-
-    // 1. 한도 초과 시
-    if (currentCost > MAX_COST_LIMIT) {
+    // --------------------------------------------------------
+    // CASE B: 한도 초과 (비용 > 8천) -> 다운사이징 필요
+    // --------------------------------------------------------
+    // 현재 비율이 계산된 한계 비율보다 크다면 (오차 범위 0.01)
+    if (currentRate > calculatedRate + 0.01) {
       isCheckingCostRef.current = true;
-      const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
-      const targetRate = (targetMaintenanceCost / totalRevenue) * 100;
-      const formattedTargetRate = Math.floor(targetRate * 100) / 100;
 
-      const currentCostEok = (currentCost / 100000000).toFixed(2);
+      const currentCostEok = (totalAnnualCost / 100000000).toFixed(2);
       const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
 
       const confirmMsg = `[비용 조정 알림]
 현재 운영비용(${currentCostEok}억원)이 한도(${limitCostEok}억원)를 초과했습니다.
 
-O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하여
+O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
 비용을 맞추시겠습니까?`;
 
       if (suppressCostAlerts) {
         // [알림 끔] 자동 적용
-        store.setSimulationOption('maintenanceRate', formattedTargetRate);
+        store.setSimulationOption('maintenanceRate', calculatedRate);
         setTimeout(() => {
           isCheckingCostRef.current = false;
         }, 300);
       } else {
-        // [알림 켬] Confirm 창 띄움
+        // [알림 켬] Confirm
         setTimeout(() => {
           if (window.confirm(confirmMsg)) {
-            store.setSimulationOption('maintenanceRate', formattedTargetRate);
+            store.setSimulationOption('maintenanceRate', calculatedRate);
           }
           setTimeout(() => {
             isCheckingCostRef.current = false;
@@ -279,62 +303,28 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         }, 100);
       }
     }
-    // 2. 한도 이내로 복귀 가능 시
-    else if (store.maintenanceRate < DEFAULT_RATE) {
-      const potentialCost = totalRevenue * (DEFAULT_RATE / 100) + laborCostWon;
+    // --------------------------------------------------------
+    // CASE C: 한도 여유 (비용 < 8천 & 비율 < 25%) -> 복구 가능
+    // --------------------------------------------------------
+    // 현재 비율이 최적 비율보다 작다면 (즉, 더 올릴 수 있다면)
+    else if (currentRate < 25.0 && currentRate < calculatedRate - 0.01) {
+      isCheckingCostRef.current = true;
 
-      if (potentialCost <= MAX_COST_LIMIT) {
-        // 기본값(25%)으로 복귀 가능
-        isCheckingCostRef.current = true;
-        if (suppressCostAlerts) {
-          store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
-          setTimeout(() => {
-            isCheckingCostRef.current = false;
-          }, 300);
-        } else {
-          // (복귀는 보통 알림 없이 해도 되지만, 로직 통일성을 위해 자동 적용하거나 알림 가능)
-          // 여기서는 사용자 편의를 위해 '복귀'는 묻지 않고 자동으로 하되, 알림 끄기 옵션을 존중
-          store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
-          setTimeout(() => {
-            isCheckingCostRef.current = false;
-          }, 500);
-        }
-      } else {
-        // 여전히 한도는 넘지만 비율을 조금 더 올릴 수 있는 경우
-        isCheckingCostRef.current = true;
-        const targetMaintenanceCost = Math.max(
-          0,
-          MAX_COST_LIMIT - laborCostWon
-        );
-        const maxPossibleRate = (targetMaintenanceCost / totalRevenue) * 100;
-        const formattedMaxRate = Math.floor(maxPossibleRate * 100) / 100;
-
-        if (formattedMaxRate > store.maintenanceRate + 0.5) {
-          if (suppressCostAlerts) {
-            store.setSimulationOption('maintenanceRate', formattedMaxRate);
-            setTimeout(() => {
-              isCheckingCostRef.current = false;
-            }, 300);
-          } else {
-            // 미세 조정은 보통 알림 없이 진행
-            store.setSimulationOption('maintenanceRate', formattedMaxRate);
-            setTimeout(() => {
-              isCheckingCostRef.current = false;
-            }, 500);
-          }
-        } else {
-          // 변경 없음
-          isCheckingCostRef.current = false;
-        }
-      }
+      // 복구는 사용자 경험상 자동으로 해주는 것이 매끄러움
+      // (내렸다가 다시 모델을 바꿨거나 조건이 좋아졌을 때 자동 복구)
+      store.setSimulationOption('maintenanceRate', calculatedRate);
+      setTimeout(() => {
+        isCheckingCostRef.current = false;
+      }, 300);
     }
   }, [
-    totalAnnualCost,
     totalRevenue,
     laborCostWon,
+    totalAnnualCost,
     store.maintenanceRate,
-    store,
+    store.selectedModel,
     suppressCostAlerts,
+    store, // store 함수 호출을 위해
   ]);
 
   return (
@@ -438,7 +428,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         </div>
       )}
 
-      {/* [수정] 안내 문구 및 알림 끄기 체크박스 추가 */}
+      {/* 알림 끄기 체크박스 */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center text-xs text-slate-500 mt-2">
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
