@@ -29,7 +29,7 @@ export default function Step4_Simulation() {
   const [showRationalization, setShowRationalization] = useState(false);
   const isCheckingCostRef = useRef(false);
 
-  // [NEW] 모델 변경 감지용 Ref
+  // [모델 변경 감지용 Ref]
   const prevModelRef = useRef(store.selectedModel);
 
   // [State] 비용 조정 알림 억제(자동 적용) 상태
@@ -233,7 +233,7 @@ export default function Step4_Simulation() {
   }
 
   // ================================================================
-  // [핵심 로직 개선] 비용 자동 조정 및 모델 변경 대응
+  // [핵심 로직 개선] 비용 자동 조정 (반올림 적용)
   // ================================================================
   useEffect(() => {
     // 1. 계산에 필요한 데이터가 없으면 중단
@@ -242,13 +242,14 @@ export default function Step4_Simulation() {
     const MAX_COST_LIMIT = 80000000;
 
     // 2. 현재 조건에서 가능한 '최적 비율(Ideal Rate)' 계산
-    //    공식: (8천만원 - 인건비) / 매출 * 100, 단 최대 25%
     const maxAllowedOandM = Math.max(0, MAX_COST_LIMIT - laborCostWon);
     let calculatedRate = (maxAllowedOandM / totalRevenue) * 100;
 
-    // 25.0%를 넘지 않도록 제한 + 소수점 둘째 자리 버림
+    // 25.0%를 넘지 않도록 제한
     calculatedRate = Math.min(25.0, calculatedRate);
-    calculatedRate = Math.floor(calculatedRate * 100) / 100;
+
+    // [수정 포인트] Math.floor(내림) -> Math.round(반올림) 으로 변경하여 0.39억 등의 오차 보정
+    calculatedRate = Math.round(calculatedRate * 100) / 100;
 
     const currentRate = store.maintenanceRate;
     const isModelChanged = prevModelRef.current !== store.selectedModel;
@@ -257,10 +258,7 @@ export default function Step4_Simulation() {
     // CASE A: 모델이 변경된 경우 (강제 리셋)
     // --------------------------------------------------------
     if (isModelChanged) {
-      // 묻지도 따지지도 않고 최적 비율로 바로 적용
       store.setSimulationOption('maintenanceRate', calculatedRate);
-
-      // 상태 업데이트
       prevModelRef.current = store.selectedModel;
       isCheckingCostRef.current = false;
       return;
@@ -272,7 +270,6 @@ export default function Step4_Simulation() {
     // --------------------------------------------------------
     // CASE B: 한도 초과 (비용 > 8천) -> 다운사이징 필요
     // --------------------------------------------------------
-    // 현재 비율이 계산된 한계 비율보다 크다면 (오차 범위 0.01)
     if (currentRate > calculatedRate + 0.01) {
       isCheckingCostRef.current = true;
 
@@ -304,14 +301,11 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
       }
     }
     // --------------------------------------------------------
-    // CASE C: 한도 여유 (비용 < 8천 & 비율 < 25%) -> 복구 가능
+    // CASE C: 한도 여유 -> 복구 가능
     // --------------------------------------------------------
-    // 현재 비율이 최적 비율보다 작다면 (즉, 더 올릴 수 있다면)
     else if (currentRate < 25.0 && currentRate < calculatedRate - 0.01) {
       isCheckingCostRef.current = true;
-
-      // 복구는 사용자 경험상 자동으로 해주는 것이 매끄러움
-      // (내렸다가 다시 모델을 바꿨거나 조건이 좋아졌을 때 자동 복구)
+      // 복구는 자동 적용
       store.setSimulationOption('maintenanceRate', calculatedRate);
       setTimeout(() => {
         isCheckingCostRef.current = false;
@@ -324,7 +318,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
     store.maintenanceRate,
     store.selectedModel,
     suppressCostAlerts,
-    store, // store 함수 호출을 위해
+    store,
   ]);
 
   return (
