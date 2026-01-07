@@ -29,6 +29,9 @@ export default function Step4_Simulation() {
   const [showRationalization, setShowRationalization] = useState(false);
   const isCheckingCostRef = useRef(false);
 
+  // [NEW] 비용 조정 알림 억제(자동 적용) 상태
+  const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
+
   // Store의 중앙 계산 결과 사용
   const results = store.getSimulationResults();
 
@@ -68,16 +71,13 @@ export default function Step4_Simulation() {
     );
   };
 
-  // [NEW] 기본료 전용 입력 핸들러 (연간사용량 입력 시 절감액 자동 계산)
+  // [NEW] 기본료 전용 입력 핸들러
   const handleBaseUsageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/,/g, '');
     const usageVal = Number(rawValue);
 
     if (!isNaN(usageVal)) {
-      // 1. 사용량 업데이트
       store.updateRationalization('base_usage', usageVal);
-
-      // 2. 절감액 자동 계산 후 업데이트 (차이 * 사용량)
       const diff = rationalization.base_eul - rationalization.base_gap;
       const autoSavings = diff * usageVal;
       store.updateRationalization('base_savings_manual', autoSavings);
@@ -97,8 +97,7 @@ export default function Step4_Simulation() {
   const isKepco = store.selectedModel === 'KEPCO';
   const isEul = store.contractType.includes('(을)');
 
-  // 1. 합리화 절감액 (UI 표시용)
-  // [수정] 기본료 절감액은 'base_savings_manual' 값을 사용
+  // 합리화 절감액 (UI 표시용)
   const saving_base = rationalization.base_savings_manual || 0;
 
   const diff_light = rationalization.light_eul - rationalization.light_gap;
@@ -109,11 +108,10 @@ export default function Step4_Simulation() {
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
 
-  // [수정] 화면 표시용 합계 (변수명 통일)
   const totalRationalizationSavings =
     saving_base + saving_light + saving_mid + saving_max;
 
-  // 나머지 데이터 매핑
+  // 데이터 매핑
   const initialAnnualGen = results.initialAnnualGen;
   const volume_self = results.volume_self;
   const volume_ec = results.volume_ec;
@@ -237,6 +235,7 @@ export default function Step4_Simulation() {
     }
   }
 
+  // [수정] 비용 체크 로직 (알림 끄기 기능 적용)
   useEffect(() => {
     const MAX_COST_LIMIT = 80000000;
     const DEFAULT_RATE = 25.0;
@@ -246,6 +245,7 @@ export default function Step4_Simulation() {
 
     const currentCost = totalAnnualCost;
 
+    // 1. 한도 초과 시
     if (currentCost > MAX_COST_LIMIT) {
       isCheckingCostRef.current = true;
       const targetMaintenanceCost = Math.max(0, MAX_COST_LIMIT - laborCostWon);
@@ -261,23 +261,46 @@ export default function Step4_Simulation() {
 O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하여
 비용을 맞추시겠습니까?`;
 
-      setTimeout(() => {
-        if (window.confirm(confirmMsg)) {
-          store.setSimulationOption('maintenanceRate', formattedTargetRate);
-        }
+      if (suppressCostAlerts) {
+        // [알림 끔] 자동 적용
+        store.setSimulationOption('maintenanceRate', formattedTargetRate);
         setTimeout(() => {
           isCheckingCostRef.current = false;
-        }, 500);
-      }, 100);
-    } else if (store.maintenanceRate < DEFAULT_RATE) {
-      const potentialCost = totalRevenue * (DEFAULT_RATE / 100) + laborCostWon;
-      if (potentialCost <= MAX_COST_LIMIT) {
-        isCheckingCostRef.current = true;
-        store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
-        setTimeout(() => {
-          isCheckingCostRef.current = false;
-        }, 500);
+        }, 300);
       } else {
+        // [알림 켬] Confirm 창 띄움
+        setTimeout(() => {
+          if (window.confirm(confirmMsg)) {
+            store.setSimulationOption('maintenanceRate', formattedTargetRate);
+          }
+          setTimeout(() => {
+            isCheckingCostRef.current = false;
+          }, 500);
+        }, 100);
+      }
+    }
+    // 2. 한도 이내로 복귀 가능 시
+    else if (store.maintenanceRate < DEFAULT_RATE) {
+      const potentialCost = totalRevenue * (DEFAULT_RATE / 100) + laborCostWon;
+
+      if (potentialCost <= MAX_COST_LIMIT) {
+        // 기본값(25%)으로 복귀 가능
+        isCheckingCostRef.current = true;
+        if (suppressCostAlerts) {
+          store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
+          setTimeout(() => {
+            isCheckingCostRef.current = false;
+          }, 300);
+        } else {
+          // (복귀는 보통 알림 없이 해도 되지만, 로직 통일성을 위해 자동 적용하거나 알림 가능)
+          // 여기서는 사용자 편의를 위해 '복귀'는 묻지 않고 자동으로 하되, 알림 끄기 옵션을 존중
+          store.setSimulationOption('maintenanceRate', DEFAULT_RATE);
+          setTimeout(() => {
+            isCheckingCostRef.current = false;
+          }, 500);
+        }
+      } else {
+        // 여전히 한도는 넘지만 비율을 조금 더 올릴 수 있는 경우
         isCheckingCostRef.current = true;
         const targetMaintenanceCost = Math.max(
           0,
@@ -287,11 +310,22 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         const formattedMaxRate = Math.floor(maxPossibleRate * 100) / 100;
 
         if (formattedMaxRate > store.maintenanceRate + 0.5) {
-          store.setSimulationOption('maintenanceRate', formattedMaxRate);
-        }
-        setTimeout(() => {
+          if (suppressCostAlerts) {
+            store.setSimulationOption('maintenanceRate', formattedMaxRate);
+            setTimeout(() => {
+              isCheckingCostRef.current = false;
+            }, 300);
+          } else {
+            // 미세 조정은 보통 알림 없이 진행
+            store.setSimulationOption('maintenanceRate', formattedMaxRate);
+            setTimeout(() => {
+              isCheckingCostRef.current = false;
+            }, 500);
+          }
+        } else {
+          // 변경 없음
           isCheckingCostRef.current = false;
-        }, 500);
+        }
       }
     }
   }, [
@@ -300,6 +334,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
     laborCostWon,
     store.maintenanceRate,
     store,
+    suppressCostAlerts,
   ]);
 
   return (
@@ -403,6 +438,7 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
         </div>
       )}
 
+      {/* [수정] 안내 문구 및 알림 끄기 체크박스 추가 */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex justify-between items-center text-xs text-slate-500 mt-2">
         <div className="flex items-center gap-1">
           <LucideInfo size={14} />
@@ -411,7 +447,24 @@ O&M 비율을 ${store.maintenanceRate}% → ${formattedTargetRate}%로 조정하
             <b>-{store.degradationRate}%</b>
           </span>
         </div>
-        <div className="text-slate-400">(설정에서 변경 가능)</div>
+        <div className="flex items-center gap-3">
+          <div className="text-slate-400">(설정에서 변경 가능)</div>
+          <label className="flex items-center gap-1 cursor-pointer select-none border-l pl-3 border-slate-300">
+            <input
+              type="checkbox"
+              className="w-3 h-3 accent-blue-600 rounded"
+              checked={suppressCostAlerts}
+              onChange={(e) => setSuppressCostAlerts(e.target.checked)}
+            />
+            <span
+              className={`font-bold transition-colors ${
+                suppressCostAlerts ? 'text-blue-600' : 'text-slate-400'
+              }`}
+            >
+              비용 자동 조정 (알림 끄기)
+            </span>
+          </label>
+        </div>
       </div>
 
       {adviceMessage && (
