@@ -2,14 +2,24 @@
 
 import { createClient } from '@/src/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberId, setRememberId] = useState(false); // [추가] 아이디 저장 체크 상태
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // [추가] 컴포넌트 마운트 시 로컬 스토리지에서 아이디 불러오기
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('savedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberId(true);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,15 +34,28 @@ export default function LoginPage() {
       alert('로그인 실패: ' + error.message);
       setLoading(false);
     } else {
-      router.push('/'); // 로그인 성공 시 메인으로 이동
+      // [추가] 로그인 성공 시 아이디 저장 처리
+      if (rememberId) {
+        localStorage.setItem('savedEmail', email);
+      } else {
+        localStorage.removeItem('savedEmail');
+      }
+
+      router.push('/'); // 메인으로 이동
       router.refresh();
     }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded shadow-md">
-        <h2 className="text-2xl font-bold text-center">관리자 로그인</h2>
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">관리자 로그인</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            서비스 이용을 위해 로그인이 필요합니다.
+          </p>
+        </div>
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -42,10 +65,12 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 mt-1 border rounded focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 mt-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+              placeholder="admin@example.com"
               required
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700">
               비밀번호
@@ -54,14 +79,33 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 mt-1 border rounded focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 mt-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+              placeholder="••••••••"
               required
             />
           </div>
+
+          {/* [추가] 아이디 저장 체크박스 */}
+          <div className="flex items-center">
+            <input
+              id="remember-id"
+              type="checkbox"
+              checked={rememberId}
+              onChange={(e) => setRememberId(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+            />
+            <label
+              htmlFor="remember-id"
+              className="ml-2 text-sm text-gray-600 cursor-pointer select-none"
+            >
+              아이디 저장
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full p-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
+            className="w-full py-2.5 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition font-bold shadow-sm"
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>
