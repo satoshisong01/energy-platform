@@ -332,7 +332,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                     {/* 4. 요금제 프리셋 */}
                     <div>
                       <h3 className="text-sm font-bold text-purple-600 mb-4 uppercase tracking-wider border-b pb-2 border-purple-100">
-                        4. 주요 요금제 프리셋 (Top 4)
+                        4. 주요 요금제 프리셋 (Top 5)
                       </h3>
                       <div className="space-y-3">
                         {store.tariffPresets.map((preset, index) => (
