@@ -253,6 +253,26 @@ const PMT = (rate: number, nper: number, pv: number) => {
   return (rate * pv * pvif) / (pvif - 1);
 };
 
+// [중요] 기본 요금제 리스트를 상수(Const)로 분리 (새 요금제 추가됨)
+const DEFAULT_TARIFFS: TariffPreset[] = [
+  { id: 1, name: '산업용(을) 고압A - 선택2', baseRate: 8320, savings: 210.5 },
+  {
+    id: 2,
+    name: '산업용(갑)2 고압A - 선택2',
+    baseRate: 7470,
+    savings: 136.47,
+  },
+  { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
+  { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
+  // [NEW] 5번째 요금제 추가
+  {
+    id: 5,
+    name: '산업용(을) 고압A - 선택I',
+    baseRate: 7220,
+    savings: 216,
+  },
+];
+
 export const useProposalStore = create<ProposalState>((set, get) => ({
   siteImage: null,
   proposalId: null,
@@ -328,23 +348,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       repaymentPeriod: 9,
     },
   },
-  tariffPresets: [
-    { id: 1, name: '산업용(을) 고압A - 선택2', baseRate: 8320, savings: 210.5 },
-    {
-      id: 2,
-      name: '산업용(갑)2 고압A - 선택2',
-      baseRate: 7470,
-      savings: 136.47,
-    },
-    { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
-    { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
-    {
-      id: 5,
-      name: '산업용(을) 고압A - 선택I',
-      baseRate: 7220,
-      savings: 216,
-    },
-  ],
+  // [수정] 상수로 분리된 리스트 사용
+  tariffPresets: DEFAULT_TARIFFS,
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
   useEc: true,
@@ -706,6 +711,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
+  // [수정] 불러오기 시 새 요금제가 있으면 병합(Merge)하는 로직 추가
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -716,15 +722,34 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       if (error) throw error;
       if (!data) throw new Error('데이터 없음');
 
+      // 1. 저장된 요금제 리스트 가져오기 (없으면 빈 배열)
+      const savedPresets = data.input_data.tariffPresets || [];
+
+      // 2. [병합 로직] 기본값(5개) 중 저장된 데이터에 없는 것(새로 생긴 것)을 찾음
+      const newPresets = DEFAULT_TARIFFS.filter(
+        (def) =>
+          !savedPresets.find((saved: TariffPreset) => saved.id === def.id)
+      );
+
+      // 3. 기존 저장 데이터 + 새로운 요금제를 합침 (ID 순 정렬)
+      const mergedPresets = [...savedPresets, ...newPresets].sort(
+        (a, b) => a.id - b.id
+      );
+
       set({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
+        // 저장된 데이터를 덮어쓰되...
         ...data.input_data,
+        // tariffPresets 만큼은 우리가 합친 최신 버전으로 교체!
+        tariffPresets: mergedPresets,
+
         financialSettings:
           data.input_data.financialSettings || get().financialSettings,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
       });
+
       get().recalculateCapacity(data.input_data.roofAreas);
       get().recalculateInvestment();
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
@@ -783,6 +808,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: 3,
       totalInvestment: 0,
       recAveragePrice: 80,
+      // [수정] 초기화 시에도 상수(5개 목록) 사용
+      tariffPresets: DEFAULT_TARIFFS,
     });
   },
 
