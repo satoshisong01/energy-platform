@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// ... (NumberInput 컴포넌트는 기존과 동일하므로 생략하거나 그대로 유지) ...
+// ... (NumberInput 컴포넌트) ...
 interface NumberInputProps {
   value: number;
   onChange: (val: number) => void;
@@ -51,11 +51,18 @@ const NumberInput = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/,/g, '');
-    if (/^\d*\.?\d*$/.test(raw)) {
+    const num = parseFloat(raw);
+
+    // 빈 값 처리
+    if (raw === '') {
+      setTempValue('');
+      onChange(0);
+      return;
+    }
+
+    if (/^-?\d*\.?\d*$/.test(raw)) {
       setTempValue(raw);
-      const num = parseFloat(raw);
       if (!isNaN(num)) onChange(num);
-      else if (raw === '') onChange(0);
     }
   };
 
@@ -77,31 +84,32 @@ const NumberInput = ({
 // [Main Component]
 // -------------------------------------------------------------------------
 
-const TARIFF_OPTIONS = [
-  { name: '산업용(을) 고압A - 선택2', rate: 8320, savings: 210.5 },
-  { name: '산업용(갑)2 고압A - 선택2', rate: 7470, savings: 136.47 },
-  { name: '일반용(갑) 1 저압', rate: 6160, savings: 114.4 },
-  { name: '산업용(갑)1 저압', rate: 5550, savings: 108.4 },
-];
-
 export default function Step3_EnergyData() {
   const store = useProposalStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // [수정] Store에 있는 tariffPresets를 사용하도록 변경
   const handleTariffChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const opt = TARIFF_OPTIONS.find((t) => t.name === e.target.value);
+    const selectedName = e.target.value;
+    // store.tariffPresets 에서 찾기
+    const opt = store.tariffPresets.find((t) => t.name === selectedName);
+
     if (opt) {
-      store.setContractType(opt.name, opt.rate, opt.savings);
+      store.setContractType(opt.name, opt.baseRate, opt.savings);
     }
   };
 
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
-  const updateStore = (month: number, field: any, value: number) => {
+  const updateStore = (
+    month: number,
+    field: keyof MonthlyData,
+    value: number
+  ) => {
     store.updateMonthlyData(month, field, value);
   };
 
-  // [NEW] 일괄적용 버튼 컴포넌트 (테이블 헤더용)
+  // 일괄적용 버튼
   const BatchButton = ({
     field,
     label = '[일괄]',
@@ -118,7 +126,7 @@ export default function Step3_EnergyData() {
     </button>
   );
 
-  // 엑셀 업로드 핸들러
+  // 엑셀 업로드 핸들러 (반올림 적용됨)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -142,22 +150,21 @@ export default function Step3_EnergyData() {
         let month = count + 1;
 
         const yearMatch = yearMonthStr.match(/(\d{4})/);
-        const monthMatch = yearMonthStr.match(/(\d{1,2})월/); // 예: 08월
+        const monthMatch = yearMonthStr.match(/(\d{1,2})월/);
 
         if (yearMatch) year = parseInt(yearMatch[1]);
-        // 엑셀 서식에 따라 "8" 또는 "08" 등 다양하므로 유연하게 처리 필요
-        // 여기선 단순화: 엑셀 첫열이 '2024년 8월' 같은 포맷이라 가정
         if (monthMatch) month = parseInt(monthMatch[1]);
-        else if (!isNaN(parseInt(yearMonthStr))) month = parseInt(yearMonthStr); // 그냥 숫자만 있을 경우
+        else if (!isNaN(parseInt(yearMonthStr))) month = parseInt(yearMonthStr);
 
         newData.push({
           month: month,
           year: year,
-          usageKwh: Math.round(Number(row[1]) || 0), // 사용량
-          selfConsumption: Math.round(Number(row[2]) || 0), // 자가소비
-          peakKw: Math.round(Number(row[3]) || 0), // 피크치
-          totalBill: Math.round(Number(row[4]) || 0), // 전기요금
-          baseBill: Math.round(Number(row[5]) || 0), // 기본요금
+          // [수정] Math.round 적용
+          usageKwh: Math.round(Number(row[1]) || 0),
+          selfConsumption: Math.round(Number(row[2]) || 0),
+          peakKw: Math.round(Number(row[3]) || 0),
+          totalBill: Math.round(Number(row[4]) || 0),
+          baseBill: Math.round(Number(row[5]) || 0),
           solarGeneration: 0,
         });
         count++;
@@ -183,7 +190,7 @@ export default function Step3_EnergyData() {
     reader.readAsBinaryString(file);
   };
 
-  // 계산 로직 (기존 유지)
+  // 계산 로직
   const totalUsageInput = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
@@ -299,8 +306,9 @@ export default function Step3_EnergyData() {
               value={store.contractType}
               onChange={handleTariffChange}
             >
-              {TARIFF_OPTIONS.map((opt) => (
-                <option key={opt.name} value={opt.name}>
+              {/* [수정] store.tariffPresets를 매핑하여 동적으로 옵션 생성 */}
+              {store.tariffPresets.map((opt) => (
+                <option key={opt.id} value={opt.name}>
                   {opt.name}
                 </option>
               ))}
@@ -370,7 +378,7 @@ export default function Step3_EnergyData() {
                 </th>
               </tr>
               <tr>
-                {/* [수정] 입력 헤더에 각각 일괄 버튼 추가 */}
+                {/* 각 컬럼 헤더 및 일괄 버튼 */}
                 <th className={`${styles.headerBlue} min-w-[120px]`}>
                   <div className="flex flex-col items-center justify-center gap-1">
                     <span>사용량(kWh)</span>
@@ -627,7 +635,6 @@ export default function Step3_EnergyData() {
           </table>
         </div>
 
-        {/* 하단 배지 및 비고 영역은 기존과 동일 */}
         <div
           style={{
             display: 'flex',
