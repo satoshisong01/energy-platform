@@ -9,7 +9,6 @@ import { LucidePrinter } from 'lucide-react';
 import PreviewChart from './preview/PreviewChart';
 import PreviewDetailTable from './preview/PreviewDetailTable';
 import PreviewFinancialTable from './preview/PreviewFinancialTable';
-// [수정] PreviewModelVisual에서 분리된 두 컴포넌트를 가져옵니다.
 import {
   PreviewModelGraph,
   PreviewModelImage,
@@ -22,10 +21,20 @@ import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
-// 페이지 하단 Footer 컴포넌트
+// ----------------------------------------------------------------
+// [수정] 페이지 하단 Footer 컴포넌트 (폴더명 제거 로직 추가)
+// ----------------------------------------------------------------
 const PageFooter = ({ page }: { page: number }) => {
   const { proposalName, clientName } = useProposalStore();
-  const displayName = proposalName || `${clientName} 태양광 발전 제안서`;
+
+  // 1. 기본 이름 가져오기
+  const rawName = proposalName || `${clientName} 태양광 발전 제안서`;
+
+  // 2. [핵심] 만약 이름에 '/'가 있다면 뒤쪽(파일명)만 잘라내기
+  // 예: "인스케이프/분석자료_..." -> "분석자료_..."
+  const displayName = rawName.includes('/')
+    ? rawName.split('/').pop()
+    : rawName;
 
   return (
     <div className={styles.pageFooter}>
@@ -139,8 +148,11 @@ export default function PreviewPanel() {
   return (
     <div className={styles.a4Page} id="print-area">
       {/* [페이지 1] 표지 + 요약 */}
-      <div className="print-page-center" style={{ position: 'relative', marginTop: '10px'  }}>
-        <div className={styles.header} style={{ width: '100%'}}>
+      <div
+        className="print-page-center"
+        style={{ position: 'relative', marginTop: '10px' }}
+      >
+        <div className={styles.header} style={{ width: '100%' }}>
           <div className={styles.logoBox}>FIRST C&D</div>
           <div className={styles.companyInfo}>
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
@@ -201,7 +213,10 @@ export default function PreviewPanel() {
       </div>
 
       {/* [페이지 4] 상세 데이터 테이블 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      <div
+        className="print-page-center"
+        style={{ position: 'relative', marginTop: '20px' }}
+      >
         <div style={{ width: '100%' }}>
           <PreviewDetailTable
             data={computedData}
