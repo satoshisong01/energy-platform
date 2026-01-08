@@ -190,7 +190,10 @@ export default function PreviewPanel() {
       </div>
 
       {/* [페이지 2] 설치 공간 분석 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      <div
+        className="print-page-center"
+        style={{ position: 'relative', marginTop: '20px' }}
+      >
         <div style={{ width: '100%' }}>
           <PreviewSiteAnalysis />
         </div>
