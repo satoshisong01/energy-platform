@@ -338,6 +338,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     },
     { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
     { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
+    {
+      id: 5,
+      name: '산업용(을) 고압A - 선택I',
+      baseRate: 7220,
+      savings: 216,
+    },
   ],
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
