@@ -175,7 +175,10 @@ interface ProposalState {
   moduleTier: ModuleTier;
   useEc: boolean;
   truckCount: number;
+
   maintenanceRate: number;
+  isMaintenanceAuto: boolean; // [NEW] 유지보수비 자동조정 여부
+
   degradationRate: number;
   totalInvestment: number;
 
@@ -253,7 +256,7 @@ const PMT = (rate: number, nper: number, pv: number) => {
   return (rate * pv * pvif) / (pvif - 1);
 };
 
-// [중요] 기본 요금제 리스트를 상수(Const)로 분리 (새 요금제 추가됨)
+// [중요] 기본 요금제 리스트를 상수(Const)로 분리
 const DEFAULT_TARIFFS: TariffPreset[] = [
   { id: 1, name: '산업용(을) 고압A - 선택2', baseRate: 8320, savings: 210.5 },
   {
@@ -264,7 +267,6 @@ const DEFAULT_TARIFFS: TariffPreset[] = [
   },
   { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
   { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
-  // [NEW] 5번째 요금제 추가
   {
     id: 5,
     name: '산업용(을) 고압A - 선택I',
@@ -348,13 +350,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       repaymentPeriod: 9,
     },
   },
-  // [수정] 상수로 분리된 리스트 사용
   tariffPresets: DEFAULT_TARIFFS,
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
   useEc: true,
   truckCount: 3,
+
   maintenanceRate: 25.0,
+  isMaintenanceAuto: true, // [NEW] 기본값은 자동(true)
+
   degradationRate: 0.5,
   totalInvestment: 0,
   recAveragePrice: 80,
@@ -561,7 +565,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       moduleTier: state.moduleTier,
       useEc: state.useEc,
       truckCount: state.truckCount,
+
       maintenanceRate: state.maintenanceRate,
+      isMaintenanceAuto: state.isMaintenanceAuto, // [CHECK] 저장 시 포함
+
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -637,7 +644,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       moduleTier: state.moduleTier,
       useEc: state.useEc,
       truckCount: state.truckCount,
+
       maintenanceRate: state.maintenanceRate,
+      isMaintenanceAuto: state.isMaintenanceAuto, // [CHECK] 저장 시 포함
+
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -741,6 +751,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         // 저장된 데이터를 덮어쓰되...
         ...data.input_data,
+
+        // isMaintenanceAuto가 없는 구버전 데이터를 위해 기본값 true 처리
+        isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
+
         // tariffPresets 만큼은 우리가 합친 최신 버전으로 교체!
         tariffPresets: mergedPresets,
 
@@ -810,6 +824,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       recAveragePrice: 80,
       // [수정] 초기화 시에도 상수(5개 목록) 사용
       tariffPresets: DEFAULT_TARIFFS,
+
+      // [NEW] 리셋 시 자동 모드로 복귀
+      maintenanceRate: 25.0,
+      isMaintenanceAuto: true,
     });
   },
 

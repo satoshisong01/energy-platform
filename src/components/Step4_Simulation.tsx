@@ -233,7 +233,7 @@ export default function Step4_Simulation() {
   }
 
   // ================================================================
-  // [핵심 로직 개선] 비용 자동 조정 (반올림 적용)
+  // [핵심 로직 개선] 비용 자동 조정 (반올림 적용 + 자동/수동 분기)
   // ================================================================
   useEffect(() => {
     // 1. 계산에 필요한 데이터가 없으면 중단
@@ -258,7 +258,10 @@ export default function Step4_Simulation() {
     // CASE A: 모델이 변경된 경우 (강제 리셋)
     // --------------------------------------------------------
     if (isModelChanged) {
-      store.setSimulationOption('maintenanceRate', calculatedRate);
+      // 모델 변경 시에는 '자동 모드'일 때만 최적값으로 리셋해주는 게 자연스러움
+      if (store.isMaintenanceAuto) {
+        store.setSimulationOption('maintenanceRate', calculatedRate);
+      }
       prevModelRef.current = store.selectedModel;
       isCheckingCostRef.current = false;
       return;
@@ -268,7 +271,7 @@ export default function Step4_Simulation() {
     if (isCheckingCostRef.current) return;
 
     // --------------------------------------------------------
-    // CASE B: 한도 초과 (비용 > 8천) -> 다운사이징 필요
+    // CASE B: 한도 초과 (비용 > 8천) -> [안전장치] 수동/자동 상관없이 작동
     // --------------------------------------------------------
     if (currentRate > calculatedRate + 0.01) {
       isCheckingCostRef.current = true;
@@ -282,14 +285,14 @@ export default function Step4_Simulation() {
 O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
 비용을 맞추시겠습니까?`;
 
-      if (suppressCostAlerts) {
-        // [알림 끔] 자동 적용
+      // [핵심] 자동 모드이거나 알림을 껐으면 -> 자동 수정
+      // 수동 모드면 -> 사용자에게 물어봄 (실수 방지)
+      if (suppressCostAlerts || store.isMaintenanceAuto) {
         store.setSimulationOption('maintenanceRate', calculatedRate);
         setTimeout(() => {
           isCheckingCostRef.current = false;
         }, 300);
       } else {
-        // [알림 켬] Confirm
         setTimeout(() => {
           if (window.confirm(confirmMsg)) {
             store.setSimulationOption('maintenanceRate', calculatedRate);
@@ -301,11 +304,15 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
       }
     }
     // --------------------------------------------------------
-    // CASE C: 한도 여유 -> 복구 가능
+    // CASE C: 한도 여유 -> [최적화] '자동 모드'일 때만 작동
     // --------------------------------------------------------
-    else if (currentRate < 25.0 && currentRate < calculatedRate - 0.01) {
+    // 수동 모드(isMaintenanceAuto = false)일 때는 여기서 25%로 안 올리고 가만히 둠
+    else if (
+      store.isMaintenanceAuto &&
+      currentRate < 25.0 &&
+      currentRate < calculatedRate - 0.01
+    ) {
       isCheckingCostRef.current = true;
-      // 복구는 자동 적용
       store.setSimulationOption('maintenanceRate', calculatedRate);
       setTimeout(() => {
         isCheckingCostRef.current = false;
@@ -317,6 +324,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
     totalAnnualCost,
     store.maintenanceRate,
     store.selectedModel,
+    store.isMaintenanceAuto, // [CHECK] 상태 변화 감지 추가
     suppressCostAlerts,
     store,
   ]);

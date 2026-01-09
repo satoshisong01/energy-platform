@@ -1,11 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  useProposalStore,
-  SystemConfig,
-  FinancialSettings,
-} from '../lib/store';
+import { useProposalStore, SystemConfig } from '../lib/store';
 import {
   LucideX,
   LucideSave,
@@ -28,8 +24,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
   const store = useProposalStore();
   const [activeTab, setActiveTab] = useState(0);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
-
-  // [NEW] 금융 설정 탭 내부 탭 (단가 설정 vs 금융 정책 설정)
   const [activeConfigSubTab, setActiveConfigSubTab] = useState<
     'basic' | 'financial'
   >('basic');
@@ -56,14 +50,12 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
     }
   };
 
-  // [NEW] 금융 설정 변경 핸들러
   const handleFinancialChange = (
     type: 'rps' | 'factoring',
     field: string,
     value: string
   ) => {
     const numValue = parseFloat(value) || 0;
-    // 기존 설정을 유지하면서 해당 필드만 업데이트
     const currentSettings = store.financialSettings || {
       rps: {
         loanRatio: 80,
@@ -142,7 +134,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
               '1. 기본 정보',
               '2. 현장 정보',
               '3. 에너지 데이터',
-              '4. 상세 옵션 (단가 & 금융)', // 탭 이름 변경
+              '4. 상세 옵션 (단가 & 금융)',
             ].map((tab, idx) => (
               <button
                 key={idx}
@@ -282,15 +274,44 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                         3. 시뮬레이션 기준 비율 (단위: %)
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
+                        {/* [수정] 유지보수 비율 설정 영역 (체크박스 추가) */}
                         <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">
-                            유지보수 비율
-                          </label>
+                          <div className="flex justify-between items-end mb-1">
+                            <label className="block text-xs font-semibold text-gray-500">
+                              유지보수 비율
+                            </label>
+                            <label className="flex items-center gap-1 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                className="w-3 h-3 accent-blue-600 rounded"
+                                checked={store.isMaintenanceAuto}
+                                onChange={(e) =>
+                                  store.setSimulationOption(
+                                    'isMaintenanceAuto',
+                                    e.target.checked
+                                  )
+                                }
+                              />
+                              <span
+                                className={`text-[10px] font-bold transition-colors ${
+                                  store.isMaintenanceAuto
+                                    ? 'text-blue-600'
+                                    : 'text-gray-400'
+                                }`}
+                              >
+                                자동 조정
+                              </span>
+                            </label>
+                          </div>
                           <div className="relative">
                             <input
                               type="number"
                               step="0.1"
-                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                              className={`w-full p-2 border rounded text-right pr-8 outline-none font-mono transition-colors ${
+                                store.isMaintenanceAuto
+                                  ? 'bg-gray-50 text-gray-600 border-gray-200 focus:bg-white focus:border-blue-400'
+                                  : 'bg-white border-gray-300 focus:ring-2 focus:ring-blue-500'
+                              }`}
                               value={store.maintenanceRate}
                               onChange={(e) =>
                                 store.setSimulationOption(
@@ -303,7 +324,13 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               %
                             </span>
                           </div>
+                          <div className="mt-1 text-[10px] text-gray-400">
+                            {store.isMaintenanceAuto
+                              ? '* 한도(8천만원) 내에서 최대 25%까지 자동 최적화됩니다.'
+                              : '* 사용자가 입력한 비율로 고정됩니다. (단, 8천만원 초과 시 조정됨)'}
+                          </div>
                         </div>
+
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 mb-1">
                             매년 발전 감소율
@@ -401,9 +428,8 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                     </div>
                   </div>
                 ) : (
-                  // [NEW] 금융 정책 설정 화면
                   <div className="space-y-8">
-                    {/* RPS 정책자금 설정 */}
+                    {/* 금융 정책 설정 */}
                     <section>
                       <h3 className="text-sm font-bold text-blue-600 mb-4 uppercase tracking-wider border-b pb-2 border-blue-100 flex items-center gap-2">
                         RPS 정책자금 설정
@@ -465,8 +491,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                         </div>
                       </div>
                     </section>
-
-                    {/* 팩토링 설정 */}
                     <section>
                       <h3 className="text-sm font-bold text-green-600 mb-4 uppercase tracking-wider border-b pb-2 border-green-100 flex items-center gap-2">
                         팩토링 설정
@@ -586,7 +610,7 @@ const ConfigInput = ({
   </div>
 );
 
-// [NEW] FinancialInput 컴포넌트
+// FinancialInput 컴포넌트
 const FinancialInput = ({
   label,
   value,
