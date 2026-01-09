@@ -177,7 +177,7 @@ interface ProposalState {
   truckCount: number;
 
   maintenanceRate: number;
-  isMaintenanceAuto: boolean; // [NEW] 유지보수비 자동조정 여부
+  isMaintenanceAuto: boolean;
 
   degradationRate: number;
   totalInvestment: number;
@@ -357,7 +357,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   truckCount: 3,
 
   maintenanceRate: 25.0,
-  isMaintenanceAuto: true, // [NEW] 기본값은 자동(true)
+  isMaintenanceAuto: true,
 
   degradationRate: 0.5,
   totalInvestment: 0,
@@ -567,7 +567,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: state.truckCount,
 
       maintenanceRate: state.maintenanceRate,
-      isMaintenanceAuto: state.isMaintenanceAuto, // [CHECK] 저장 시 포함
+      isMaintenanceAuto: state.isMaintenanceAuto,
 
       degradationRate: state.degradationRate,
       config: state.config,
@@ -646,7 +646,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: state.truckCount,
 
       maintenanceRate: state.maintenanceRate,
-      isMaintenanceAuto: state.isMaintenanceAuto, // [CHECK] 저장 시 포함
+      isMaintenanceAuto: state.isMaintenanceAuto,
 
       degradationRate: state.degradationRate,
       config: state.config,
@@ -721,7 +721,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [수정] 불러오기 시 새 요금제가 있으면 병합(Merge)하는 로직 추가
+  // [수정] 불러오기 시 새 요금제가 있으면 병합(Merge)하는 로직
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -764,7 +764,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         siteImage: data.input_data.siteImage || null,
       });
 
-      get().recalculateCapacity(data.input_data.roofAreas);
+      // [수정 포인트] 불러올 때는 용량을 다시 계산하지 않고 저장된 값을 그대로 사용합니다.
+      // get().recalculateCapacity(data.input_data.roofAreas); // <-- 삭제됨
+
       get().recalculateInvestment();
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
     } catch (error: any) {
@@ -822,7 +824,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: 3,
       totalInvestment: 0,
       recAveragePrice: 80,
-      // [수정] 초기화 시에도 상수(5개 목록) 사용
       tariffPresets: DEFAULT_TARIFFS,
 
       // [NEW] 리셋 시 자동 모드로 복귀
