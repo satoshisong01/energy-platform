@@ -9,36 +9,47 @@ import {
   LucidePlus,
   LucideTrash2,
   LucideLayoutGrid,
+  LucideArrowRightCircle, // 아이콘 추가
 } from 'lucide-react';
 
 export default function Step2_SiteInfo() {
   const store = useProposalStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. [원본 로직 유지] 총 면적 계산 (Store의 구역별 면적 합산)
+  // 1. 총 면적 계산
   const totalAreaM2 = store.roofAreas.reduce(
     (acc, cur) => acc + (cur.valueM2 || 0),
     0
   );
 
-  // 2. [원본 로직 유지] 평수 계산 (소수점 1자리까지 표시)
+  // 2. 평수 계산
   const totalAreaPyeong = totalAreaM2 / 3.3058;
 
-  // 3. [기준값 설정] 최대 설치 가능 용량 (단순 공식 적용)
-  // [수정] 엑셀 공식대로 "평수 / 2" 적용 (소수점 버림)
+  // 3. 최대 설치 가능 용량 (평수 / 2)
   const calculatedMaxCapacity = Math.floor(totalAreaPyeong / 2);
 
-  // 4. [원본 로직 유지] 모듈 수량 계산 (640W 기준, 반올림)
+  // 4. 모듈 수량 계산
   const panelCount =
     store.capacityKw > 0 ? Math.round((store.capacityKw * 1000) / 640) : 0;
 
-  // 5. [동기화] 면적이 변경되어 최대값이 바뀌면, 실제 용량도 자동으로 맞춰줌 (초기 세팅)
+  // -----------------------------------------------------------------------
+  // [수정 포인트] 자동 동기화 로직 삭제 (주석 처리)
+  // 이유: 불러오기 시 저장된 값(예: 225kW)을 계산된 값(125kW)으로 덮어쓰는 문제 방지
+  // -----------------------------------------------------------------------
+  /*
   useEffect(() => {
     if (calculatedMaxCapacity > 0) {
       store.setCapacityKw(calculatedMaxCapacity);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calculatedMaxCapacity]);
+  */
+
+  // [기능 추가] 최대 용량을 클릭하면 실제 용량에 적용하는 핸들러
+  const applyMaxCapacity = () => {
+    if (calculatedMaxCapacity > 0) {
+      store.setCapacityKw(calculatedMaxCapacity);
+    }
+  };
 
   // 파일 업로드 핸들러
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,7 +110,7 @@ export default function Step2_SiteInfo() {
         )}
       </div>
 
-      {/* 2. 설치 면적 입력 (구역별 리스트) */}
+      {/* 2. 설치 면적 입력 */}
       <div className="bg-white border border-slate-200 rounded-xl p-4">
         <div className="flex justify-between items-center mb-3 border-b border-slate-100 pb-2">
           <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
@@ -159,7 +170,6 @@ export default function Step2_SiteInfo() {
           ))}
         </div>
 
-        {/* 총 면적 및 평수 표시 */}
         <div className="mt-3 flex justify-end items-center gap-3 text-sm font-bold text-slate-700 bg-slate-50 p-2 rounded">
           <div>
             총 면적:{' '}
@@ -179,7 +189,7 @@ export default function Step2_SiteInfo() {
         </div>
       </div>
 
-      {/* 3. 용량 설정 (분리됨: 이론상 최대 vs 실제 설계) */}
+      {/* 3. 용량 설정 */}
       <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
         <div className="flex items-center gap-2 mb-3 text-slate-800 font-bold border-b border-slate-200 pb-2">
           <LucideSun size={18} className="text-orange-500" />
@@ -187,24 +197,32 @@ export default function Step2_SiteInfo() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          {/* 왼쪽: 자동 계산된 최대값 (고정) */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
+          {/* 왼쪽: 자동 계산된 최대값 (클릭하여 적용 가능하도록 변경) */}
+          <div
+            className="group cursor-pointer"
+            onClick={applyMaxCapacity}
+            title="클릭하여 설계값에 적용"
+          >
+            <label className="block text-xs font-bold text-slate-500 mb-1 group-hover:text-blue-600 transition-colors">
               최대 설치 가능 (평수 / 2)
             </label>
             <div className="relative">
               <input
                 type="text"
                 readOnly
-                className="w-full bg-slate-200 border border-slate-300 rounded-lg px-3 py-2 text-slate-500 font-bold focus:outline-none cursor-not-allowed text-right pr-10"
+                className="w-full bg-slate-200 border border-slate-300 rounded-lg px-3 py-2 text-slate-500 font-bold focus:outline-none cursor-pointer text-right pr-10 group-hover:bg-blue-50 group-hover:border-blue-300 transition-colors"
                 value={calculatedMaxCapacity.toLocaleString()}
               />
-              <span className="absolute right-3 top-2 text-xs text-slate-500 font-bold pt-0.5">
+              <span className="absolute right-3 top-2 text-xs text-slate-500 font-bold pt-0.5 group-hover:text-blue-500">
                 kW
               </span>
+              {/* 클릭 유도 아이콘 */}
+              <div className="absolute left-3 top-2.5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <LucideArrowRightCircle size={16} />
+              </div>
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">
-              * 계산식: 전체 평수 / 2
+            <div className="text-[10px] text-slate-400 mt-1 group-hover:text-blue-500">
+              * 클릭 시 우측 '설계값'에 자동 적용됩니다.
             </div>
           </div>
 
@@ -225,7 +243,6 @@ export default function Step2_SiteInfo() {
                 kW
               </span>
             </div>
-            {/* 모듈 수량 표시 */}
             <div className="flex justify-end items-center gap-1 text-[11px] text-blue-500 mt-1 font-bold">
               <LucideLayoutGrid size={12} />
               모듈 약 {panelCount.toLocaleString()}장 예상

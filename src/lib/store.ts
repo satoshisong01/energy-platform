@@ -748,28 +748,35 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         (a, b) => a.id - b.id
       );
 
+      // [중요] 저장된 capacityKw 값을 별도 변수로 확보
+      const savedCapacityKw = data.input_data.capacityKw;
+
       set({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
-        // 저장된 데이터를 덮어쓰되...
+
+        // 저장된 데이터 전체 적용
         ...data.input_data,
 
-        // isMaintenanceAuto가 없는 구버전 데이터를 위해 기본값 true 처리
+        // [확실하게 덮어쓰기] capacityKw가 있다면 그걸로 강제 설정
+        capacityKw:
+          savedCapacityKw !== undefined
+            ? savedCapacityKw
+            : data.input_data.capacityKw,
+
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
-
-        // tariffPresets 만큼은 우리가 합친 최신 버전으로 교체!
         tariffPresets: mergedPresets,
-
         financialSettings:
           data.input_data.financialSettings || get().financialSettings,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
       });
 
-      // [수정 포인트] 불러올 때 용량을 강제 재계산하지 않도록 이 줄을 삭제함
-      // get().recalculateCapacity(data.input_data.roofAreas);
+      // [삭제됨] get().recalculateCapacity(data.input_data.roofAreas);
 
+      // 투자비 재계산 (capacityKw는 위에서 설정된 값 사용)
       get().recalculateInvestment();
+
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
     } catch (error: any) {
       alert(`불러오기 실패: ${error.message}`);
