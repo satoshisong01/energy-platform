@@ -177,7 +177,7 @@ interface ProposalState {
   truckCount: number;
 
   maintenanceRate: number;
-  isMaintenanceAuto: boolean;
+  isMaintenanceAuto: boolean; // 유지보수비 자동조정 여부
 
   degradationRate: number;
   totalInvestment: number;
@@ -575,6 +575,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
       siteImage: state.siteImage,
+      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장 (필수)
     };
 
     try {
@@ -653,6 +654,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       financialSettings: state.financialSettings,
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
+      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장
     };
 
     try {
@@ -721,7 +723,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [수정] 불러오기 시 새 요금제가 있으면 병합(Merge)하는 로직
+  // [수정] 불러오기 시 RecalculateCapacity 삭제 (저장된 용량 유지)
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -764,8 +766,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         siteImage: data.input_data.siteImage || null,
       });
 
-      // [수정 포인트] 불러올 때는 용량을 다시 계산하지 않고 저장된 값을 그대로 사용합니다.
-      // get().recalculateCapacity(data.input_data.roofAreas); // <-- 삭제됨
+      // [수정 포인트] 불러올 때 용량을 강제 재계산하지 않도록 이 줄을 삭제함
+      // get().recalculateCapacity(data.input_data.roofAreas);
 
       get().recalculateInvestment();
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
@@ -826,7 +828,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       recAveragePrice: 80,
       tariffPresets: DEFAULT_TARIFFS,
 
-      // [NEW] 리셋 시 자동 모드로 복귀
       maintenanceRate: 25.0,
       isMaintenanceAuto: true,
     });
