@@ -177,7 +177,7 @@ interface ProposalState {
   truckCount: number;
 
   maintenanceRate: number;
-  isMaintenanceAuto: boolean; // 유지보수비 자동조정 여부
+  isMaintenanceAuto: boolean;
 
   degradationRate: number;
   totalInvestment: number;
@@ -575,7 +575,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
       siteImage: state.siteImage,
-      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장 (필수)
+      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장
     };
 
     try {
@@ -723,7 +723,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [수정] 불러오기 시 RecalculateCapacity 삭제 (저장된 용량 유지)
+  // [수정] loadProposal: 에러 방지 및 안전한 데이터 로드
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -734,49 +734,55 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       if (error) throw error;
       if (!data) throw new Error('데이터 없음');
 
-      // 1. 저장된 요금제 리스트 가져오기 (없으면 빈 배열)
       const savedPresets = data.input_data.tariffPresets || [];
-
-      // 2. [병합 로직] 기본값(5개) 중 저장된 데이터에 없는 것(새로 생긴 것)을 찾음
       const newPresets = DEFAULT_TARIFFS.filter(
         (def) =>
           !savedPresets.find((saved: TariffPreset) => saved.id === def.id)
       );
-
-      // 3. 기존 저장 데이터 + 새로운 요금제를 합침 (ID 순 정렬)
       const mergedPresets = [...savedPresets, ...newPresets].sort(
         (a, b) => a.id - b.id
       );
 
-      // [중요] 저장된 capacityKw 값을 별도 변수로 확보
-      const savedCapacityKw = data.input_data.capacityKw;
+      // [1] 금융 설정 안전 병합 (기본값 + 저장된 값)
+      // 옛날 데이터(factoring 등이 없는 경우) 로드 시 에러 방지
+      const defaultFin = get().financialSettings;
+      const savedFin = data.input_data.financialSettings || {};
+
+      const mergedFinancial = {
+        rps: { ...defaultFin.rps, ...(savedFin.rps || {}) },
+        factoring: { ...defaultFin.factoring, ...(savedFin.factoring || {}) },
+      };
+
+      // [2] 용량 안전 처리
+      // 저장된 capacityKw가 있으면 쓰고, 없으면(옛날 파일) 계산해서 채워넣음 (undefined 방지)
+      let finalCapacity = data.input_data.capacityKw;
+      if (finalCapacity === undefined || finalCapacity === null) {
+        // 저장된 용량이 없으면 지붕 면적 기준으로 계산 (Fallback)
+        const totalM2 = (data.input_data.roofAreas || []).reduce(
+          (sum: number, area: any) => sum + (area.valueM2 || 0),
+          0
+        );
+        const totalPyeong = totalM2 * 0.3025;
+        finalCapacity = Math.floor(totalPyeong / 2);
+      }
 
       set({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
-
-        // 저장된 데이터 전체 적용
+        // 나머지 데이터 덮어쓰기
         ...data.input_data,
 
-        // [확실하게 덮어쓰기] capacityKw가 있다면 그걸로 강제 설정
-        capacityKw:
-          savedCapacityKw !== undefined
-            ? savedCapacityKw
-            : data.input_data.capacityKw,
+        // [안전하게 병합된 값들 적용]
+        capacityKw: finalCapacity,
+        financialSettings: mergedFinancial,
+        tariffPresets: mergedPresets,
 
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
-        tariffPresets: mergedPresets,
-        financialSettings:
-          data.input_data.financialSettings || get().financialSettings,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
       });
 
-      // [삭제됨] get().recalculateCapacity(data.input_data.roofAreas);
-
-      // 투자비 재계산 (capacityKw는 위에서 설정된 값 사용)
       get().recalculateInvestment();
-
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
     } catch (error: any) {
       alert(`불러오기 실패: ${error.message}`);
