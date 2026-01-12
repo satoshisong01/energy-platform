@@ -262,7 +262,7 @@ export default function PreviewPanel() {
       </div>
 
       {/* [페이지 8] 비교 테이블 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      <div className="print-page-center" style={{ position: 'relative', marginTop: '20px' }}>
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
         </div>

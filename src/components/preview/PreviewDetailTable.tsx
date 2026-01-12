@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { LucideTable, LucideZap, LucideFileText } from 'lucide-react';
-import { useProposalStore } from '../../lib/store'; // [NEW] 스토어 임포트
+import { useProposalStore } from '../../lib/store';
 import styles from '../PreviewPanel.module.css';
 
 type Props = {
@@ -20,7 +20,6 @@ export default function PreviewDetailTable({
   maxLoadRatio,
   totalBenefit,
 }: Props) {
-  // [NEW] 스토어에서 비고(energyNote) 가져오기
   const { energyNote } = useProposalStore();
 
   return (
@@ -29,48 +28,58 @@ export default function PreviewDetailTable({
       <table className={styles.table}>
         <thead>
           <tr>
-            <th rowSpan={2} className={styles.headerGray}>
+            <th rowSpan={2} className={`${styles.headerGray} text-[14px]`}>
               월
             </th>
-            <th colSpan={2} className={styles.headerGray}>
+            <th colSpan={2} className={`${styles.headerGray} text-[14px]`}>
               사용량 분석
             </th>
-            <th colSpan={2} className={styles.headerBlue}>
+            <th colSpan={2} className={`${styles.headerBlue} text-[14px]`}>
               태양광 발전
             </th>
-            <th colSpan={2} className={styles.headerOrange}>
+            <th colSpan={2} className={`${styles.headerOrange} text-[14px]`}>
               요금 분석 (원)
             </th>
-            <th colSpan={4} className={styles.headerOrange}>
+            <th colSpan={4} className={`${styles.headerOrange} text-[14px]`}>
               경제성 분석 (원)
             </th>
           </tr>
           <tr>
-            <th className={styles.headerGray}>사용량</th>
-            <th>자가소비</th>
-            <th className={`${styles.headerBlue} ${styles.textBlue}`}>
+            <th className={`${styles.headerGray} text-[14px]`}>사용량</th>
+            <th className={`${styles.headerGray} text-[14px]`}>자가소비</th>
+            <th
+              className={`${styles.headerBlue} ${styles.textBlue} text-[14px]`}
+            >
               발전량
             </th>
-            <th className={styles.headerBlue}>잉여전력</th>
-            <th className={styles.headerOrange}>기존요금</th>
-            <th className={styles.headerOrange}>기본요금</th>
-            <th className={`${styles.headerOrange} ${styles.textOrange}`}>
+            <th className={`${styles.headerBlue} text-[14px]`}>잉여전력</th>
+            <th className={`${styles.headerOrange} text-[14px]`}>기존요금</th>
+            <th className={`${styles.headerOrange} text-[14px]`}>기본요금</th>
+            <th
+              className={`${styles.headerOrange} ${styles.textOrange} text-[14px]`}
+            >
               최대부하절감
             </th>
-            <th className={`${styles.headerOrange} ${styles.textOrange}`}>
+            <th
+              className={`${styles.headerOrange} ${styles.textOrange} text-[14px]`}
+            >
               기본요금절감
             </th>
-            <th className={`${styles.headerOrange} ${styles.textBlue}`}>
+            <th
+              className={`${styles.headerOrange} ${styles.textBlue} text-[14px]`}
+            >
               설치후요금
             </th>
-            <th className={`${styles.headerOrange} ${styles.textGreen}`}>
+            <th
+              className={`${styles.headerOrange} ${styles.textGreen} text-[14px]`}
+            >
               잉여수익
             </th>
           </tr>
         </thead>
         <tbody>
           {data.map((row) => (
-            <tr key={row.month}>
+            <tr key={row.month} className="text-[13px]">
               <td>{row.month}월</td>
               <td className={styles.alignRight}>
                 {row.usageKwh.toLocaleString()}
@@ -108,7 +117,9 @@ export default function PreviewDetailTable({
               </td>
             </tr>
           ))}
-          <tr className={styles.totalRow}>
+
+          {/* 소계 (합계) 행 - 조금 더 크게 강조 (text-[14px]) */}
+          <tr className={`${styles.totalRow} text-[14px]`}>
             <td>소계</td>
             <td className={styles.alignRight}>
               {totals.usageKwh.toLocaleString()}
@@ -144,7 +155,7 @@ export default function PreviewDetailTable({
         </tbody>
       </table>
 
-      {/* ✅ [NEW] 비고 출력 섹션 */}
+      {/* ✅ [NEW] 비고 출력 섹션 (글자 크기 확대) */}
       {energyNote && (
         <div
           style={{
@@ -153,7 +164,7 @@ export default function PreviewDetailTable({
             backgroundColor: '#f8fafc',
             borderRadius: '0.5rem',
             border: '1px solid #e2e8f0',
-            fontSize: '0.875rem',
+            fontSize: '15px', // [수정] 0.875rem -> 15px
             color: '#475569',
           }}
         >
@@ -167,33 +178,41 @@ export default function PreviewDetailTable({
               color: '#334155',
             }}
           >
-            <LucideFileText size={16} /> <span>비고 (특이사항)</span>
+            <LucideFileText size={18} /> <span>비고 (특이사항)</span>
           </div>
-          <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+          <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
             {energyNote}
           </div>
         </div>
       )}
 
+      {/* 하단 배지 영역 (전체적으로 확대) */}
       <div className={styles.badgeWrapper}>
         <div style={{ textAlign: 'right', marginRight: '2rem' }}>
           <div
-            style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'bold' }}
+            style={{
+              fontSize: '15px', // [수정] 0.8rem -> 15px
+              color: '#64748b',
+              fontWeight: 'bold',
+              marginBottom: '4px',
+            }}
           >
             연간 총 경제적 효과 (절감+수익)
           </div>
           <div
             style={{
-              fontSize: '2rem',
+              fontSize: '2.25rem', // [수정] 2rem -> 2.25rem
               fontWeight: '900',
               color: '#1e40af',
               lineHeight: '1.1',
             }}
           >
             {Math.round(totalBenefit).toLocaleString()}{' '}
-            <span style={{ fontSize: '1rem', color: '#94a3b8' }}>원</span>
+            <span style={{ fontSize: '1.25rem', color: '#94a3b8' }}>원</span>
           </div>
         </div>
+
+        {/* 최대부하비율 배지 */}
         <div
           className={styles.badge}
           style={{
@@ -202,30 +221,53 @@ export default function PreviewDetailTable({
             borderColor: '#7dd3fc',
             gap: '0.5rem',
             marginRight: '0.5rem',
+            padding: '0.75rem 1.25rem', // [수정] 패딩 약간 증가
           }}
         >
-          <span className={styles.finalLabel} style={{ color: '#0369a1' }}>
+          <span
+            className={styles.finalLabel}
+            style={{ color: '#0369a1', fontSize: '14px' }} // [수정] 라벨 크기 증가
+          >
             최대부하비율
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline' }}>
-            <span className={styles.finalValue} style={{ color: '#0284c7' }}>
+            <span
+              className={styles.finalValue}
+              style={{ color: '#0284c7', fontSize: '1.5rem' }} // [수정] 값 크기 증가
+            >
               {maxLoadRatio.toFixed(1)}
             </span>
-            <span className={styles.finalUnit} style={{ color: '#38bdf8' }}>
+            <span
+              className={styles.finalUnit}
+              style={{ color: '#38bdf8', fontSize: '1rem' }}
+            >
               %
             </span>
           </div>
         </div>
-        <div className={styles.badge}>
-          <LucideZap className="text-pink-500 mr-2" size={20} />
-          <span className={styles.finalLabel}>기존 전기요금 대비 절감율</span>
+
+        {/* 절감율 배지 */}
+        <div
+          className={styles.badge}
+          style={{ padding: '0.75rem 1.25rem' }} // [수정] 패딩 약간 증가
+        >
+          <LucideZap className="text-pink-500 mr-2" size={24} />
+          <span className={styles.finalLabel} style={{ fontSize: '14px' }}>
+            기존 전기요금 대비 절감율
+          </span>
           <span
             className={styles.finalValue}
-            style={{ color: '#db2777', marginLeft: '0.5rem' }}
+            style={{
+              color: '#db2777',
+              marginLeft: '0.5rem',
+              fontSize: '1.5rem',
+            }} // [수정] 값 크기 증가
           >
             {savingRate.toFixed(1)}
           </span>
-          <span className={styles.finalUnit}>%</span>
+          <span className={styles.finalUnit} style={{ fontSize: '1rem' }}>
+            %
+          </span>
         </div>
       </div>
     </div>
