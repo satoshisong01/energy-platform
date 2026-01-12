@@ -287,7 +287,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
 
       // [핵심] 자동 모드이거나 알림을 껐으면 -> 자동 수정
       // 수동 모드면 -> 사용자에게 물어봄 (실수 방지)
-      if (suppressCostAlerts || store.isMaintenanceAuto) {
+      if (suppressCostAlerts) {
         store.setSimulationOption('maintenanceRate', calculatedRate);
         setTimeout(() => {
           isCheckingCostRef.current = false;

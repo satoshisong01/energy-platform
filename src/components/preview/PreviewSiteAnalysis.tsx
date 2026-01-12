@@ -7,13 +7,20 @@ import { LucideArrowDown } from 'lucide-react';
 
 export default function PreviewSiteAnalysis() {
   const store = useProposalStore();
-  const { roofAreas, totalAreaPyeong, capacityKw, address, siteImage } = store;
+  const { roofAreas, capacityKw, address, siteImage } = store;
 
-  // 전체 면적 m2 계산
-  const totalAreaM2 = roofAreas.reduce((acc, cur) => acc + cur.valueM2, 0);
+  // 1. 전체 면적 m² 계산 (Store의 roofAreas 기반 실시간 계산)
+  const totalAreaM2 = roofAreas.reduce(
+    (acc, cur) => acc + (cur.valueM2 || 0),
+    0
+  );
 
-  // 모듈 수량 (640W 기준)
-  const moduleCount = Math.round((capacityKw * 1000) / 640);
+  // 2. 평수 계산 (m² / 3.3058)
+  const totalAreaPyeong = totalAreaM2 / 3.3058;
+
+  // 3. 모듈 수량 (640W 기준)
+  const moduleCount =
+    capacityKw > 0 ? Math.round((capacityKw * 1000) / 640) : 0;
 
   return (
     <div className={styles.container}>
@@ -29,7 +36,8 @@ export default function PreviewSiteAnalysis() {
           <div className={styles.areaInfoBox}>
             <span className={styles.label}>공장 지붕 면적</span>
             <span className={styles.valMain}>
-              {totalAreaPyeong.toLocaleString()} 평
+              {/* 소수점 반올림하여 정수 혹은 소수점 1자리로 표현 */}
+              {Math.round(totalAreaPyeong).toLocaleString()} 평
             </span>
             <span className={styles.valSub}>
               ({totalAreaM2.toLocaleString()} m²)

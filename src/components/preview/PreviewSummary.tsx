@@ -117,11 +117,14 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // 한전 유지보수 비용 (기본 25% -> 8천만원 한도)
-    const KEPCO_DEFAULT_RATE = 25.0;
-    let appliedRate = KEPCO_DEFAULT_RATE;
+    // [수정] 유지보수 비율 결정 로직
+    // 수동 모드이면 사용자가 입력한 값(예: 3%) 사용, 자동이면 25%에서 시작
+    const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
+
+    let appliedRate = baseRate;
     let tempCost = annualRevenue * (appliedRate / 100);
 
+    // [공통] 8천만원 한도 초과 시 하향 조정 (Rule #1)
     if (tempCost > MAX_LIMIT) {
       if (annualRevenue > 0) {
         const rawRate = (MAX_LIMIT / annualRevenue) * 100;
@@ -160,8 +163,6 @@ export default function PreviewSummary() {
   // [2] 시나리오별 데이터 독립 계산
   // --------------------------------------------------------------------------
   const getScenarioData = (isPremium: boolean) => {
-    // [수정] applyEc(체크박스 상태)에 따라 트럭 대수 결정
-    // 체크되어 있으면 Store값(또는 3대), 해제되어 있으면 0대
     const activeTruckCount = applyEc
       ? store.truckCount > 0
         ? store.truckCount
@@ -177,14 +178,12 @@ export default function PreviewSummary() {
     );
     const rawSurplus = Math.max(0, annualGen - annualSelf);
 
-    // 트럭이 0대면 volume_ec는 0이 됨
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
     let targetEcPrice = 0;
     let modelName = '';
 
-    // 모듈 가격 (Step4 선택값 통일)
     let currentSolarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM')
       currentSolarPrice = config.price_solar_premium;
@@ -211,16 +210,18 @@ export default function PreviewSummary() {
       revenue_surplus +
       fixedRationalizationSavings;
 
-    // 비용 계산 (트럭이 0대면 인건비 0)
     const laborCostWon =
       activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
 
-    // [자동 보정 로직]
-    const DEFAULT_RATE = 25.0;
-    let scenarioMaintenanceRate = DEFAULT_RATE;
+    // [수정] 유지보수 비율 결정 로직
+    // 수동 모드이면 사용자가 입력한 값(store.maintenanceRate) 사용
+    const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
+
+    let scenarioMaintenanceRate = baseRate;
     let tempTotalCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
 
+    // [공통] 8천만원 한도 초과 시 하향 조정 (Rule #1)
     if (tempTotalCost > MAX_LIMIT) {
       const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
       if (grossRevenue > 0) {
@@ -235,7 +236,6 @@ export default function PreviewSummary() {
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // 투자비 계산 (트럭 대수에 따라 EC 비용 반영)
     const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = activeTruckCount * config.price_ec_unit;
     const infraCost =
