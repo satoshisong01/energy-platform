@@ -28,17 +28,17 @@ export type BusinessModel = 'KEPCO' | 'RE100' | 'REC5';
 // 금융 상세 설정 인터페이스
 export interface FinancialSettings {
   rps: {
-    loanRatio: number; // 대출 비율 (%)
-    equityRatio: number; // 자기자본 비율 (%)
-    interestRate: number; // 연 이자율 (%)
-    gracePeriod: number; // 거치 기간 (년)
-    repaymentPeriod: number; // 상환 기간 (년)
+    loanRatio: number;
+    equityRatio: number;
+    interestRate: number;
+    gracePeriod: number;
+    repaymentPeriod: number;
   };
   factoring: {
-    loanRatio: number; // 대출 비율 (%)
-    interestRate: number; // 연 이자율 (%)
-    gracePeriod: number; // 거치 기간 (년)
-    repaymentPeriod: number; // 상환 기간 (년)
+    loanRatio: number;
+    interestRate: number;
+    gracePeriod: number;
+    repaymentPeriod: number;
   };
 }
 
@@ -54,8 +54,8 @@ export type SystemConfig = {
   unit_price_savings: number;
   unit_price_ec_1_5: number;
   unit_price_ec_5_0: number;
-  loan_rate_rps: number; // 하위 호환성을 위해 유지
-  loan_rate_factoring: number; // 하위 호환성을 위해 유지
+  loan_rate_rps: number;
+  loan_rate_factoring: number;
   rental_price_per_kw: number;
   subscription_price_per_kw: number;
   sub_price_self: number;
@@ -179,6 +179,10 @@ interface ProposalState {
   maintenanceRate: number;
   isMaintenanceAuto: boolean;
 
+  // [NEW] 새로운 토글 상태 추가
+  isRationalizationEnabled: boolean; // 전기요금 합리화 적용 여부
+  isSurplusDiscarded: boolean; // 잉여전력 폐기(판매불가) 여부
+
   degradationRate: number;
   totalInvestment: number;
 
@@ -256,23 +260,12 @@ const PMT = (rate: number, nper: number, pv: number) => {
   return (rate * pv * pvif) / (pvif - 1);
 };
 
-// [중요] 기본 요금제 리스트를 상수(Const)로 분리
 const DEFAULT_TARIFFS: TariffPreset[] = [
   { id: 1, name: '산업용(을) 고압A - 선택2', baseRate: 8320, savings: 210.5 },
-  {
-    id: 2,
-    name: '산업용(갑)2 고압A - 선택2',
-    baseRate: 7470,
-    savings: 136.47,
-  },
+  { id: 2, name: '산업용(갑)2 고압A - 선택2', baseRate: 7470, savings: 136.47 },
   { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
   { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
-  {
-    id: 5,
-    name: '산업용(을) 고압A - 선택I',
-    baseRate: 7220,
-    savings: 216,
-  },
+  { id: 5, name: '산업용(을) 고압A - 선택I', baseRate: 7220, savings: 216 },
 ];
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
@@ -358,6 +351,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
   maintenanceRate: 25.0,
   isMaintenanceAuto: true,
+
+  // [NEW] 기본값 설정
+  isRationalizationEnabled: false,
+  isSurplusDiscarded: false,
 
   degradationRate: 0.5,
   totalInvestment: 0,
@@ -568,6 +565,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
+      // [NEW] 저장 항목 추가
+      isRationalizationEnabled: state.isRationalizationEnabled,
+      isSurplusDiscarded: state.isSurplusDiscarded,
 
       degradationRate: state.degradationRate,
       config: state.config,
@@ -575,7 +575,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
       siteImage: state.siteImage,
-      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장
+      capacityKw: state.capacityKw,
     };
 
     try {
@@ -648,13 +648,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
+      // [NEW] 저장 항목 추가
+      isRationalizationEnabled: state.isRationalizationEnabled,
+      isSurplusDiscarded: state.isSurplusDiscarded,
 
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
       tariffPresets: state.tariffPresets,
       recAveragePrice: state.recAveragePrice,
-      capacityKw: state.capacityKw, // [CHECK] 용량값 명시적 저장
+      capacityKw: state.capacityKw,
     };
 
     try {
@@ -723,7 +726,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [수정] loadProposal: 에러 방지 및 안전한 데이터 로드
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -743,8 +745,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         (a, b) => a.id - b.id
       );
 
-      // [1] 금융 설정 안전 병합 (기본값 + 저장된 값)
-      // 옛날 데이터(factoring 등이 없는 경우) 로드 시 에러 방지
       const defaultFin = get().financialSettings;
       const savedFin = data.input_data.financialSettings || {};
 
@@ -753,11 +753,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         factoring: { ...defaultFin.factoring, ...(savedFin.factoring || {}) },
       };
 
-      // [2] 용량 안전 처리
-      // 저장된 capacityKw가 있으면 쓰고, 없으면(옛날 파일) 계산해서 채워넣음 (undefined 방지)
       let finalCapacity = data.input_data.capacityKw;
       if (finalCapacity === undefined || finalCapacity === null) {
-        // 저장된 용량이 없으면 지붕 면적 기준으로 계산 (Fallback)
         const totalM2 = (data.input_data.roofAreas || []).reduce(
           (sum: number, area: any) => sum + (area.valueM2 || 0),
           0
@@ -769,15 +766,19 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       set({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
-        // 나머지 데이터 덮어쓰기
         ...data.input_data,
 
-        // [안전하게 병합된 값들 적용]
         capacityKw: finalCapacity,
         financialSettings: mergedFinancial,
         tariffPresets: mergedPresets,
 
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
+
+        // [NEW] 로드 시 새로운 필드 기본값 처리
+        isRationalizationEnabled:
+          data.input_data.isRationalizationEnabled ?? false,
+        isSurplusDiscarded: data.input_data.isSurplusDiscarded ?? false,
+
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
       });
@@ -843,6 +844,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       maintenanceRate: 25.0,
       isMaintenanceAuto: true,
+      // [NEW] 리셋 시 초기화
+      isRationalizationEnabled: false,
+      isSurplusDiscarded: false,
     });
   },
 
@@ -860,6 +864,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       selectedModel,
       useEc,
       financialSettings,
+      // [NEW] 상태값 가져오기
+      isRationalizationEnabled,
+      isSurplusDiscarded,
     } = state;
 
     // 1. 투자비 (원 단위 변환)
@@ -889,11 +896,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       // [KEPCO]: 100% 잉여 판매 (자가소비 0, EC 0, 합리화 0)
       volume_self = 0;
       volume_ec = 0;
-      volume_surplus_final = initialAnnualGen; // 전량 판매
+
+      // [NEW] 잉여전력 폐기 옵션 적용
+      if (isSurplusDiscarded) {
+        volume_surplus_final = 0; // 폐기이므로 0
+        revenue_surplus = 0;
+      } else {
+        volume_surplus_final = initialAnnualGen; // 전량 판매
+        revenue_surplus = initialAnnualGen * config.unit_price_kepco;
+      }
 
       revenue_saving = 0;
       revenue_ec = 0;
-      revenue_surplus = initialAnnualGen * config.unit_price_kepco;
       totalRationalizationSavings = 0;
 
       // KEPCO 총 수익 = 오직 잉여 판매 수익만
@@ -911,7 +925,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       if (useEc) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
-      volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
+
+      // [NEW] 잉여전력 폐기 옵션 적용
+      if (isSurplusDiscarded) {
+        volume_surplus_final = 0;
+      } else {
+        volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
+      }
 
       // 단가 적용
       const appliedSavingsPrice =
@@ -934,14 +954,20 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         (rationalization.max_eul - rationalization.max_gap) *
         rationalization.max_usage;
 
-      totalRationalizationSavings = isEul
-        ? saving_base + saving_light + saving_mid + saving_max
-        : 0;
+      // [NEW] 합리화 옵션 토글 적용
+      totalRationalizationSavings =
+        isEul && isRationalizationEnabled
+          ? saving_base + saving_light + saving_mid + saving_max
+          : 0;
 
       // 수익 항목 계산
       revenue_saving = volume_self * appliedSavingsPrice;
       revenue_ec = volume_ec * appliedSellPrice;
-      revenue_surplus = volume_surplus_final * config.unit_price_kepco;
+
+      // [NEW] 잉여전력 폐기면 수익 0
+      revenue_surplus = isSurplusDiscarded
+        ? 0
+        : volume_surplus_final * config.unit_price_kepco;
 
       // 총 수익 합산
       annualGrossRevenue =

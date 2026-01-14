@@ -11,11 +11,19 @@ import {
 
 export default function PreviewSummary() {
   const store = useProposalStore();
-  const { config, rationalization } = store;
+  const {
+    config,
+    rationalization,
+    isRationalizationEnabled,
+    isSurplusDiscarded,
+    contractType,
+  } = store;
 
-  // [합리화 절감액] Step4 수동 입력값 우선 적용
+  // [합리화 절감액] Step4 수동 입력값 + 토글 상태 반영
   const calculateRationalizationSavings = () => {
-    const isEul = store.contractType.includes('(을)');
+    if (!isRationalizationEnabled) return 0;
+
+    const isEul = contractType.includes('(을)');
     if (!isEul) return 0;
 
     const saving_base = rationalization.base_savings_manual || 0;
@@ -51,7 +59,6 @@ export default function PreviewSummary() {
 
   const handleEcToggle = (checked: boolean) => {
     setApplyEc(checked);
-    // Store에도 반영하여 데이터 동기화
     store.setSimulationOption('useEc', checked);
   };
 
@@ -117,14 +124,12 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // [수정] 유지보수 비율 결정 로직
-    // 수동 모드이면 사용자가 입력한 값(예: 3%) 사용, 자동이면 25%에서 시작
+    // 유지보수 비율: 자동/수동 체크
     const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
 
     let appliedRate = baseRate;
     let tempCost = annualRevenue * (appliedRate / 100);
 
-    // [공통] 8천만원 한도 초과 시 하향 조정 (Rule #1)
     if (tempCost > MAX_LIMIT) {
       if (annualRevenue > 0) {
         const rawRate = (MAX_LIMIT / annualRevenue) * 100;
@@ -202,7 +207,11 @@ export default function PreviewSummary() {
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
     const revenue_ec = volume_ec * targetEcPrice;
-    const revenue_surplus = volume_surplus_final * config.unit_price_kepco;
+
+    // 잉여 전력 폐기 옵션 적용
+    const revenue_surplus = isSurplusDiscarded
+      ? 0
+      : volume_surplus_final * config.unit_price_kepco;
 
     const grossRevenue =
       revenue_saving +
@@ -213,15 +222,13 @@ export default function PreviewSummary() {
     const laborCostWon =
       activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
 
-    // [수정] 유지보수 비율 결정 로직
-    // 수동 모드이면 사용자가 입력한 값(store.maintenanceRate) 사용
+    // 유지보수 비율 결정 로직
     const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
 
     let scenarioMaintenanceRate = baseRate;
     let tempTotalCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
 
-    // [공통] 8천만원 한도 초과 시 하향 조정 (Rule #1)
     if (tempTotalCost > MAX_LIMIT) {
       const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
       if (grossRevenue > 0) {
@@ -422,83 +429,103 @@ export default function PreviewSummary() {
         <div className={styles.headerTitle}>
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
-        <div className="flex items-center gap-2 no-print">
-          <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
-            <input
-              type="checkbox"
-              className="w-3 h-3"
-              checked={applyEc}
-              onChange={(e) => handleEcToggle(e.target.checked)}
-            />
-            <span className="font-bold text-slate-700">EC 적용</span>
-          </label>
-          <button
-            className={`${styles.expandBtn} ${
-              showExpansion ? styles.active : ''
+
+        {/* [수정] 우측 컨트롤 영역 전체 래퍼 (flex) */}
+        <div className="flex items-center gap-2">
+          {/* 1. 요금 합리화 배지 (no-print 없음 -> 인쇄 시 보임) */}
+          <div
+            className={`text-xs font-bold px-2 py-1 rounded border ${
+              contractType.includes('(을)') && isRationalizationEnabled
+                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
             }`}
-            onClick={() => setShowExpansion(!showExpansion)}
           >
-            {showExpansion ? '닫기' : 'REC 5.0 비교'}
-          </button>
+            {contractType.includes('(을)') && isRationalizationEnabled
+              ? '요금합리화 가능'
+              : '요금합리화 컨설팅 필요'}
+          </div>
+
+          {/* 2. 컨트롤 버튼 그룹 (no-print 적용 -> 인쇄 시 숨김) */}
+          <div className="flex items-center gap-2 no-print">
+            <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
+              <input
+                type="checkbox"
+                className="w-3 h-3"
+                checked={applyEc}
+                onChange={(e) => handleEcToggle(e.target.checked)}
+              />
+              <span className="font-bold text-slate-700">EC 적용</span>
+            </label>
+            <button
+              className={`${styles.expandBtn} ${
+                showExpansion ? styles.active : ''
+              }`}
+              onClick={() => setShowExpansion(!showExpansion)}
+            >
+              {showExpansion ? '닫기' : 'REC 5.0 비교'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 한전 장기 계약 섹션 */}
-      <div className={styles.kepcoSection}>
-        <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
-        <div className={styles.kepcoContent}>
-          <div className={styles.kepcoItem}>
-            <span className={styles.kLabel}>투자</span>
-            <span className={styles.kValue}>
-              {kepcoData.investUk.toFixed(2)} 억
-            </span>
-            <span className={styles.kSub}>{kepcoData.capacity} kW</span>
-          </div>
-          <div className={styles.kArrow}>
-            <LucideArrowRight size={14} />
-          </div>
-
-          <div className={styles.kepcoItem}>
-            <span className={styles.kLabel}>연간 발전량</span>
-            <span className={styles.kValueSm}>
-              {Math.round(kepcoData.annualGen).toLocaleString()} kWh
-            </span>
-          </div>
-          <div className={styles.kArrow}>
-            <LucideArrowRight size={14} />
-          </div>
-
-          <div className={styles.kepcoItem}>
-            <span className={styles.kLabel}>연간 수익/수익률</span>
-            <div className="flex gap-2">
+      {/* 한전 장기 계약 섹션 - 판매 불가(폐기) 시 숨김 */}
+      {!isSurplusDiscarded && (
+        <div className={styles.kepcoSection}>
+          <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
+          <div className={styles.kepcoContent}>
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>투자</span>
               <span className={styles.kValue}>
-                {kepcoData.annualProfitUk.toFixed(2)} 억
+                {kepcoData.investUk.toFixed(2)} 억
               </span>
-              <span className={styles.kSubBlue}>
-                {kepcoData.annualRevenueRatio.toFixed(2)}%
+              <span className={styles.kSub}>{kepcoData.capacity} kW</span>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>연간 발전량</span>
+              <span className={styles.kValueSm}>
+                {Math.round(kepcoData.annualGen).toLocaleString()} kWh
               </span>
             </div>
-          </div>
-          <div className={styles.kArrow}>
-            <LucideArrowRight size={14} />
-          </div>
-
-          <div className={styles.kepcoItem}>
-            <span className={styles.kLabel}>20년간 수익</span>
-            <div className="flex items-center gap-2">
-              <span className={styles.kValue}>
-                {kepcoData.totalProfit20Uk.toFixed(2)} 억
-              </span>
-              <span className={styles.kSubBlue}>
-                {kepcoData.totalProfitRatio.toFixed(0)}%
-              </span>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
             </div>
-            <div className="mt-1 px-2 py-0.5 bg-slate-100 rounded text-xs font-bold text-slate-500 text-center">
-              ROI {kepcoData.roiYears.toFixed(2)}년
+
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>연간 수익/수익률</span>
+              <div className="flex gap-2">
+                <span className={styles.kValue}>
+                  {kepcoData.annualProfitUk.toFixed(2)} 억
+                </span>
+                <span className={styles.kSubBlue}>
+                  {kepcoData.annualRevenueRatio.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>20년간 수익</span>
+              <div className="flex items-center gap-2">
+                <span className={styles.kValue}>
+                  {kepcoData.totalProfit20Uk.toFixed(2)} 억
+                </span>
+                <span className={styles.kSubBlue}>
+                  {kepcoData.totalProfitRatio.toFixed(0)}%
+                </span>
+              </div>
+              <div className="mt-1 px-2 py-0.5 bg-slate-100 rounded text-xs font-bold text-slate-500 text-center">
+                ROI {kepcoData.roiYears.toFixed(2)}년
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.planSection}>
         <div className={styles.sectionTitle}>{stdData.title}</div>

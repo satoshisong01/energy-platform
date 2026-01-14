@@ -19,7 +19,6 @@ import {
   LucideChevronUp,
 } from 'lucide-react';
 
-// [Helper] 반올림 함수
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
 export default function Step4_Simulation() {
@@ -28,14 +27,9 @@ export default function Step4_Simulation() {
 
   const [showRationalization, setShowRationalization] = useState(false);
   const isCheckingCostRef = useRef(false);
-
-  // [모델 변경 감지용 Ref]
   const prevModelRef = useRef(store.selectedModel);
-
-  // [State] 비용 조정 알림 억제(자동 적용) 상태
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
 
-  // Store의 중앙 계산 결과 사용
   const results = store.getSimulationResults();
 
   useEffect(() => {
@@ -49,7 +43,6 @@ export default function Step4_Simulation() {
     store.config,
   ]);
 
-  // [Helper] 일반 입력 필드 렌더링
   const renderRationalizationInput = (
     field: keyof RationalizationData,
     placeholder: string = '0',
@@ -232,33 +225,20 @@ export default function Step4_Simulation() {
     }
   }
 
-  // ================================================================
-  // [핵심 로직 개선] 비용 자동 조정 (반올림 적용 + 자동/수동 분기)
-  // ================================================================
   useEffect(() => {
-    // 1. 계산에 필요한 데이터가 없으면 중단
     if (!totalRevenue || totalRevenue === 0) return;
 
     const MAX_COST_LIMIT = 80000000;
-
-    // 2. 현재 조건에서 가능한 '최적 비율(Ideal Rate)' 계산
     const maxAllowedOandM = Math.max(0, MAX_COST_LIMIT - laborCostWon);
     let calculatedRate = (maxAllowedOandM / totalRevenue) * 100;
 
-    // 25.0%를 넘지 않도록 제한
     calculatedRate = Math.min(25.0, calculatedRate);
-
-    // [수정 포인트] Math.floor(내림) -> Math.round(반올림) 으로 변경하여 0.39억 등의 오차 보정
     calculatedRate = Math.round(calculatedRate * 100) / 100;
 
     const currentRate = store.maintenanceRate;
     const isModelChanged = prevModelRef.current !== store.selectedModel;
 
-    // --------------------------------------------------------
-    // CASE A: 모델이 변경된 경우 (강제 리셋)
-    // --------------------------------------------------------
     if (isModelChanged) {
-      // 모델 변경 시에는 '자동 모드'일 때만 최적값으로 리셋해주는 게 자연스러움
       if (store.isMaintenanceAuto) {
         store.setSimulationOption('maintenanceRate', calculatedRate);
       }
@@ -267,12 +247,8 @@ export default function Step4_Simulation() {
       return;
     }
 
-    // 이미 체크 중이면 중복 실행 방지
     if (isCheckingCostRef.current) return;
 
-    // --------------------------------------------------------
-    // CASE B: 한도 초과 (비용 > 8천) -> [안전장치] 수동/자동 상관없이 작동
-    // --------------------------------------------------------
     if (currentRate > calculatedRate + 0.01) {
       isCheckingCostRef.current = true;
 
@@ -285,8 +261,6 @@ export default function Step4_Simulation() {
 O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
 비용을 맞추시겠습니까?`;
 
-      // [핵심] 자동 모드이거나 알림을 껐으면 -> 자동 수정
-      // 수동 모드면 -> 사용자에게 물어봄 (실수 방지)
       if (suppressCostAlerts) {
         store.setSimulationOption('maintenanceRate', calculatedRate);
         setTimeout(() => {
@@ -302,12 +276,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
           }, 500);
         }, 100);
       }
-    }
-    // --------------------------------------------------------
-    // CASE C: 한도 여유 -> [최적화] '자동 모드'일 때만 작동
-    // --------------------------------------------------------
-    // 수동 모드(isMaintenanceAuto = false)일 때는 여기서 25%로 안 올리고 가만히 둠
-    else if (
+    } else if (
       store.isMaintenanceAuto &&
       currentRate < 25.0 &&
       currentRate < calculatedRate - 0.01
@@ -324,7 +293,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
     totalAnnualCost,
     store.maintenanceRate,
     store.selectedModel,
-    store.isMaintenanceAuto, // [CHECK] 상태 변화 감지 추가
+    store.isMaintenanceAuto,
     suppressCostAlerts,
     store,
   ]);
@@ -476,176 +445,197 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
         </div>
       )}
 
-      {isEul && (
-        <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden">
-          <button
-            className="w-full flex items-center justify-between p-3 bg-slate-100 hover:bg-slate-200 transition"
-            onClick={() => setShowRationalization(!showRationalization)}
+      {/* [NEW] 전기요금 합리화 절감액 토글 섹션 */}
+      <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden bg-white">
+        <div className="p-3 bg-slate-100 flex items-center justify-between border-b border-slate-200">
+          <label
+            className={`flex items-center gap-2 text-sm font-bold cursor-pointer select-none ${
+              isEul ? 'text-slate-700' : 'text-slate-400'
+            }`}
           >
-            <span className="font-bold text-slate-700 text-sm flex items-center gap-2">
-              ⚡ 전기요금 합리화 절감액 계산
-            </span>
-            {showRationalization ? (
-              <LucideChevronUp size={16} />
-            ) : (
-              <LucideChevronDown size={16} />
-            )}
-          </button>
+            <input
+              type="checkbox"
+              disabled={!isEul} // (을) 아니면 비활성화
+              checked={store.isRationalizationEnabled}
+              onChange={(e) =>
+                store.setSimulationOption(
+                  'isRationalizationEnabled',
+                  e.target.checked
+                )
+              }
+              className="w-4 h-4 accent-blue-600 disabled:bg-slate-200"
+            />
+            ⚡ 전기요금 합리화 절감액 계산 {isEul ? '' : '(을 전용)'}
+          </label>
 
-          {showRationalization && (
-            <div className="p-4 bg-white text-xs">
-              <table className="w-full text-center border-collapse border border-slate-300">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
-                    <th className="p-2 border-r border-slate-300">구분</th>
-                    <th className="p-2 border-r border-slate-300">을 (원)</th>
-                    <th className="p-2 border-r border-slate-300">갑 (원)</th>
-                    <th className="p-2 border-r border-slate-300 bg-yellow-50">
-                      차이
-                    </th>
-                    <th className="p-2 border-r border-slate-300">
-                      연간사용량 (kW)
-                    </th>
-                    <th className="p-2 bg-blue-50">절감액 (원)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {/* 기본료 */}
-                  <tr className="border-b border-slate-300">
-                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                      기본료
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('base_eul')}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('base_gap')}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
-                      {(
-                        rationalization.base_eul - rationalization.base_gap
-                      ).toLocaleString()}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      <input
-                        type="text"
-                        className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={rationalization.base_usage.toLocaleString()}
-                        onChange={handleBaseUsageChange}
-                        onFocus={(e) => e.target.select()}
-                        placeholder="연간사용량"
-                      />
-                    </td>
-                    <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
-                      <input
-                        type="text"
-                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={Math.round(saving_base).toLocaleString()}
-                        onChange={handleBaseSavingsChange}
-                        onFocus={(e) => e.target.select()}
-                      />
-                    </td>
-                  </tr>
-
-                  {/* 경부하 */}
-                  <tr className="border-b border-slate-300">
-                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                      경부하
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('light_eul')}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('light_gap')}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                      {(
-                        rationalization.light_eul - rationalization.light_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('light_usage')}
-                    </td>
-                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                      {Math.round(saving_light).toLocaleString()}
-                    </td>
-                  </tr>
-
-                  {/* 중간부하 */}
-                  <tr className="border-b border-slate-300">
-                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                      중간부하
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('mid_eul')}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('mid_gap')}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                      {(
-                        rationalization.mid_eul - rationalization.mid_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('mid_usage')}
-                    </td>
-                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                      {Math.round(saving_mid).toLocaleString()}
-                    </td>
-                  </tr>
-
-                  {/* 최대부하 */}
-                  <tr className="border-b border-slate-300">
-                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                      최대부하
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('max_eul')}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('max_gap')}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                      {(
-                        rationalization.max_eul - rationalization.max_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
-                    </td>
-                    <td className="p-1 border-r border-slate-300">
-                      {renderRationalizationInput('max_usage')}
-                    </td>
-                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                      {Math.round(saving_max).toLocaleString()}
-                    </td>
-                  </tr>
-
-                  {/* 합계 */}
-                  <tr className="border-t-2 border-slate-300">
-                    <td
-                      colSpan={5}
-                      className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
-                    >
-                      합계 (절감액)
-                    </td>
-                    <td className="p-2 font-extrabold text-blue-700 bg-blue-100">
-                      {Math.round(totalRationalizationSavings).toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          {store.isRationalizationEnabled && (
+            <button
+              className="p-1 hover:bg-slate-200 rounded transition"
+              onClick={() => setShowRationalization(!showRationalization)}
+            >
+              {showRationalization ? (
+                <LucideChevronUp size={16} />
+              ) : (
+                <LucideChevronDown size={16} />
+              )}
+            </button>
           )}
         </div>
-      )}
+
+        {/* 체크되고, 펼쳐졌을 때만 내용 표시 */}
+        {store.isRationalizationEnabled && showRationalization && (
+          <div className="p-4 bg-white text-xs">
+            <table className="w-full text-center border-collapse border border-slate-300">
+              <thead>
+                <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
+                  <th className="p-2 border-r border-slate-300">구분</th>
+                  <th className="p-2 border-r border-slate-300">을 (원)</th>
+                  <th className="p-2 border-r border-slate-300">갑 (원)</th>
+                  <th className="p-2 border-r border-slate-300 bg-yellow-50">
+                    차이
+                  </th>
+                  <th className="p-2 border-r border-slate-300">
+                    연간사용량 (kW)
+                  </th>
+                  <th className="p-2 bg-blue-50">절감액 (원)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {/* 기본료 */}
+                <tr className="border-b border-slate-300">
+                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                    기본료
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('base_eul')}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('base_gap')}
+                  </td>
+                  <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
+                    {(
+                      rationalization.base_eul - rationalization.base_gap
+                    ).toLocaleString()}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    <input
+                      type="text"
+                      className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={rationalization.base_usage.toLocaleString()}
+                      onChange={handleBaseUsageChange}
+                      onFocus={(e) => e.target.select()}
+                      placeholder="연간사용량"
+                    />
+                  </td>
+                  <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
+                    <input
+                      type="text"
+                      className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={Math.round(saving_base).toLocaleString()}
+                      onChange={handleBaseSavingsChange}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </td>
+                </tr>
+
+                {/* 경부하 */}
+                <tr className="border-b border-slate-300">
+                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                    경부하
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('light_eul')}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('light_gap')}
+                  </td>
+                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                    {(
+                      rationalization.light_eul - rationalization.light_gap
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('light_usage')}
+                  </td>
+                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                    {Math.round(saving_light).toLocaleString()}
+                  </td>
+                </tr>
+
+                {/* 중간부하 */}
+                <tr className="border-b border-slate-300">
+                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                    중간부하
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('mid_eul')}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('mid_gap')}
+                  </td>
+                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                    {(
+                      rationalization.mid_eul - rationalization.mid_gap
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('mid_usage')}
+                  </td>
+                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                    {Math.round(saving_mid).toLocaleString()}
+                  </td>
+                </tr>
+
+                {/* 최대부하 */}
+                <tr className="border-b border-slate-300">
+                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                    최대부하
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('max_eul')}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('max_gap')}
+                  </td>
+                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                    {(
+                      rationalization.max_eul - rationalization.max_gap
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}
+                  </td>
+                  <td className="p-1 border-r border-slate-300">
+                    {renderRationalizationInput('max_usage')}
+                  </td>
+                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                    {Math.round(saving_max).toLocaleString()}
+                  </td>
+                </tr>
+
+                {/* 합계 */}
+                <tr className="border-t-2 border-slate-300">
+                  <td
+                    colSpan={5}
+                    className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
+                  >
+                    합계 (절감액)
+                  </td>
+                  <td className="p-2 font-extrabold text-blue-700 bg-blue-100">
+                    {Math.round(totalRationalizationSavings).toLocaleString()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* 투자비 테이블 */}
       <div className="mt-6">
@@ -761,9 +751,35 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
       </div>
 
       <div className="mt-6">
-        <div className="flex items-center gap-2 mb-2 text-green-800">
-          <LucideTrendingUp size={16} />
-          <span className="text-sm font-bold">연간 수익 상세 분석</span>
+        <div className="flex items-center justify-between gap-2 mb-2 text-green-800">
+          <div className="flex items-center gap-2">
+            <LucideTrendingUp size={16} />
+            <span className="text-sm font-bold">연간 수익 상세 분석</span>
+          </div>
+
+          {/* [NEW] 잉여 전력 폐기 체크박스 */}
+          {!isKepco && (
+            <label className="flex items-center gap-1 cursor-pointer select-none bg-red-50 px-2 py-1 rounded border border-red-100">
+              <input
+                type="checkbox"
+                className="w-3 h-3 accent-red-500"
+                checked={store.isSurplusDiscarded}
+                onChange={(e) =>
+                  store.setSimulationOption(
+                    'isSurplusDiscarded',
+                    e.target.checked
+                  )
+                }
+              />
+              <span
+                className={`text-xs font-bold ${
+                  store.isSurplusDiscarded ? 'text-red-600' : 'text-slate-400'
+                }`}
+              >
+                잉여 전력 폐기 (판매 불가)
+              </span>
+            </label>
+          )}
         </div>
 
         <div className={styles.detailBox}>
@@ -813,10 +829,21 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
               <div className={`${styles.row} ${styles.bgPink}`}>
                 <span className={styles.dLabel}>잉여 전력량 (년)</span>
                 <span>
-                  <span className={styles.dVal}>
+                  <span
+                    className={`font-bold ${
+                      store.isSurplusDiscarded
+                        ? 'text-red-500 line-through decoration-red-500'
+                        : 'text-slate-800'
+                    }`}
+                  >
                     {Math.round(volume_surplus).toLocaleString()}
-                  </span>{' '}
-                  kWh
+                  </span>
+                  {store.isSurplusDiscarded && (
+                    <span className="ml-1 text-red-500 font-bold">
+                      0 (폐기)
+                    </span>
+                  )}
+                  <span className="ml-1 text-xs text-gray-500">kWh</span>
                 </span>
               </div>
               <div className={styles.row}>
@@ -902,8 +929,13 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
                 <span className="text-xs text-gray-500 pl-2">
                   ○ 잉여 한전판매 수익
                 </span>
-                <span className="text-xs">
+                <span
+                  className={`text-xs ${
+                    store.isSurplusDiscarded ? 'text-red-500 font-bold' : ''
+                  }`}
+                >
                   {(revenue_surplus / 100000000).toFixed(2)} 억원
+                  {store.isSurplusDiscarded && ' (폐기)'}
                 </span>
               </div>
             </>

@@ -228,7 +228,7 @@ export default function PreviewFinancialTable() {
               연간 실제 순수익 (Net Profit)
             </td>
             <td style={{ fontSize: '1.1rem', color: '#fbbf24' }}>
-              {(results.annualOperatingProfit / 100000000).toFixed(2)}
+              {(results.annualOperatingProfit / 100000000).toFixed(2)} 억
             </td>
           </tr>
         </tbody>

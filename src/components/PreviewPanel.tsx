@@ -22,16 +22,15 @@ import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
 // ----------------------------------------------------------------
-// [수정] 페이지 하단 Footer 컴포넌트 (폴더명 제거 로직 추가)
+// [수정] 페이지 하단 Footer 컴포넌트
 // ----------------------------------------------------------------
 const PageFooter = ({ page }: { page: number }) => {
-  const { proposalName, clientName } = useProposalStore();
+  const store = useProposalStore();
 
-  // 1. 기본 이름 가져오기
-  const rawName = proposalName || `${clientName} 태양광 발전 제안서`;
+  // 현재 설정(EC 여부, 트럭 대수 등)이 반영된 '자동 생성 파일명' 사용
+  const rawName = store.getProposalFileName();
 
-  // 2. [핵심] 만약 이름에 '/'가 있다면 뒤쪽(파일명)만 잘라내기
-  // 예: "인스케이프/분석자료_..." -> "분석자료_..."
+  // 폴더명 제거 로직
   const displayName = rawName.includes('/')
     ? rawName.split('/').pop()
     : rawName;
@@ -55,7 +54,7 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산 (기존 코드 유지)
+  // [1] 월별 데이터 계산
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
@@ -174,7 +173,12 @@ export default function PreviewPanel() {
             </h1>
             <h2 className={styles.subTitle}>
               - {store.clientName} (태양광발전{' '}
-              {store.capacityKw.toLocaleString()}kW) -
+              {store.capacityKw.toLocaleString()}kW
+              {/* [수정] EC가 켜져있고 대수가 있으면 표시 */}
+              {store.useEc && store.truckCount > 0
+                ? `, EC ${store.truckCount}대`
+                : ''}
+              ) -
             </h2>
           </div>
           <div className={styles.contractCard}>
@@ -262,7 +266,10 @@ export default function PreviewPanel() {
       </div>
 
       {/* [페이지 8] 비교 테이블 */}
-      <div className="print-page-center" style={{ position: 'relative', marginTop: '20px' }}>
+      <div
+        className="print-page-center"
+        style={{ position: 'relative', marginTop: '20px' }}
+      >
         <div style={{ width: '100%' }}>
           <PreviewComparisonTable />
         </div>
