@@ -321,9 +321,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   tariffPresets: DEFAULT_TARIFFS,
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
-  useEc: true,
-  truckCount: 3,
-  maintenanceRate: 25.0,
+
+  // [수정] 초기값: EC 끄기, 트럭 0대, 유지보수 5%
+  useEc: false,
+  truckCount: 0,
+  maintenanceRate: 5.0,
+
   isMaintenanceAuto: true,
   isRationalizationEnabled: false,
   isSurplusDiscarded: false,
@@ -374,6 +377,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ),
     })),
   setMonthlyData: (data) => set({ monthlyData: data }),
+
+  // [수정된 간결한 버전]
   copyJanToAll: () =>
     set((state) => {
       const jan = state.monthlyData[0];
@@ -382,6 +387,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return { monthlyData: newData };
     }),
+
   copyFieldToAll: (field) =>
     set((state) => {
       const firstVal = state.monthlyData[0][field];
@@ -396,9 +402,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       rationalization: { ...state.rationalization, [field]: value },
     })),
 
-  // --------------------------------------------------------------------------------------
-  // [핵심] 상호 배제 및 상태에 따른 유지보수율 강제 설정 로직
-  // --------------------------------------------------------------------------------------
   setSimulationOption: (field, value) => {
     set((state) => {
       let newState = { ...state, [field]: value };
@@ -417,7 +420,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         } else {
           // 고정형 OFF
           // 이동형이 꺼져있다면 그냥 5% (아무것도 안씀)
-          // 만약 사용자가 이동형을 쓰고 싶으면 Step4에서 다시 체크할 것임
           newState.maintenanceRate = 5.0;
         }
       }
@@ -431,8 +433,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
           if (state.truckCount === 0) newState.truckCount = 3;
         } else {
-          // 이동형 OFF
-          // 고정형도 아님 (사용자가 직접 껐으므로)
+          // 이동형 OFF: 자가소비도 끄고, 유지보수는 5%
           newState.isEcSelfConsumption = false;
           newState.maintenanceRate = 5.0;
           newState.truckCount = 0;
@@ -801,6 +802,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
+  // [수정] 초기화 시에도 5% / EC 끔
   resetProposal: () => {
     set({
       siteImage: null,
@@ -836,12 +838,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         max_gap: 136.47,
         max_usage: 0,
       },
-      useEc: true,
-      truckCount: 3,
+
+      // [Reset Defaults]
+      useEc: false,
+      truckCount: 0,
+      maintenanceRate: 5.0,
+
       totalInvestment: 0,
       recAveragePrice: 80,
       tariffPresets: DEFAULT_TARIFFS,
-      maintenanceRate: 25.0,
       isMaintenanceAuto: true,
       isRationalizationEnabled: false,
       isSurplusDiscarded: false,
@@ -911,7 +916,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       const cyclesPerDay = isEcSelfConsumption ? 1 : 4;
       const ecCapacityAnnual = truckCount * 100 * cyclesPerDay * 365;
 
-      // [수정] 이동형(useEc) 또는 고정형(isEcSelfConsumption) 둘 중 하나라도 켜져 있으면 EC 계산
+      // EC 충전량 계산 (이동형 or 고정형)
       if (useEc || isEcSelfConsumption) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
@@ -962,7 +967,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         totalRationalizationSavings;
     }
 
-    // [수정] 인건비: 이동형일 때만 발생
+    // 인건비: 이동형일 때만 발생
     const laborCostWon =
       truckCount > 0 &&
       useEc &&

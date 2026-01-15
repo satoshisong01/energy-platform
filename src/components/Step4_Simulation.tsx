@@ -48,15 +48,19 @@ export default function Step4_Simulation() {
     store.isEcSelfConsumption,
   ]);
 
-  // 2. 비용 자동 조정 로직 (Alert 중복 방지 강화)
+  // 2. 비용 자동 조정 로직 (Alert 중복 방지 및 초기 0원 문제 해결)
   useEffect(() => {
     // 자동 조정 모드가 꺼져있으면 실행하지 않음
     if (!store.isMaintenanceAuto) return;
 
-    // 이미 알림창이 떠 있거나 처리 중이면 중단 (중복 방지 핵심)
+    const totalRevenue = results.annualGrossRevenue;
+
+    // [핵심] 매출이 0원이면(초기 로딩 상태) 계산을 중단하여 불필요한 알림 방지
+    if (totalRevenue === 0) return;
+
+    // 이미 알림창이 떠 있거나 처리 중이면 중단
     if (isConfirmingRef.current) return;
 
-    const totalRevenue = results.annualGrossRevenue;
     const isKepco = store.selectedModel === 'KEPCO';
 
     // 이동형 EC 모드 여부 확인
@@ -122,15 +126,14 @@ export default function Step4_Simulation() {
     store.selectedModel, // 모델 변경 시
     store.useEc, // EC 토글 시
     store.isEcSelfConsumption, // 자가소비 변경 시
-    // store.isMaintenanceAuto는 포함하지 않음 (토글 시 즉시 반응보다 로직 안정성 우선)
-    // config.price_labor_ec,   // 인건비 변경 시
-    // store.maintenanceRate,   // 값 비교용
-    // suppressCostAlerts,
-    // store
-    // (의존성을 줄여서 불필요한 호출 방지)
+    store.isMaintenanceAuto, // 자동모드 토글 시
+    config.price_labor_ec, // 인건비 변경 시
+    store.maintenanceRate, // 값 비교용
+    suppressCostAlerts,
+    // store는 렌더링 최적화를 위해 의존성 배열에서 제외 가능하지만, 안전을 위해 포함해도 무방함 (여기선 제외함)
   ]);
 
-  // ... (이하 UI 렌더링 코드는 동일합니다) ...
+  // --- UI 렌더링 함수들 (기존 코드 그대로 유지) ---
 
   const renderRationalizationInput = (
     field: keyof RationalizationData,
@@ -176,6 +179,8 @@ export default function Step4_Simulation() {
       store.updateRationalization('base_savings_manual', savingsVal);
     }
   };
+
+  // --- 변수 계산 (기존 코드 그대로 유지) ---
 
   const isKepco = store.selectedModel === 'KEPCO';
   const isEul = contractType.includes('(을)');
@@ -726,7 +731,10 @@ export default function Step4_Simulation() {
                   <td className="text-blue-600 font-bold">
                     {solarCount.toFixed(2)} ea
                   </td>
-                  <td>{store.useEc ? truckCount : 0} ea</td>
+                  <td>
+                    {store.useEc || store.isEcSelfConsumption ? truckCount : 0}{' '}
+                    ea
+                  </td>
 
                   {/* 자가소비(배터리형)면 트랙터 수량 0 */}
                   <td>{tractorCost > 0 ? 1 : 0} ea</td>
