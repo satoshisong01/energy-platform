@@ -1,4 +1,3 @@
-// src/components/preview/PreviewModelVisual.tsx
 'use client';
 
 import React from 'react';
@@ -16,63 +15,130 @@ import {
 } from 'recharts';
 import styles from './PreviewModelVisual.module.css';
 
-// [공통] 차트 데이터 생성 로직
+// [수정] 차트 데이터 생성 로직 (EC 방전 로직 추가)
 const useChartData = () => {
   const store = useProposalStore();
-  const totalUsage = store.monthlyData.reduce(
+
+  // 1. 연간 데이터 가져오기
+  const totalUsageYear = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0
   );
-  const avgDailyUsage = totalUsage / 365;
-  const capacity = store.capacityKw;
+  const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
+    const days = new Date(2025, cur.month, 0).getDate();
+    return acc + store.capacityKw * 3.64 * days;
+  }, 0);
 
-  const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-    let usageRatio = 0.02;
-    if (hour >= 8 && hour <= 18) usageRatio = 0.065;
-    const deterministicNoise = Math.sin(hour * 999) * 0.1;
-    const usage = avgDailyUsage * usageRatio * (1.0 + deterministicNoise);
+  // 2. 실제 잉여 전력량 계산
+  const totalSelfConsumption = store.monthlyData.reduce(
+    (acc, cur) => acc + cur.selfConsumption,
+    0
+  );
 
-    let solarRatio = 0;
-    if (hour >= 6 && hour <= 19) {
-      const dist = Math.abs(hour - 12.5);
-      solarRatio = Math.max(0, 1 - Math.pow(dist / 7.5, 2.5));
+  // 3. 하루 평균 데이터 계산
+  const dailyGenAvg = initialAnnualGen / 365;
+  const dailySelfAvg = totalSelfConsumption / 365;
+
+  // 4. 시간대별 패턴
+  const solarPattern = [
+    0, 0, 0, 0, 0, 0, 0.02, 0.08, 0.15, 0.22, 0.26, 0.28, 0.26, 0.22, 0.15,
+    0.08, 0.02, 0, 0, 0, 0, 0, 0, 0,
+  ];
+  const solarPatternSum = solarPattern.reduce((a, b) => a + b, 0);
+
+  const usagePattern = [
+    0.03, 0.03, 0.03, 0.03, 0.04, 0.05, 0.07, 0.09, 0.1, 0.1, 0.1, 0.1, 0.1,
+    0.1, 0.1, 0.1, 0.09, 0.07, 0.06, 0.05, 0.04, 0.04, 0.03, 0.03,
+  ];
+  const usagePatternSum = usagePattern.reduce((a, b) => a + b, 0);
+
+  // --- [Step 1] 기본 데이터 생성 및 총 잉여량 계산 ---
+  let dailyTotalSurplus = 0; // 하루 동안 발생하는 총 잉여 전력 (충전 가능량)
+
+  const tempData = Array.from({ length: 24 }, (_, hour) => {
+    const generation = (solarPattern[hour] * dailyGenAvg) / solarPatternSum;
+    let usage = (usagePattern[hour] * dailySelfAvg) / usagePatternSum;
+
+    if (generation > 0 && usage > generation) {
+      usage = generation * 0.95;
     }
-    const generation = capacity * solarRatio * 0.8;
+
     const surplusVal = Math.max(0, generation - usage);
-    const surplusRange = generation > usage ? [usage, generation] : null;
+    dailyTotalSurplus += surplusVal; // 잉여 누적
 
     return {
-      hour: `${hour}시`,
+      hour,
+      hourLabel: `${hour}시`,
       usage,
       generation,
       surplusVal,
-      surplusRange,
+      ecDischarge: 0, // 초기화
     };
   });
+
+  // --- [Step 2] EC 방전 시뮬레이션 (밤 시간대 사용량 커버) ---
+  // EC 사용 조건: EC 옵션이 켜져있고, 한전 모델이 아닐 때
+  if (store.useEc && store.selectedModel !== 'KEPCO') {
+    let remainingEnergy = dailyTotalSurplus; // 배터리 잔량 (하루 잉여량만큼 충전되었다고 가정)
+
+    // 전략: 저녁(16시~)부터 사용하고, 남으면 새벽(0시~)에 사용
+
+    // 1. 오후/저녁 시간대 (16시 ~ 23시)
+    for (let i = 16; i < 24; i++) {
+      const row = tempData[i];
+      // 발전량보다 사용량이 많은 구간(Deficit) 찾기
+      const deficit = Math.max(0, row.usage - row.generation);
+
+      if (deficit > 0 && remainingEnergy > 0) {
+        const dischargeAmount = Math.min(deficit, remainingEnergy);
+        row.ecDischarge = dischargeAmount;
+        remainingEnergy -= dischargeAmount;
+      }
+    }
+
+    // 2. 새벽/아침 시간대 (00시 ~ 09시) - 저녁에 쓰고 남은게 있다면
+    for (let i = 0; i < 10; i++) {
+      const row = tempData[i];
+      const deficit = Math.max(0, row.usage - row.generation);
+
+      if (deficit > 0 && remainingEnergy > 0) {
+        const dischargeAmount = Math.min(deficit, remainingEnergy);
+        row.ecDischarge = dischargeAmount;
+        remainingEnergy -= dischargeAmount;
+      }
+    }
+  }
+
+  // --- [Step 3] 최종 데이터 포맷팅 ---
+  const hourlyData = tempData.map((row) => ({
+    ...row,
+    hour: row.hourLabel,
+    // 그래프 표현용: 잉여 영역 (발전 > 사용)
+    surplusRange:
+      row.generation > row.usage ? [row.usage, row.generation] : null,
+  }));
 
   return { hourlyData };
 };
 
-// -----------------------------------------------------------
-// [컴포넌트 1] 그래프 부분 (6페이지용)
-// -----------------------------------------------------------
 export function PreviewModelGraph() {
   const { hourlyData } = useChartData();
 
   return (
     <div className={styles.container}>
-      <h3 className={styles.title}>RE100 에너지 발전 수익 분석 그래프</h3>
+      <h3 className={styles.title}>
+        RE100 에너지 발전 수익 분석 그래프 (일일 평균)
+      </h3>
       <div className={styles.chartBox}>
-        <h4 className={styles.chartTitle}>시간대별 전력 수급</h4>
+        <h4 className={styles.chartTitle}>시간대별 전력 수급 패턴</h4>
         <div style={{ height: 400 }}>
-          {' '}
-          {/* 높이 약간 확보 */}
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={hourlyData}
               margin={{ top: 20, right: 20, bottom: 0, left: 0 }}
             >
               <defs>
+                {/* 잉여 전력 패턴 (빨강 빗금) */}
                 <pattern
                   id="stripePattern"
                   patternUnits="userSpaceOnUse"
@@ -90,6 +156,7 @@ export function PreviewModelGraph() {
                     opacity="0.3"
                   />
                 </pattern>
+                {/* EC 방전 패턴 (초록 빗금 - 선택사항, 여기선 solid color 사용예정) */}
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -126,6 +193,8 @@ export function PreviewModelGraph() {
                 }}
               />
               <Legend verticalAlign="top" height={36} iconSize={10} />
+
+              {/* 1. 기본 사용량 (파랑) */}
               <Area
                 type="monotone"
                 dataKey="usage"
@@ -135,6 +204,19 @@ export function PreviewModelGraph() {
                 strokeWidth={2}
                 fillOpacity={0.6}
               />
+
+              {/* 2. EC 방전량 (초록) - 사용량 위에 덮어씌움 */}
+              <Area
+                type="monotone"
+                dataKey="ecDischarge"
+                name="EC 공급 (저장전력)"
+                fill="#4ade80" // 밝은 초록색
+                stroke="#16a34a" // 진한 초록색
+                strokeWidth={2}
+                fillOpacity={0.8}
+              />
+
+              {/* 3. 잉여 전력 영역 (빨강 빗금) */}
               <Area
                 type="monotone"
                 dataKey="surplusRange"
@@ -143,6 +225,8 @@ export function PreviewModelGraph() {
                 fill="url(#stripePattern)"
                 legendType="none"
               />
+
+              {/* 4. 태양광 발전량 (주황 선) */}
               <Line
                 type="monotone"
                 dataKey="generation"
@@ -151,6 +235,8 @@ export function PreviewModelGraph() {
                 strokeWidth={3}
                 dot={false}
               />
+
+              {/* 5. 잉여 전력 선 (빨강 선) - 시각적 강조용 */}
               <Line
                 type="monotone"
                 dataKey="surplusVal"
@@ -169,43 +255,40 @@ export function PreviewModelGraph() {
         <p className={styles.desc}>
           *{' '}
           <span style={{ color: '#ef4444', fontWeight: 'bold' }}>
-            빨간색 빗금 영역
+            빨간색 빗금
           </span>
-          은 자가소비 후 남는 <b>잉여 전력</b>으로, 판매하여 수익을 창출합니다.
+          : 잉여 전력 (충전) /{' '}
+          <span style={{ color: '#16a34a', fontWeight: 'bold' }}>
+            초록색 영역
+          </span>
+          : EC 공급 (방전)
+          <br />
+          <span className="text-gray-400 text-xs">
+            (낮에 남은 전력을 저장했다가, 태양광이 없는 아침/저녁 시간대에
+            사용합니다)
+          </span>
         </p>
       </div>
     </div>
   );
 }
 
-// -----------------------------------------------------------
-// [컴포넌트 2] 이미지/영상 부분 (7페이지용) - 수정됨
-// -----------------------------------------------------------
+// ... (PreviewModelImage 컴포넌트는 기존과 동일하므로 생략) ...
 export function PreviewModelImage() {
   const store = useProposalStore();
   const isKepco = store.selectedModel === 'KEPCO';
-  const truckCount = store.truckCount; // Step4에서 선택한 트럭 대수
+  const truckCount = store.truckCount;
 
-  // [수정 1] 트럭 대수에 따른 영상 및 캡처 이미지 경로 설정
-  const videoSrc =
-    truckCount === 2
-      ? '/videos/direct.mp4' // 2대일 때 (구 한전 영상)
-      : '/videos/egc.mp4'; // 3대 이상일 때 (구 RE100 영상)
-
+  const videoSrc = truckCount === 2 ? '/videos/direct.mp4' : '/videos/egc.mp4';
   const videoCaptureImage =
     truckCount === 2 ? '/images/direct_capture.png' : '/images/egc_capture.png';
-
-  // [수정 2] 한전 모델일 경우 고정 이미지 경로 설정
   const kepcoImageSrc = '/images/direct_sale.jpg';
-
-  // 제목 설정
   const title = isKepco
     ? '한전 판매형 프로세스'
     : `에너지 캐리어(EC) 운송 프로세스 (${truckCount}대 운용)`;
 
   return (
     <div className={styles.container}>
-      {/* 인쇄 스타일 */}
       <style jsx global>{`
         @media print {
           .print-hide {
@@ -225,9 +308,7 @@ export function PreviewModelImage() {
           {title}
         </h4>
         <div className={styles.videoWrapper} style={{ height: '500px' }}>
-          {/* [수정 3] 조건부 렌더링: 한전이면 이미지, 아니면 비디오 */}
           {isKepco ? (
-            // [CASE 1] 한전 모델: 화면/인쇄 모두 이미지 표시
             <img
               src={kepcoImageSrc}
               className="w-full h-full object-contain rounded-lg"
@@ -237,9 +318,7 @@ export function PreviewModelImage() {
               }}
             />
           ) : (
-            // [CASE 2] RE100/REC5 모델: 화면은 비디오, 인쇄는 캡처 이미지
             <>
-              {/* 화면용: 비디오 */}
               <video
                 src={videoSrc}
                 className="w-full h-full object-contain rounded-lg print-hide"
@@ -248,7 +327,6 @@ export function PreviewModelImage() {
                 muted
                 playsInline
               />
-              {/* 인쇄용: 캡처 이미지 */}
               <img
                 src={videoCaptureImage}
                 className="w-full h-full object-contain rounded-lg print-show"

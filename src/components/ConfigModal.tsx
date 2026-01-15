@@ -8,6 +8,7 @@ import {
   LucideFolderOpen,
   LucideFilePlus,
   LucideSettings,
+  LucideBattery,
 } from 'lucide-react';
 
 import ProposalListModal from './ProposalListModal';
@@ -255,11 +256,81 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           field="unit_price_savings"
                           store={store}
                         />
-                        <ConfigInput
-                          label="EC 판매 (REC 1.5)"
-                          field="unit_price_ec_1_5"
-                          store={store}
-                        />
+
+                        {/* EC 판매 (REC 1.5) + 자가소비 체크박스 통합 */}
+                        <div className="col-span-1 p-3 border border-slate-200 rounded bg-slate-50">
+                          {/* 1. 이동형 (기본) */}
+                          <div
+                            className={`mb-3 ${
+                              store.isEcSelfConsumption ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">
+                              EC 판매 (REC 1.5 / 이동형)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              disabled={store.isEcSelfConsumption}
+                              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-right bg-white"
+                              value={store.config.unit_price_ec_1_5}
+                              onChange={(e) =>
+                                store.updateConfig(
+                                  'unit_price_ec_1_5',
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* 2. 자가소비형 (체크박스) */}
+                          <div className="pt-2 border-t border-slate-200">
+                            <label className="flex items-center gap-2 cursor-pointer select-none mb-2">
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 accent-green-600"
+                                checked={store.isEcSelfConsumption}
+                                onChange={(e) =>
+                                  store.setSimulationOption(
+                                    'isEcSelfConsumption',
+                                    e.target.checked
+                                  )
+                                }
+                              />
+                              <span
+                                className={`text-xs font-bold flex items-center gap-1 ${
+                                  store.isEcSelfConsumption
+                                    ? 'text-green-700'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                <LucideBattery size={14} />
+                                EC 자가소비 (배터리형) 적용
+                              </span>
+                            </label>
+
+                            {store.isEcSelfConsumption && (
+                              <div className="pl-6 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <label className="block text-[10px] text-green-600 mb-1 font-bold">
+                                  자가소비용 적용 단가
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-full p-2 border border-green-300 rounded focus:ring-2 focus:ring-green-500 outline-none font-mono text-right text-green-700 font-bold bg-green-50"
+                                  value={store.config.unit_price_ec_self}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'unit_price_ec_self',
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <ConfigInput
                           label="EC 판매 (REC 5.0)"
                           field="unit_price_ec_5_0"
@@ -274,7 +345,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                         3. 시뮬레이션 기준 비율 (단위: %)
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
-                        {/* [수정] 유지보수 비율 설정 영역 (체크박스 추가) */}
                         <div>
                           <div className="flex justify-between items-end mb-1">
                             <label className="block text-xs font-semibold text-gray-500">
@@ -429,7 +499,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {/* 금융 정책 설정 */}
+                    {/* 금융 정책 설정 (기존 동일) */}
                     <section>
                       <h3 className="text-sm font-bold text-blue-600 mb-4 uppercase tracking-wider border-b pb-2 border-blue-100 flex items-center gap-2">
                         RPS 정책자금 설정

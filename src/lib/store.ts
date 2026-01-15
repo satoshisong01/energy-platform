@@ -25,7 +25,6 @@ export type MonthlyData = {
 export type ModuleTier = 'PREMIUM' | 'STANDARD' | 'ECONOMY';
 export type BusinessModel = 'KEPCO' | 'RE100' | 'REC5';
 
-// 금융 상세 설정 인터페이스
 export interface FinancialSettings {
   rps: {
     loanRatio: number;
@@ -54,6 +53,7 @@ export type SystemConfig = {
   unit_price_savings: number;
   unit_price_ec_1_5: number;
   unit_price_ec_5_0: number;
+  unit_price_ec_self: number;
   loan_rate_rps: number;
   loan_rate_factoring: number;
   rental_price_per_kw: number;
@@ -93,58 +93,46 @@ export type ProposalMeta = {
   updated_at: string;
 };
 
-// 계산 결과 반환 타입
 type SimulationResult = {
   totalInvestment: number;
   totalInvestmentUk: number;
-
   initialAnnualGen: number;
   annualSelfConsumption: number;
   annualSurplus: number;
   volume_self: number;
   volume_ec: number;
   volume_surplus_final: number;
-
   revenue_saving: number;
   revenue_ec: number;
   revenue_surplus: number;
   totalRationalizationSavings: number;
-
   annualGrossRevenue: number;
   annualOperatingProfit: number;
-
   annualMaintenanceCost: number;
   laborCostWon: number;
-
   self_final_profit: number;
   rps_final_profit: number;
   fac_final_profit: number;
   rental_final_profit: number;
   sub_final_profit: number;
-
   rps_equity: number;
   rps_interest_only: number;
   rps_pmt: number;
   rps_net_1_5: number;
   rps_net_6_15: number;
-
   fac_interest_only: number;
   fac_pmt: number;
   fac_net_1: number;
   fac_net_2_10: number;
-
   rec_1000_common: number;
   rec_1000_rent: number;
   rec_1000_sub: number;
-
   rec_annual_common: number;
   rec_annual_rent: number;
   rec_annual_sub: number;
-
   self_roi_years: number;
   rps_roi_years: number;
   fac_roi_years: number;
-
   rental_revenue_yr: number;
   sub_revenue_yr: number;
 };
@@ -175,20 +163,15 @@ interface ProposalState {
   moduleTier: ModuleTier;
   useEc: boolean;
   truckCount: number;
-
   maintenanceRate: number;
   isMaintenanceAuto: boolean;
-
-  // [NEW] 새로운 토글 상태 추가
-  isRationalizationEnabled: boolean; // 전기요금 합리화 적용 여부
-  isSurplusDiscarded: boolean; // 잉여전력 폐기(판매불가) 여부
-
+  isRationalizationEnabled: boolean;
+  isSurplusDiscarded: boolean;
+  isEcSelfConsumption: boolean;
   degradationRate: number;
   totalInvestment: number;
-
   recAveragePrice: number;
 
-  // --- Actions ---
   setSiteImage: (img: string | null) => void;
   setClientName: (name: string) => void;
   setTargetDate: (date: string) => void;
@@ -213,11 +196,9 @@ interface ProposalState {
     field: keyof MonthlyData,
     value: number
   ) => void;
-
   setMonthlyData: (data: MonthlyData[]) => void;
   copyJanToAll: () => void;
   copyFieldToAll: (field: keyof MonthlyData) => void;
-
   setEnergyNote: (note: string) => void;
   updateRationalization: (
     field: keyof RationalizationData,
@@ -233,13 +214,9 @@ interface ProposalState {
     value: string | number
   ) => void;
   recalculateInvestment: () => void;
-
   setCapacityKw: (val: number) => void;
   setRecAveragePrice: (price: number) => void;
-
   getProposalFileName: () => string;
-
-  // DB Actions
   checkDuplicateName: (name: string, excludeId?: number) => Promise<boolean>;
   saveProposal: (customName?: string) => Promise<boolean>;
   saveAsProposal: (customName: string) => Promise<boolean>;
@@ -248,12 +225,9 @@ interface ProposalState {
   loadProposal: (id: number) => Promise<void>;
   deleteProposal: (id: number) => Promise<void>;
   resetProposal: () => void;
-
-  // Calculation Action
   getSimulationResults: () => SimulationResult;
 }
 
-// [Helper] PMT 함수
 const PMT = (rate: number, nper: number, pv: number) => {
   if (rate === 0) return -pv / nper;
   const pvif = Math.pow(1 + rate, nper);
@@ -321,6 +295,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     unit_price_savings: 136.47,
     unit_price_ec_1_5: 261.45,
     unit_price_ec_5_0: 441.15,
+    unit_price_ec_self: 155.5,
     loan_rate_rps: 1.75,
     loan_rate_factoring: 5.1,
     rental_price_per_kw: 20000,
@@ -348,19 +323,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   moduleTier: 'STANDARD',
   useEc: true,
   truckCount: 3,
-
   maintenanceRate: 25.0,
   isMaintenanceAuto: true,
-
-  // [NEW] 기본값 설정
   isRationalizationEnabled: false,
   isSurplusDiscarded: false,
-
+  isEcSelfConsumption: false,
   degradationRate: 0.5,
   totalInvestment: 0,
   recAveragePrice: 80,
 
-  // --- Actions ---
   setSiteImage: (img) => set({ siteImage: img }),
   setClientName: (name) => set({ clientName: name }),
   setTargetDate: (date) => set({ targetDate: date }),
@@ -402,28 +373,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         d.month === month ? { ...d, [field]: value } : d
       ),
     })),
-
   setMonthlyData: (data) => set({ monthlyData: data }),
-
   copyJanToAll: () =>
     set((state) => {
       const jan = state.monthlyData[0];
       const newData = state.monthlyData.map((d, i) =>
-        i === 0
-          ? d
-          : {
-              ...d,
-              usageKwh: jan.usageKwh,
-              selfConsumption: jan.selfConsumption,
-              totalBill: jan.totalBill,
-              baseBill: jan.baseBill,
-              peakKw: jan.peakKw,
-              solarGeneration: jan.solarGeneration,
-            }
+        i === 0 ? d : { ...d, ...jan, month: d.month }
       );
       return { monthlyData: newData };
     }),
-
   copyFieldToAll: (field) =>
     set((state) => {
       const firstVal = state.monthlyData[0][field];
@@ -432,20 +390,60 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return { monthlyData: newData };
     }),
-
   setEnergyNote: (note) => set({ energyNote: note }),
   updateRationalization: (field, value) =>
     set((state) => ({
       rationalization: { ...state.rationalization, [field]: value },
     })),
+
+  // --------------------------------------------------------------------------------------
+  // [핵심] 상호 배제 및 상태에 따른 유지보수율 강제 설정 로직
+  // --------------------------------------------------------------------------------------
   setSimulationOption: (field, value) => {
     set((state) => {
-      if (field === 'useEc')
-        return { ...state, useEc: value, truckCount: value ? 3 : 0 };
-      return { ...state, [field]: value };
+      let newState = { ...state, [field]: value };
+
+      // 1. [설정창] 'EC 자가소비(고정형)' 체크 변경 시
+      if (field === 'isEcSelfConsumption') {
+        if (value === true) {
+          // 고정형 ON: 이동형(useEc)은 끄지만, 용량 계산은 필요하므로 useEc를 false로 두되
+          // 계산 로직에서는 isEcSelfConsumption이 true면 계산하도록 함.
+          // UI상 체크박스를 끄기 위해 useEc = false.
+          newState.useEc = false;
+          newState.maintenanceRate = 5.0; // 고정형은 5%
+
+          // 고정형이라도 용량 계산을 위해 truckCount는 유지 (없으면 3으로 세팅)
+          if (state.truckCount === 0) newState.truckCount = 3;
+        } else {
+          // 고정형 OFF
+          // 이동형이 꺼져있다면 그냥 5% (아무것도 안씀)
+          // 만약 사용자가 이동형을 쓰고 싶으면 Step4에서 다시 체크할 것임
+          newState.maintenanceRate = 5.0;
+        }
+      }
+
+      // 2. [Step 4] '에너지 캐리어(이동형)' 체크 변경 시
+      if (field === 'useEc') {
+        if (value === true) {
+          // 이동형 ON: 고정형(자가소비)은 끔
+          newState.isEcSelfConsumption = false;
+          newState.maintenanceRate = 25.0; // 이동형은 25% (한도 적용은 useEffect가 함)
+
+          if (state.truckCount === 0) newState.truckCount = 3;
+        } else {
+          // 이동형 OFF
+          // 고정형도 아님 (사용자가 직접 껐으므로)
+          newState.isEcSelfConsumption = false;
+          newState.maintenanceRate = 5.0;
+          newState.truckCount = 0;
+        }
+      }
+
+      return newState;
     });
     get().recalculateInvestment();
   },
+
   setTruckCount: (count) => {
     set({ truckCount: count });
     get().recalculateInvestment();
@@ -477,20 +475,38 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     if (state.contractType === updated.name)
       get().setContractType(updated.name, updated.baseRate, updated.savings);
   },
+
   recalculateInvestment: () => {
     const state = get();
-    const { config, capacityKw, moduleTier, useEc, selectedModel, truckCount } =
-      state;
+    const {
+      config,
+      capacityKw,
+      moduleTier,
+      useEc,
+      selectedModel,
+      truckCount,
+      isEcSelfConsumption,
+    } = state;
     let unitPrice = config.price_solar_standard;
     if (moduleTier === 'PREMIUM') unitPrice = config.price_solar_premium;
     if (moduleTier === 'ECONOMY') unitPrice = config.price_solar_economy;
+
     const solarCost = (capacityKw / 100) * unitPrice;
     let ecCost = 0,
       tractorCost = 0,
       platformCost = 0;
-    if (useEc && selectedModel !== 'KEPCO') {
+
+    // EC 비용 계산: 이동형(useEc)이거나 고정형(isEcSelfConsumption)일 때
+    if ((useEc || isEcSelfConsumption) && selectedModel !== 'KEPCO') {
       ecCost = truckCount * config.price_ec_unit;
-      tractorCost = truckCount > 0 ? config.price_tractor : 0;
+
+      // 고정형이면 트랙터 비용 0원
+      if (isEcSelfConsumption) {
+        tractorCost = 0;
+      } else {
+        tractorCost = truckCount > 0 ? config.price_tractor : 0;
+      }
+
       platformCost = truckCount > 0 ? config.price_platform : 0;
     }
     set({ totalInvestment: solarCost + ecCost + tractorCost + platformCost });
@@ -509,16 +525,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     const dateStr = `${yy}${mm}${dd}`;
-
-    const isEcActive = state.useEc && state.selectedModel !== 'KEPCO';
+    const isEcActive =
+      (state.useEc || state.isEcSelfConsumption) &&
+      state.selectedModel !== 'KEPCO';
     const ecPart = isEcActive ? `_EC${state.truckCount}대` : '';
-
     return `분석자료_${state.clientName}_${state.capacityKw}kW${ecPart}_${dateStr}`;
   },
 
-  // ------------------------------------------------------------------
-  // DB Actions
-  // ------------------------------------------------------------------
   checkDuplicateName: async (name, excludeId) => {
     let query = supabase
       .from('proposals')
@@ -537,7 +550,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const state = get();
     const defaultName = get().getProposalFileName();
     const finalName = customName || state.proposalName || defaultName;
-
     const isDuplicate = await get().checkDuplicateName(
       finalName,
       state.proposalId || undefined
@@ -562,13 +574,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       moduleTier: state.moduleTier,
       useEc: state.useEc,
       truckCount: state.truckCount,
-
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
-      // [NEW] 저장 항목 추가
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
-
+      isEcSelfConsumption: state.isEcSelfConsumption,
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -621,7 +631,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
   saveAsProposal: async (customName) => {
     const state = get();
-
     const isDuplicate = await get().checkDuplicateName(customName);
     if (isDuplicate) {
       alert(
@@ -645,13 +654,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       moduleTier: state.moduleTier,
       useEc: state.useEc,
       truckCount: state.truckCount,
-
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
-      // [NEW] 저장 항목 추가
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
-
+      isEcSelfConsumption: state.isEcSelfConsumption,
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -672,9 +679,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         })
         .select()
         .single();
-
       if (error) throw error;
-
       if (data) {
         set({ proposalId: data.id, proposalName: customName });
         alert(`✅ '${customName}'(으)로 복제 저장되었습니다.`);
@@ -747,7 +752,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
       const defaultFin = get().financialSettings;
       const savedFin = data.input_data.financialSettings || {};
-
       const mergedFinancial = {
         rps: { ...defaultFin.rps, ...(savedFin.rps || {}) },
         factoring: { ...defaultFin.factoring, ...(savedFin.factoring || {}) },
@@ -767,22 +771,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
-
         capacityKw: finalCapacity,
         financialSettings: mergedFinancial,
         tariffPresets: mergedPresets,
-
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
-
-        // [NEW] 로드 시 새로운 필드 기본값 처리
         isRationalizationEnabled:
           data.input_data.isRationalizationEnabled ?? false,
         isSurplusDiscarded: data.input_data.isSurplusDiscarded ?? false,
-
+        isEcSelfConsumption: data.input_data.isEcSelfConsumption ?? false,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
+        config: { ...get().config, ...(data.input_data.config || {}) },
       });
-
       get().recalculateInvestment();
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
     } catch (error: any) {
@@ -841,18 +841,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestment: 0,
       recAveragePrice: 80,
       tariffPresets: DEFAULT_TARIFFS,
-
       maintenanceRate: 25.0,
       isMaintenanceAuto: true,
-      // [NEW] 리셋 시 초기화
       isRationalizationEnabled: false,
       isSurplusDiscarded: false,
+      isEcSelfConsumption: false,
     });
   },
 
-  // =================================================================
-  // [핵심 수정] 중앙 계산 로직 (Store)
-  // =================================================================
   getSimulationResults: () => {
     const state = get();
     const {
@@ -864,84 +860,78 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       selectedModel,
       useEc,
       financialSettings,
-      // [NEW] 상태값 가져오기
       isRationalizationEnabled,
       isSurplusDiscarded,
+      contractType,
+      isEcSelfConsumption,
     } = state;
 
-    // 1. 투자비 (원 단위 변환)
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
-    // 2. 발전량 총합 계산 (단순 방식: 용량 * 3.64 * 일수)
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
       return acc + capacityKw * 3.64 * days;
     }, 0);
 
-    // 3. 변수 선언
-    let volume_self = 0;
-    let volume_ec = 0;
-    let volume_surplus_final = 0;
+    let volume_self = 0,
+      volume_ec = 0,
+      volume_surplus_final = 0;
+    let revenue_saving = 0,
+      revenue_ec = 0,
+      revenue_surplus = 0,
+      totalRationalizationSavings = 0;
+    let annualGrossRevenue = 0;
 
-    let revenue_saving = 0;
-    let revenue_ec = 0;
-    let revenue_surplus = 0;
-    let totalRationalizationSavings = 0;
+    const isGap = contractType.includes('(갑)');
 
-    let annualGrossRevenue = 0; // 최종 연간 수익
-
-    // 4. 모델별 분기 처리
     if (selectedModel === 'KEPCO') {
-      // [KEPCO]: 100% 잉여 판매 (자가소비 0, EC 0, 합리화 0)
       volume_self = 0;
       volume_ec = 0;
-
-      // [NEW] 잉여전력 폐기 옵션 적용
       if (isSurplusDiscarded) {
-        volume_surplus_final = 0; // 폐기이므로 0
+        volume_surplus_final = 0;
         revenue_surplus = 0;
       } else {
-        volume_surplus_final = initialAnnualGen; // 전량 판매
+        volume_surplus_final = initialAnnualGen;
         revenue_surplus = initialAnnualGen * config.unit_price_kepco;
       }
-
-      revenue_saving = 0;
-      revenue_ec = 0;
-      totalRationalizationSavings = 0;
-
-      // KEPCO 총 수익 = 오직 잉여 판매 수익만
       annualGrossRevenue = revenue_surplus;
     } else {
-      // [RE100 / REC5]
-      const annualSelfConsumption = monthlyData.reduce(
+      let annualSelfConsumptionCalc = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
         0
       );
-      volume_self = Math.min(initialAnnualGen, annualSelfConsumption);
-      const rawSurplus = Math.max(0, initialAnnualGen - annualSelfConsumption);
+      if (isGap) annualSelfConsumptionCalc = 0;
+      volume_self = Math.min(initialAnnualGen, annualSelfConsumptionCalc);
 
-      const ecCapacityAnnual = truckCount * 100 * 4 * 365;
-      if (useEc) {
+      const rawSurplus = Math.max(
+        0,
+        initialAnnualGen - annualSelfConsumptionCalc
+      );
+      const cyclesPerDay = isEcSelfConsumption ? 1 : 4;
+      const ecCapacityAnnual = truckCount * 100 * cyclesPerDay * 365;
+
+      // [수정] 이동형(useEc) 또는 고정형(isEcSelfConsumption) 둘 중 하나라도 켜져 있으면 EC 계산
+      if (useEc || isEcSelfConsumption) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
 
-      // [NEW] 잉여전력 폐기 옵션 적용
-      if (isSurplusDiscarded) {
-        volume_surplus_final = 0;
-      } else {
-        volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
-      }
+      if (isSurplusDiscarded) volume_surplus_final = 0;
+      else volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
-      // 단가 적용
       const appliedSavingsPrice =
         state.unitPriceSavings || config.unit_price_savings;
       let appliedSellPrice = config.unit_price_kepco;
-      if (selectedModel === 'RE100')
-        appliedSellPrice = config.unit_price_ec_1_5;
-      if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
 
-      // 합리화 절감액 계산
+      if (isEcSelfConsumption) {
+        appliedSellPrice = config.unit_price_ec_self;
+      } else {
+        if (selectedModel === 'RE100')
+          appliedSellPrice = config.unit_price_ec_1_5;
+        if (selectedModel === 'REC5')
+          appliedSellPrice = config.unit_price_ec_5_0;
+      }
+
       const isEul = state.contractType.includes('(을)');
       const saving_base = rationalization.base_savings_manual || 0;
       const saving_light =
@@ -954,22 +944,17 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         (rationalization.max_eul - rationalization.max_gap) *
         rationalization.max_usage;
 
-      // [NEW] 합리화 옵션 토글 적용
       totalRationalizationSavings =
         isEul && isRationalizationEnabled
           ? saving_base + saving_light + saving_mid + saving_max
           : 0;
 
-      // 수익 항목 계산
       revenue_saving = volume_self * appliedSavingsPrice;
       revenue_ec = volume_ec * appliedSellPrice;
-
-      // [NEW] 잉여전력 폐기면 수익 0
       revenue_surplus = isSurplusDiscarded
         ? 0
         : volume_surplus_final * config.unit_price_kepco;
 
-      // 총 수익 합산
       annualGrossRevenue =
         revenue_saving +
         revenue_ec +
@@ -977,24 +962,24 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         totalRationalizationSavings;
     }
 
-    // 5. 비용 및 순수익 (Net)
+    // [수정] 인건비: 이동형일 때만 발생
     const laborCostWon =
-      truckCount > 0 && useEc && selectedModel !== 'KEPCO'
+      truckCount > 0 &&
+      useEc &&
+      selectedModel !== 'KEPCO' &&
+      !isEcSelfConsumption
         ? config.price_labor_ec * 100000000
         : 0;
-
     const annualMaintenanceCost =
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
     const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
 
-    // 6. 20년 수익 시뮬레이션
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
     const self_final_profit =
       (annualOperatingProfit * (1 - Math.pow(R, n))) / (1 - R);
 
-    // 7. 금융 모델 및 ROI (기존 로직 유지)
     const rps = financialSettings.rps;
     const rps_rate = rps.interestRate / 100;
     const rps_loan = totalInvestment * (rps.loanRatio / 100);
@@ -1059,11 +1044,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestmentUk,
       initialAnnualGen,
       annualSelfConsumption:
-        selectedModel === 'KEPCO'
+        selectedModel === 'KEPCO' || isGap
           ? 0
           : monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0),
       annualSurplus:
-        selectedModel === 'KEPCO'
+        selectedModel === 'KEPCO' || isGap
           ? initialAnnualGen
           : Math.max(
               0,

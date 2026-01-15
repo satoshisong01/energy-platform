@@ -7,6 +7,7 @@ import {
   LucideArrowRight,
   LucideWallet,
   LucideChevronsDown,
+  LucideBattery,
 } from 'lucide-react';
 
 export default function PreviewSummary() {
@@ -17,15 +18,14 @@ export default function PreviewSummary() {
     isRationalizationEnabled,
     isSurplusDiscarded,
     contractType,
+    isEcSelfConsumption,
   } = store;
 
-  // [합리화 절감액] Step4 수동 입력값 + 토글 상태 반영
+  // [합리화 절감액]
   const calculateRationalizationSavings = () => {
     if (!isRationalizationEnabled) return 0;
-
     const isEul = contractType.includes('(을)');
     if (!isEul) return 0;
-
     const saving_base = rationalization.base_savings_manual || 0;
     const diff_light = rationalization.light_eul - rationalization.light_gap;
     const saving_light = diff_light * rationalization.light_usage;
@@ -33,14 +33,12 @@ export default function PreviewSummary() {
     const saving_mid = diff_mid * rationalization.mid_usage;
     const diff_max = rationalization.max_eul - rationalization.max_gap;
     const saving_max = diff_max * rationalization.max_usage;
-
     return saving_base + saving_light + saving_mid + saving_max;
   };
 
   const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
-  // [공통] 발전량 (단순 계산)
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
@@ -48,7 +46,7 @@ export default function PreviewSummary() {
 
   const [showExpansion, setShowExpansion] = useState(false);
 
-  // [EC 적용 상태] Step4 상태와 연동하되, Preview에서 토글 가능
+  // [수정] 체크박스 상태는 오직 이동형(useEc)과 연동
   const [applyEc, setApplyEc] = useState(
     store.useEc && store.selectedModel !== 'KEPCO'
   );
@@ -58,11 +56,10 @@ export default function PreviewSummary() {
   }, [store.useEc, store.selectedModel]);
 
   const handleEcToggle = (checked: boolean) => {
-    setApplyEc(checked);
     store.setSimulationOption('useEc', checked);
   };
 
-  // ... (기초 데이터) ...
+  // ... (기본 데이터 계산 생략 없이 포함) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -82,7 +79,6 @@ export default function PreviewSummary() {
     const usageSaving =
       Math.min(autoGen, selfConsum) *
       (store.unitPriceSavings || config.unit_price_savings);
-
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
       0
@@ -109,9 +105,7 @@ export default function PreviewSummary() {
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
   const MAX_LIMIT = 80000000;
 
-  // --------------------------------------------------------------------------
-  // [1] 한전 데이터 독립 계산
-  // --------------------------------------------------------------------------
+  // [1] 한전 데이터
   const calculateKepcoData = () => {
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -123,10 +117,7 @@ export default function PreviewSummary() {
     const investUk = solarCost;
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
-
-    // 유지보수 비율: 자동/수동 체크
-    const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
-
+    const baseRate = 5.0;
     let appliedRate = baseRate;
     let tempCost = annualRevenue * (appliedRate / 100);
 
@@ -138,10 +129,8 @@ export default function PreviewSummary() {
         appliedRate = 0;
       }
     }
-
     const maintenanceCost = annualRevenue * (appliedRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
-
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
@@ -164,80 +153,84 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // --------------------------------------------------------------------------
-  // [2] 시나리오별 데이터 독립 계산
-  // --------------------------------------------------------------------------
+  // [2] 시나리오 데이터 (수정됨)
   const getScenarioData = (isPremium: boolean) => {
-    const activeTruckCount = applyEc
-      ? store.truckCount > 0
-        ? store.truckCount
-        : 3
-      : 0;
+    const isGap = contractType.includes('(갑)');
 
-    const ecCapacityAnnual = activeTruckCount * 100 * 4 * 365;
+    // EC 대수: 이동형이든 자가소비든 켜져 있으면 대수 적용
+    const activeTruckCount =
+      store.useEc || store.isEcSelfConsumption
+        ? store.truckCount > 0
+          ? store.truckCount
+          : 3
+        : 0;
+
+    const cycles = isEcSelfConsumption ? 1 : 4;
+    const ecCapacityAnnual = activeTruckCount * 100 * cycles * 365;
 
     const annualGen = simpleAnnualGen;
-    const annualSelf = store.monthlyData.reduce(
+    let annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
     );
-    const rawSurplus = Math.max(0, annualGen - annualSelf);
+    if (isGap) annualSelf = 0;
 
+    const rawSurplus = Math.max(0, annualGen - annualSelf);
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
     const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
 
     let targetEcPrice = 0;
     let modelName = '';
-
     let currentSolarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM')
       currentSolarPrice = config.price_solar_premium;
     else if (store.moduleTier === 'ECONOMY')
       currentSolarPrice = config.price_solar_economy;
 
-    if (isPremium) {
-      targetEcPrice = config.unit_price_ec_5_0;
-      modelName = 'REC 5.0 (예상)';
+    // [핵심 수정] 자가소비 모드면 프리미엄 여부 상관없이 자가소비 단가 최우선 적용
+    if (isEcSelfConsumption) {
+      targetEcPrice = config.unit_price_ec_self;
+      // 프리미엄일 때(오른쪽 비교군) 이름만 다르게 표시 (선택 사항)
+      modelName = isPremium
+        ? 'EC 자가소비 (수익 극대화)'
+        : 'EC 자가소비 (배터리)';
     } else {
-      targetEcPrice = config.unit_price_ec_1_5;
-      modelName = 'REC 1.5 (현행)';
+      // 자가소비 아닐 때(이동형) 기존 로직
+      if (isPremium) {
+        targetEcPrice = config.unit_price_ec_5_0;
+        modelName = 'REC 5.0 (예상)';
+      } else {
+        targetEcPrice = config.unit_price_ec_1_5;
+        modelName = 'REC 1.5 (현행)';
+      }
     }
 
     const revenue_saving =
       Math.min(annualGen, annualSelf) *
       (store.unitPriceSavings || config.unit_price_savings);
     const revenue_ec = volume_ec * targetEcPrice;
-
-    // 잉여 전력 폐기 옵션 적용
     const revenue_surplus = isSurplusDiscarded
       ? 0
       : volume_surplus_final * config.unit_price_kepco;
-
     const grossRevenue =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
       fixedRationalizationSavings;
 
-    const laborCostWon =
-      activeTruckCount > 0 ? config.price_labor_ec * 100000000 : 0;
+    // 인건비: 이동형일 때만
+    const isMovingEcMode = activeTruckCount > 0 && !isEcSelfConsumption;
+    const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    // 유지보수 비율 결정 로직
-    const baseRate = store.isMaintenanceAuto ? 25.0 : store.maintenanceRate;
+    // 유지보수율: 이동형 25%, 그 외 5% (한도 적용)
+    let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
+    let scenarioMaintenanceRate = targetBaseRate;
 
-    let scenarioMaintenanceRate = baseRate;
-    let tempTotalCost =
-      (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
-
-    if (tempTotalCost > MAX_LIMIT) {
-      const targetMaintenanceCost = Math.max(0, MAX_LIMIT - laborCostWon);
-      if (grossRevenue > 0) {
-        const rawRate = (targetMaintenanceCost / grossRevenue) * 100;
-        scenarioMaintenanceRate = Math.floor(rawRate * 100) / 100;
-      } else {
-        scenarioMaintenanceRate = 0;
-      }
-    }
+    const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
+    let revenueBasedCapRate =
+      grossRevenue > 0 ? (maxAvailableForOandM / grossRevenue) * 100 : 0;
+    scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
+    scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
 
     const maintenanceCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
@@ -245,8 +238,16 @@ export default function PreviewSummary() {
 
     const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = activeTruckCount * config.price_ec_unit;
-    const infraCost =
-      activeTruckCount > 0 ? config.price_tractor + config.price_platform : 0;
+
+    // 트랙터 비용: 이동형일 때만
+    let infraCost = 0;
+    if (activeTruckCount > 0) {
+      if (isEcSelfConsumption) {
+        infraCost = config.price_platform;
+      } else {
+        infraCost = config.price_tractor + config.price_platform;
+      }
+    }
 
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
@@ -263,7 +264,11 @@ export default function PreviewSummary() {
 
     return {
       title: isPremium
-        ? 'TYPE B. REC 5.0 Plan (수익 극대화)'
+        ? isEcSelfConsumption
+          ? 'TYPE B. EC 자가소비 Plan'
+          : 'TYPE B. REC 5.0 Plan (수익 극대화)'
+        : isEcSelfConsumption
+        ? 'TYPE A. EC 자가소비 Plan'
         : 'TYPE A. REC 1.5 Plan (자가소비형)',
       invest: investUk,
       ecCount: activeTruckCount,
@@ -279,7 +284,7 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
-  // 하단 무투자 모델
+  // 하단 비교 섹션 (기존 동일)
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
@@ -293,11 +298,9 @@ export default function PreviewSummary() {
   const subRevenueUk = results.sub_revenue_yr / 100000000;
   const subSavingRate =
     totalBillBefore > 0 ? (results.sub_revenue_yr / totalBillBefore) * 100 : 0;
-
   const simpleRec = 0.0;
   const re100Rec = results.rec_1000_rent;
   const subRec = results.rec_1000_sub;
-
   const toUk = (val: number) => val.toFixed(2);
 
   const renderRow = (d: typeof stdData) => (
@@ -331,7 +334,6 @@ export default function PreviewSummary() {
           </div>
         </div>
       </div>
-
       <div className={styles.arrowWrapper}>
         <LucideArrowRight
           size={20}
@@ -339,7 +341,6 @@ export default function PreviewSummary() {
           color={d.isPro ? '#f59e0b' : '#cbd5e1'}
         />
       </div>
-
       <div className={`${styles.card} ${styles.cardAnnual}`}>
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -365,7 +366,6 @@ export default function PreviewSummary() {
           </div>
         </div>
       </div>
-
       <div className={styles.middleConnect}>
         <div className={styles.connectContent}>
           <div className={styles.connectItem}>
@@ -385,7 +385,6 @@ export default function PreviewSummary() {
           <div className={styles.arrowHead}></div>
         </div>
       </div>
-
       <div
         className={`${styles.card} ${styles.cardTotal} ${
           d.isPro ? styles.cardHighlight : ''
@@ -429,23 +428,20 @@ export default function PreviewSummary() {
         <div className={styles.headerTitle}>
           01. RE100 에너지 발전 수익 분석 (종합)
         </div>
-
-        {/* [수정] 우측 컨트롤 영역 전체 래퍼 (flex) */}
         <div className="flex items-center gap-2">
-          {/* 1. 요금 합리화 배지 (no-print 없음 -> 인쇄 시 보임) */}
-          <div
-            className={`text-xs font-bold px-2 py-1 rounded border ${
-              contractType.includes('(을)') && isRationalizationEnabled
-                ? 'bg-blue-50 text-blue-600 border-blue-200'
-                : 'bg-slate-100 text-slate-500 border-slate-200'
-            }`}
-          >
-            {contractType.includes('(을)') && isRationalizationEnabled
-              ? '요금합리화 가능'
-              : '요금합리화 컨설팅 필요'}
-          </div>
-
-          {/* 2. 컨트롤 버튼 그룹 (no-print 적용 -> 인쇄 시 숨김) */}
+          {contractType.includes('(을)') && (
+            <div
+              className={`text-xs font-bold px-2 py-1 rounded border ${
+                isRationalizationEnabled
+                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}
+            >
+              {isRationalizationEnabled
+                ? '요금합리화 가능'
+                : '요금합리화 컨설팅 필요'}
+            </div>
+          )}
           <div className="flex items-center gap-2 no-print">
             <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
               <input
@@ -468,7 +464,16 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 한전 장기 계약 섹션 - 판매 불가(폐기) 시 숨김 */}
+      {/* 배터리형 적용 상태 배지 (자가소비 모드일 때만 노출) */}
+      {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
+        <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
+          <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
+            <LucideBattery size={14} /> EC 자가소비 (배터리형) 적용중
+          </span>
+        </div>
+      )}
+
+      {/* 한전 장기 계약 섹션 */}
       {!isSurplusDiscarded && (
         <div className={styles.kepcoSection}>
           <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
@@ -483,7 +488,6 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-
             <div className={styles.kepcoItem}>
               <span className={styles.kLabel}>연간 발전량</span>
               <span className={styles.kValueSm}>
@@ -493,7 +497,6 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-
             <div className={styles.kepcoItem}>
               <span className={styles.kLabel}>연간 수익/수익률</span>
               <div className="flex gap-2">
@@ -508,7 +511,6 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-
             <div className={styles.kepcoItem}>
               <span className={styles.kLabel}>20년간 수익</span>
               <div className="flex items-center gap-2">
@@ -554,7 +556,6 @@ export default function PreviewSummary() {
           <LucideWallet size={14} /> 초기 투자가 없는 모델 (연간 수익 / 절감율)
         </div>
         <div className={styles.compGrid}>
-          {/* 단순 지붕 임대 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>단순 지붕 임대</span>
             <span className={styles.compValue}>
@@ -571,8 +572,6 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
-
-          {/* RE100 임대 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>RE100 임대</span>
             <span className={styles.compValue}>
@@ -589,8 +588,6 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
-
-          {/* 구독 서비스 */}
           <div className={styles.compRow}>
             <span className={styles.compLabel}>구독 서비스</span>
             <span className={styles.compValue}>

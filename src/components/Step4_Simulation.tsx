@@ -17,21 +17,25 @@ import {
   LucideTrendingUp,
   LucideChevronDown,
   LucideChevronUp,
+  LucideBattery,
 } from 'lucide-react';
 
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
 export default function Step4_Simulation() {
   const store = useProposalStore();
-  const { config, rationalization, truckCount } = store;
+  const { config, rationalization, truckCount, contractType } = store;
 
   const [showRationalization, setShowRationalization] = useState(false);
-  const isCheckingCostRef = useRef(false);
-  const prevModelRef = useRef(store.selectedModel);
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
 
+  // [중요] 알림창 중복 방지용 Ref
+  const isConfirmingRef = useRef(false);
+
+  // 시뮬레이션 결과 실시간 구독
   const results = store.getSimulationResults();
 
+  // 1. 투자비 재계산 (입력값 변경 시)
   useEffect(() => {
     store.recalculateInvestment();
   }, [
@@ -41,7 +45,92 @@ export default function Step4_Simulation() {
     store.useEc,
     store.truckCount,
     store.config,
+    store.isEcSelfConsumption,
   ]);
+
+  // 2. 비용 자동 조정 로직 (Alert 중복 방지 강화)
+  useEffect(() => {
+    // 자동 조정 모드가 꺼져있으면 실행하지 않음
+    if (!store.isMaintenanceAuto) return;
+
+    // 이미 알림창이 떠 있거나 처리 중이면 중단 (중복 방지 핵심)
+    if (isConfirmingRef.current) return;
+
+    const totalRevenue = results.annualGrossRevenue;
+    const isKepco = store.selectedModel === 'KEPCO';
+
+    // 이동형 EC 모드 여부 확인
+    const isMovingEcMode =
+      !isKepco && store.useEc && !store.isEcSelfConsumption;
+
+    // 목표 비율 설정
+    const targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
+
+    // 8천만원 한도 비율 계산
+    const MAX_COST_LIMIT = 80000000;
+    const currentLaborCost = isMovingEcMode
+      ? config.price_labor_ec * 100000000
+      : 0;
+    const maxAvailableForOandM = Math.max(0, MAX_COST_LIMIT - currentLaborCost);
+
+    const revenueBasedCapRate =
+      totalRevenue > 0 ? (maxAvailableForOandM / totalRevenue) * 100 : 0;
+
+    // 최종 적용 비율
+    let finalRate = Math.min(targetBaseRate, revenueBasedCapRate);
+    finalRate = Math.round(finalRate * 10) / 10;
+
+    // 현재 값과 다를 경우 업데이트
+    if (Math.abs(store.maintenanceRate - finalRate) > 0.01) {
+      // 알림 끄기 상태면 즉시 반영
+      if (suppressCostAlerts) {
+        store.setSimulationOption('maintenanceRate', finalRate);
+      } else {
+        // [수정] 중복 방지 락 걸기
+        isConfirmingRef.current = true;
+
+        // 비동기로 처리하여 렌더링 충돌 방지
+        setTimeout(() => {
+          const currentCostEok = (
+            results.annualMaintenanceCost / 100000000
+          ).toFixed(2);
+          const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
+
+          let msg = '';
+          if (finalRate < targetBaseRate) {
+            msg = `[비용 한도 초과 알림]\n현재 운영비용(${currentCostEok}억원)이 한도(${limitCostEok}억원)를 초과했습니다.\n유지보수 비율을 ${store.maintenanceRate}% → ${finalRate}%로 하향 조정하시겠습니까?`;
+          } else {
+            msg = `[유지보수 비율 최적화]\n현재 운용 모드에 맞춰 유지보수 비율을 ${store.maintenanceRate}% → ${finalRate}%로 변경하시겠습니까?`;
+          }
+
+          if (window.confirm(msg)) {
+            store.setSimulationOption('maintenanceRate', finalRate);
+          } else {
+            // 취소 시 자동 조정을 끔
+            store.setSimulationOption('isMaintenanceAuto', false);
+          }
+
+          // [수정] 처리 완료 후 락 해제 (약간의 딜레이를 주어 연타 방지)
+          setTimeout(() => {
+            isConfirmingRef.current = false;
+          }, 500);
+        }, 100);
+      }
+    }
+  }, [
+    results.annualGrossRevenue, // 매출 변동 시
+    store.selectedModel, // 모델 변경 시
+    store.useEc, // EC 토글 시
+    store.isEcSelfConsumption, // 자가소비 변경 시
+    // store.isMaintenanceAuto는 포함하지 않음 (토글 시 즉시 반응보다 로직 안정성 우선)
+    // config.price_labor_ec,   // 인건비 변경 시
+    // store.maintenanceRate,   // 값 비교용
+    // suppressCostAlerts,
+    // store
+    // (의존성을 줄여서 불필요한 호출 방지)
+  ]);
+
+  // ... (이하 UI 렌더링 코드는 동일합니다) ...
 
   const renderRationalizationInput = (
     field: keyof RationalizationData,
@@ -89,7 +178,8 @@ export default function Step4_Simulation() {
   };
 
   const isKepco = store.selectedModel === 'KEPCO';
-  const isEul = store.contractType.includes('(을)');
+  const isEul = contractType.includes('(을)');
+  const isGap = contractType.includes('(갑)');
 
   const saving_base = rationalization.base_savings_manual || 0;
   const diff_light = rationalization.light_eul - rationalization.light_gap;
@@ -120,11 +210,19 @@ export default function Step4_Simulation() {
 
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
+
   let appliedSellPrice = config.unit_price_kepco;
-  if (store.selectedModel === 'RE100')
-    appliedSellPrice = config.unit_price_ec_1_5;
-  if (store.selectedModel === 'REC5')
-    appliedSellPrice = config.unit_price_ec_5_0;
+  let ecPriceLabel = 'EC-전력 판매 단가';
+
+  if (store.isEcSelfConsumption) {
+    appliedSellPrice = config.unit_price_ec_self;
+    ecPriceLabel = 'EC 자가소비 적용 단가';
+  } else {
+    if (store.selectedModel === 'RE100')
+      appliedSellPrice = config.unit_price_ec_1_5;
+    if (store.selectedModel === 'REC5')
+      appliedSellPrice = config.unit_price_ec_5_0;
+  }
 
   const totalInitialInvestment = results.totalInvestment / 100000000;
   const maintenanceTableValue = totalAnnualCost / 100000000;
@@ -136,11 +234,19 @@ export default function Step4_Simulation() {
   const solarCount = store.capacityKw / 100;
   const solarCost = solarCount * solarPrice;
   const ecCost =
-    !isKepco && store.useEc ? truckCount * config.price_ec_unit : 0;
+    !isKepco && (store.useEc || store.isEcSelfConsumption)
+      ? truckCount * config.price_ec_unit
+      : 0;
+
   const tractorCost =
-    !isKepco && truckCount > 0 && store.useEc ? 1 * config.price_tractor : 0;
+    !isKepco && truckCount > 0 && store.useEc && !store.isEcSelfConsumption
+      ? 1 * config.price_tractor
+      : 0;
+
   const platformCost =
-    !isKepco && truckCount > 0 && store.useEc ? 1 * config.price_platform : 0;
+    !isKepco && truckCount > 0 && (store.useEc || store.isEcSelfConsumption)
+      ? 1 * config.price_platform
+      : 0;
 
   let totalInvestment20Years = 0;
   if (isKepco) {
@@ -168,16 +274,6 @@ export default function Step4_Simulation() {
 
   const handleEcToggle = (checked: boolean) => {
     store.setSimulationOption('useEc', checked);
-    if (checked) {
-      let optimalCount = 1;
-      if (dailySurplus >= 1200) optimalCount = 3;
-      else if (dailySurplus >= 800) optimalCount = 2;
-      else optimalCount = 1;
-      store.setTruckCount(optimalCount);
-    } else {
-      store.setSimulationOption('maintenanceRate', 25.0);
-      isCheckingCostRef.current = false;
-    }
   };
 
   let ecRecommendation = '';
@@ -195,14 +291,15 @@ export default function Step4_Simulation() {
 
   let adviceMessage = null;
   let adviceType = 'info';
-  const maxTruckCapacity = truckCount * 100 * 4 * 365;
+  const cycles = store.isEcSelfConsumption ? 1 : 4;
+  const maxTruckCapacity = truckCount * 100 * cycles * 365;
 
-  if (!isKepco && store.useEc) {
+  if (!isKepco && (store.useEc || store.isEcSelfConsumption)) {
     if (truckCount > 0 && rawSurplus > maxTruckCapacity) {
       adviceType = 'warning';
       adviceMessage = (
         <span>
-          <b>⚠️ 설비 부족:</b> 잉여전력이 트럭 용량을 초과합니다. 트럭 추가를
+          <b>⚠️ 설비 부족:</b> 잉여전력이 EC 용량을 초과합니다. 대수 추가를
           고려하세요.
         </span>
       );
@@ -210,93 +307,20 @@ export default function Step4_Simulation() {
       adviceType = 'warning';
       adviceMessage = (
         <span>
-          <b>⚠️ 과잉 설비:</b> 트럭 용량이 잉여전력보다 너무 큽니다. 줄이는 것을
-          추천합니다.
+          <b>⚠️ 과잉 설비:</b> EC 용량이 잉여전력보다 너무 큽니다. 대수를 줄이는
+          것을 추천합니다.
         </span>
       );
     } else {
       adviceType = 'success';
       adviceMessage = (
         <span>
-          <b>✅ 최적 설계:</b> 잉여전력과 트럭 운용({truckCount}대) 밸런스가
+          <b>✅ 최적 설계:</b> 잉여전력과 EC 운용({truckCount}대) 밸런스가
           양호합니다.
         </span>
       );
     }
   }
-
-  useEffect(() => {
-    if (!totalRevenue || totalRevenue === 0) return;
-
-    const MAX_COST_LIMIT = 80000000;
-    const maxAllowedOandM = Math.max(0, MAX_COST_LIMIT - laborCostWon);
-    let calculatedRate = (maxAllowedOandM / totalRevenue) * 100;
-
-    calculatedRate = Math.min(25.0, calculatedRate);
-    calculatedRate = Math.round(calculatedRate * 100) / 100;
-
-    const currentRate = store.maintenanceRate;
-    const isModelChanged = prevModelRef.current !== store.selectedModel;
-
-    if (isModelChanged) {
-      if (store.isMaintenanceAuto) {
-        store.setSimulationOption('maintenanceRate', calculatedRate);
-      }
-      prevModelRef.current = store.selectedModel;
-      isCheckingCostRef.current = false;
-      return;
-    }
-
-    if (isCheckingCostRef.current) return;
-
-    if (currentRate > calculatedRate + 0.01) {
-      isCheckingCostRef.current = true;
-
-      const currentCostEok = (totalAnnualCost / 100000000).toFixed(2);
-      const limitCostEok = (MAX_COST_LIMIT / 100000000).toFixed(2);
-
-      const confirmMsg = `[비용 조정 알림]
-현재 운영비용(${currentCostEok}억원)이 한도(${limitCostEok}억원)를 초과했습니다.
-
-O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
-비용을 맞추시겠습니까?`;
-
-      if (suppressCostAlerts) {
-        store.setSimulationOption('maintenanceRate', calculatedRate);
-        setTimeout(() => {
-          isCheckingCostRef.current = false;
-        }, 300);
-      } else {
-        setTimeout(() => {
-          if (window.confirm(confirmMsg)) {
-            store.setSimulationOption('maintenanceRate', calculatedRate);
-          }
-          setTimeout(() => {
-            isCheckingCostRef.current = false;
-          }, 500);
-        }, 100);
-      }
-    } else if (
-      store.isMaintenanceAuto &&
-      currentRate < 25.0 &&
-      currentRate < calculatedRate - 0.01
-    ) {
-      isCheckingCostRef.current = true;
-      store.setSimulationOption('maintenanceRate', calculatedRate);
-      setTimeout(() => {
-        isCheckingCostRef.current = false;
-      }, 300);
-    }
-  }, [
-    totalRevenue,
-    laborCostWon,
-    totalAnnualCost,
-    store.maintenanceRate,
-    store.selectedModel,
-    store.isMaintenanceAuto,
-    suppressCostAlerts,
-    store,
-  ]);
 
   return (
     <div className={styles.container}>
@@ -367,7 +391,14 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
           <div className="flex justify-between w-full items-center">
             <div className="flex items-center gap-2">
               <LucideTruck size={18} className="text-blue-600" />
-              <span className={styles.toggleLabel}>에너지 캐리어(EC) 운용</span>
+              <span className={styles.toggleLabel}>
+                에너지 캐리어(EC) 운용
+                {store.isEcSelfConsumption && (
+                  <span className="ml-2 text-xs text-green-600 font-bold bg-green-100 px-2 py-0.5 rounded-full flex items-center gap-1 inline-flex">
+                    <LucideBattery size={12} /> 배터리형 적용됨
+                  </span>
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -376,7 +407,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
                 checked={store.useEc}
                 onChange={(e) => handleEcToggle(e.target.checked)}
               />
-              {store.useEc && (
+              {(store.useEc || store.isEcSelfConsumption) && (
                 <select
                   className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                   value={truckCount}
@@ -445,197 +476,194 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
         </div>
       )}
 
-      {/* [NEW] 전기요금 합리화 절감액 토글 섹션 */}
-      <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden bg-white">
-        <div className="p-3 bg-slate-100 flex items-center justify-between border-b border-slate-200">
-          <label
-            className={`flex items-center gap-2 text-sm font-bold cursor-pointer select-none ${
-              isEul ? 'text-slate-700' : 'text-slate-400'
-            }`}
-          >
-            <input
-              type="checkbox"
-              disabled={!isEul} // (을) 아니면 비활성화
-              checked={store.isRationalizationEnabled}
-              onChange={(e) =>
-                store.setSimulationOption(
-                  'isRationalizationEnabled',
-                  e.target.checked
-                )
-              }
-              className="w-4 h-4 accent-blue-600 disabled:bg-slate-200"
-            />
-            ⚡ 전기요금 합리화 절감액 계산 {isEul ? '' : '(을 전용)'}
-          </label>
-
-          {store.isRationalizationEnabled && (
-            <button
-              className="p-1 hover:bg-slate-200 rounded transition"
-              onClick={() => setShowRationalization(!showRationalization)}
+      {/* 전기요금 합리화 절감액 토글 섹션 */}
+      {!isGap && (
+        <div className="mt-4 border border-slate-300 rounded-lg overflow-hidden bg-white">
+          <div className="p-3 bg-slate-100 flex items-center justify-between border-b border-slate-200">
+            <label
+              className={`flex items-center gap-2 text-sm font-bold cursor-pointer select-none ${
+                isEul ? 'text-slate-700' : 'text-slate-400'
+              }`}
             >
-              {showRationalization ? (
-                <LucideChevronUp size={16} />
-              ) : (
-                <LucideChevronDown size={16} />
-              )}
-            </button>
+              <input
+                type="checkbox"
+                disabled={!isEul}
+                checked={store.isRationalizationEnabled}
+                onChange={(e) =>
+                  store.setSimulationOption(
+                    'isRationalizationEnabled',
+                    e.target.checked
+                  )
+                }
+                className="w-4 h-4 accent-blue-600 disabled:bg-slate-200"
+              />
+              ⚡ 전기요금 합리화 절감액 계산 {isEul ? '' : '(을 전용)'}
+            </label>
+
+            {store.isRationalizationEnabled && (
+              <button
+                className="p-1 hover:bg-slate-200 rounded transition"
+                onClick={() => setShowRationalization(!showRationalization)}
+              >
+                {showRationalization ? (
+                  <LucideChevronUp size={16} />
+                ) : (
+                  <LucideChevronDown size={16} />
+                )}
+              </button>
+            )}
+          </div>
+
+          {store.isRationalizationEnabled && showRationalization && (
+            <div className="p-4 bg-white text-xs">
+              <table className="w-full text-center border-collapse border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
+                    <th className="p-2 border-r border-slate-300">구분</th>
+                    <th className="p-2 border-r border-slate-300">을 (원)</th>
+                    <th className="p-2 border-r border-slate-300">갑 (원)</th>
+                    <th className="p-2 border-r border-slate-300 bg-yellow-50">
+                      차이
+                    </th>
+                    <th className="p-2 border-r border-slate-300">
+                      연간사용량 (kW)
+                    </th>
+                    <th className="p-2 bg-blue-50">절감액 (원)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {/* 기본료 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                      기본료
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('base_eul')}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('base_gap')}
+                    </td>
+                    <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
+                      {(
+                        rationalization.base_eul - rationalization.base_gap
+                      ).toLocaleString()}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      <input
+                        type="text"
+                        className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={rationalization.base_usage.toLocaleString()}
+                        onChange={handleBaseUsageChange}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="연간사용량"
+                      />
+                    </td>
+                    <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
+                      <input
+                        type="text"
+                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={Math.round(saving_base).toLocaleString()}
+                        onChange={handleBaseSavingsChange}
+                        onFocus={(e) => e.target.select()}
+                      />
+                    </td>
+                  </tr>
+                  {/* 경부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                      경부하
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('light_eul')}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('light_gap')}
+                    </td>
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                      {(
+                        rationalization.light_eul - rationalization.light_gap
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('light_usage')}
+                    </td>
+                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                      {Math.round(saving_light).toLocaleString()}
+                    </td>
+                  </tr>
+                  {/* 중간부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                      중간부하
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('mid_eul')}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('mid_gap')}
+                    </td>
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                      {(
+                        rationalization.mid_eul - rationalization.mid_gap
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('mid_usage')}
+                    </td>
+                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                      {Math.round(saving_mid).toLocaleString()}
+                    </td>
+                  </tr>
+                  {/* 최대부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
+                      최대부하
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('max_eul')}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('max_gap')}
+                    </td>
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
+                      {(
+                        rationalization.max_eul - rationalization.max_gap
+                      ).toLocaleString(undefined, {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })}
+                    </td>
+                    <td className="p-1 border-r border-slate-300">
+                      {renderRationalizationInput('max_usage')}
+                    </td>
+                    <td className="p-2 bg-blue-50 font-bold text-blue-600">
+                      {Math.round(saving_max).toLocaleString()}
+                    </td>
+                  </tr>
+                  {/* 합계 */}
+                  <tr className="border-t-2 border-slate-300">
+                    <td
+                      colSpan={5}
+                      className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
+                    >
+                      합계 (절감액)
+                    </td>
+                    <td className="p-2 font-extrabold text-blue-700 bg-blue-100">
+                      {Math.round(totalRationalizationSavings).toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-
-        {/* 체크되고, 펼쳐졌을 때만 내용 표시 */}
-        {store.isRationalizationEnabled && showRationalization && (
-          <div className="p-4 bg-white text-xs">
-            <table className="w-full text-center border-collapse border border-slate-300">
-              <thead>
-                <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
-                  <th className="p-2 border-r border-slate-300">구분</th>
-                  <th className="p-2 border-r border-slate-300">을 (원)</th>
-                  <th className="p-2 border-r border-slate-300">갑 (원)</th>
-                  <th className="p-2 border-r border-slate-300 bg-yellow-50">
-                    차이
-                  </th>
-                  <th className="p-2 border-r border-slate-300">
-                    연간사용량 (kW)
-                  </th>
-                  <th className="p-2 bg-blue-50">절감액 (원)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {/* 기본료 */}
-                <tr className="border-b border-slate-300">
-                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                    기본료
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('base_eul')}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('base_gap')}
-                  </td>
-                  <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
-                    {(
-                      rationalization.base_eul - rationalization.base_gap
-                    ).toLocaleString()}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    <input
-                      type="text"
-                      className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={rationalization.base_usage.toLocaleString()}
-                      onChange={handleBaseUsageChange}
-                      onFocus={(e) => e.target.select()}
-                      placeholder="연간사용량"
-                    />
-                  </td>
-                  <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
-                    <input
-                      type="text"
-                      className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={Math.round(saving_base).toLocaleString()}
-                      onChange={handleBaseSavingsChange}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </td>
-                </tr>
-
-                {/* 경부하 */}
-                <tr className="border-b border-slate-300">
-                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                    경부하
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('light_eul')}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('light_gap')}
-                  </td>
-                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                    {(
-                      rationalization.light_eul - rationalization.light_gap
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('light_usage')}
-                  </td>
-                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                    {Math.round(saving_light).toLocaleString()}
-                  </td>
-                </tr>
-
-                {/* 중간부하 */}
-                <tr className="border-b border-slate-300">
-                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                    중간부하
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('mid_eul')}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('mid_gap')}
-                  </td>
-                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                    {(
-                      rationalization.mid_eul - rationalization.mid_gap
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('mid_usage')}
-                  </td>
-                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                    {Math.round(saving_mid).toLocaleString()}
-                  </td>
-                </tr>
-
-                {/* 최대부하 */}
-                <tr className="border-b border-slate-300">
-                  <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
-                    최대부하
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('max_eul')}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('max_gap')}
-                  </td>
-                  <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
-                    {(
-                      rationalization.max_eul - rationalization.max_gap
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })}
-                  </td>
-                  <td className="p-1 border-r border-slate-300">
-                    {renderRationalizationInput('max_usage')}
-                  </td>
-                  <td className="p-2 bg-blue-50 font-bold text-blue-600">
-                    {Math.round(saving_max).toLocaleString()}
-                  </td>
-                </tr>
-
-                {/* 합계 */}
-                <tr className="border-t-2 border-slate-300">
-                  <td
-                    colSpan={5}
-                    className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
-                  >
-                    합계 (절감액)
-                  </td>
-                  <td className="p-2 font-extrabold text-blue-700 bg-blue-100">
-                    {Math.round(totalRationalizationSavings).toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* 투자비 테이블 */}
       <div className="mt-6">
@@ -699,7 +727,10 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
                     {solarCount.toFixed(2)} ea
                   </td>
                   <td>{store.useEc ? truckCount : 0} ea</td>
+
+                  {/* 자가소비(배터리형)면 트랙터 수량 0 */}
                   <td>{tractorCost > 0 ? 1 : 0} ea</td>
+
                   <td>{platformCost > 0 ? 1 : 0} set</td>
                   <td>1 set</td>
                 </tr>
@@ -757,7 +788,6 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
             <span className="text-sm font-bold">연간 수익 상세 분석</span>
           </div>
 
-          {/* [NEW] 잉여 전력 폐기 체크박스 */}
           {!isKepco && (
             <label className="flex items-center gap-1 cursor-pointer select-none bg-red-50 px-2 py-1 rounded border border-red-100">
               <input
@@ -776,7 +806,7 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
                   store.isSurplusDiscarded ? 'text-red-600' : 'text-slate-400'
                 }`}
               >
-                잉여 전력 폐기 (판매 불가)
+                인입 불가능/잉여 전력 폐기 (판매 불가)
               </span>
             </label>
           )}
@@ -881,7 +911,8 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
                 </span>
               </div>
               <div className={styles.row}>
-                <span className={styles.dLabel}>EC-전력 판매 단가</span>
+                {/* [수정] EC 판매 단가 라벨 및 값 */}
+                <span className={styles.dLabel}>{ecPriceLabel}</span>
                 <span>
                   <span className={styles.dVal}>
                     {appliedSellPrice.toLocaleString()}
@@ -955,7 +986,8 @@ O&M 비율을 ${currentRate}% → ${calculatedRate}%로 조정하여
               <span>○ O&M ({store.maintenanceRate}%)</span>
               <span>-{(maintenanceBase / 100000000).toFixed(2)} 억원</span>
             </div>
-            {laborCostWon > 0 && (
+
+            {laborCostWon > 0 && !store.isEcSelfConsumption && (
               <div className="flex justify-between text-xs text-red-500">
                 <span>○ EC 운영 인건비 ({truckCount}대)</span>
                 <span>-{(laborCostWon / 100000000).toFixed(2)} 억원</span>

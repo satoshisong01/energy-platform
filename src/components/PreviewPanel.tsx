@@ -27,10 +27,8 @@ const round2 = (num: number) => Math.round(num * 100) / 100;
 const PageFooter = ({ page }: { page: number }) => {
   const store = useProposalStore();
 
-  // 현재 설정(EC 여부, 트럭 대수 등)이 반영된 '자동 생성 파일명' 사용
   const rawName = store.getProposalFileName();
 
-  // 폴더명 제거 로직
   const displayName = rawName.includes('/')
     ? rawName.split('/').pop()
     : rawName;
@@ -45,7 +43,7 @@ const PageFooter = ({ page }: { page: number }) => {
 
 export default function PreviewPanel() {
   const store = useProposalStore();
-  const { config, rationalization, truckCount } = store;
+  const { config, rationalization, truckCount, isSurplusDiscarded } = store;
 
   const handlePrint = () => {
     window.print();
@@ -167,14 +165,36 @@ export default function PreviewPanel() {
 
         <div className={styles.titleSection} style={{ width: '100%' }}>
           <div>
-            <h1 className={styles.mainTitle}>
-              <span className={styles.highlight}>RE100</span> 에너지 발전시스템
-              분석자료
+            <h1
+              className={styles.mainTitle}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+            >
+              <span>
+                <span className={styles.highlight}>RE100</span> 에너지
+                발전시스템 분석자료
+              </span>
+
+              {/* [NEW] 한전 판매 가능/불가능 상태 표시 배지 */}
+              <span
+                style={{
+                  fontSize: '0.5em',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: isSurplusDiscarded
+                    ? '1px solid #ef4444'
+                    : '1px solid #3b82f6',
+                  backgroundColor: isSurplusDiscarded ? '#fef2f2' : '#eff6ff',
+                  color: isSurplusDiscarded ? '#dc2626' : '#2563eb',
+                  verticalAlign: 'middle',
+                  fontWeight: 'bold',
+                }}
+              >
+                {isSurplusDiscarded ? '한전 판매 불가능' : '한전 판매 가능'}
+              </span>
             </h1>
             <h2 className={styles.subTitle}>
               - {store.clientName} (태양광발전{' '}
               {store.capacityKw.toLocaleString()}kW
-              {/* [수정] EC가 켜져있고 대수가 있으면 표시 */}
               {store.useEc && store.truckCount > 0
                 ? `, EC ${store.truckCount}대`
                 : ''}

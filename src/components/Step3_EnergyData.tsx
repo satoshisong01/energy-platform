@@ -273,6 +273,9 @@ export default function Step3_EnergyData() {
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
 
+  // [NEW] (갑) 요금제 확인용 변수
+  const isGap = store.contractType.includes('(갑)');
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -326,12 +329,14 @@ export default function Step3_EnergyData() {
               <div
                 className={styles.inputReadOnly}
                 style={{
-                  backgroundColor: '#f0fdf4',
-                  color: '#16a34a',
-                  borderColor: '#bbf7d0',
+                  // [수정] (갑)이면 회색, 아니면 녹색 스타일 적용
+                  backgroundColor: isGap ? '#f3f4f6' : '#f0fdf4',
+                  color: isGap ? '#9ca3af' : '#16a34a',
+                  borderColor: isGap ? '#e5e7eb' : '#bbf7d0',
                 }}
               >
-                {store.unitPriceSavings.toLocaleString()} 원
+                {/* [수정] (갑)이면 0 표시, 아니면 실제 값 표시 */}
+                {isGap ? '0' : store.unitPriceSavings.toLocaleString()} 원
               </div>
             </div>
           </div>

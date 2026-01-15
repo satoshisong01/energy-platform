@@ -210,7 +210,7 @@ export default function PreviewRequirementsTable() {
                 </div>
                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
                   <li>ㅇ 80% 20,000원/kW</li>
-                  <li>ㅇ 일시불 인센티브</li>
+                  <li>ㅇ 일시불 인센티브 지급가능</li>
                 </ul>
               </td>
 
