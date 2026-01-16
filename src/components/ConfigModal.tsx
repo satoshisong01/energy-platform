@@ -257,7 +257,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           store={store}
                         />
 
-                        {/* EC 판매 (REC 1.5) + 자가소비 체크박스 통합 */}
+                        {/* EC 판매 (REC 1.5) + 자가소비 체크박스 및 대수 입력 */}
                         <div className="col-span-1 p-3 border border-slate-200 rounded bg-slate-50">
                           {/* 1. 이동형 (기본) */}
                           <div
@@ -283,31 +283,56 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                             />
                           </div>
 
-                          {/* 2. 자가소비형 (체크박스) */}
+                          {/* 2. 자가소비형 (체크박스 + 대수 입력) */}
                           <div className="pt-2 border-t border-slate-200">
-                            <label className="flex items-center gap-2 cursor-pointer select-none mb-2">
-                              <input
-                                type="checkbox"
-                                className="w-4 h-4 accent-green-600"
-                                checked={store.isEcSelfConsumption}
-                                onChange={(e) =>
-                                  store.setSimulationOption(
-                                    'isEcSelfConsumption',
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              <span
-                                className={`text-xs font-bold flex items-center gap-1 ${
-                                  store.isEcSelfConsumption
-                                    ? 'text-green-700'
-                                    : 'text-gray-500'
-                                }`}
-                              >
-                                <LucideBattery size={14} />
-                                EC 자가소비 (배터리형) 적용
-                              </span>
-                            </label>
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 accent-green-600"
+                                  checked={store.isEcSelfConsumption}
+                                  onChange={(e) =>
+                                    store.setSimulationOption(
+                                      'isEcSelfConsumption',
+                                      e.target.checked
+                                    )
+                                  }
+                                />
+                                <span
+                                  className={`text-xs font-bold flex items-center gap-1 ${
+                                    store.isEcSelfConsumption
+                                      ? 'text-green-700'
+                                      : 'text-gray-500'
+                                  }`}
+                                >
+                                  <LucideBattery size={14} />
+                                  EC 자가소비 (배터리형) 적용
+                                </span>
+                              </label>
+
+                              {/* [NEW] 자가소비 모드 활성화 시 대수 입력창 */}
+                              {store.isEcSelfConsumption && (
+                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    className="w-12 p-1 text-center border border-green-300 rounded text-xs font-bold text-green-700 focus:ring-1 focus:ring-green-500 outline-none bg-white"
+                                    value={store.ecSelfConsumptionCount}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value);
+                                      if (val > 0)
+                                        store.setSimulationOption(
+                                          'ecSelfConsumptionCount',
+                                          val
+                                        );
+                                    }}
+                                  />
+                                  <span className="text-[10px] text-green-600 font-bold">
+                                    대
+                                  </span>
+                                </div>
+                              )}
+                            </div>
 
                             {store.isEcSelfConsumption && (
                               <div className="pl-6 animate-in fade-in slide-in-from-top-1 duration-200">

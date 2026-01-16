@@ -19,6 +19,7 @@ export default function PreviewSummary() {
     isSurplusDiscarded,
     contractType,
     isEcSelfConsumption,
+    ecSelfConsumptionCount, // [NEW] 고정형 댓수 가져오기
   } = store;
 
   // [합리화 절감액]
@@ -39,6 +40,7 @@ export default function PreviewSummary() {
   const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
+  // [공통] 발전량
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
@@ -46,20 +48,24 @@ export default function PreviewSummary() {
 
   const [showExpansion, setShowExpansion] = useState(false);
 
-  // [수정] 체크박스 상태는 오직 이동형(useEc)과 연동
+  // [EC 적용 상태]
   const [applyEc, setApplyEc] = useState(
-    store.useEc && store.selectedModel !== 'KEPCO'
+    (store.useEc || store.isEcSelfConsumption) &&
+      store.selectedModel !== 'KEPCO'
   );
 
   useEffect(() => {
-    setApplyEc(store.useEc && store.selectedModel !== 'KEPCO');
-  }, [store.useEc, store.selectedModel]);
+    setApplyEc(
+      (store.useEc || store.isEcSelfConsumption) &&
+        store.selectedModel !== 'KEPCO'
+    );
+  }, [store.useEc, store.isEcSelfConsumption, store.selectedModel]);
 
   const handleEcToggle = (checked: boolean) => {
     store.setSimulationOption('useEc', checked);
   };
 
-  // ... (기본 데이터 계산 생략 없이 포함) ...
+  // ... (기초 데이터) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -153,20 +159,20 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // [2] 시나리오 데이터 (수정됨)
+  // [2] 시나리오별 데이터 (수정됨)
   const getScenarioData = (isPremium: boolean) => {
     const isGap = contractType.includes('(갑)');
 
-    // EC 대수: 이동형이든 자가소비든 켜져 있으면 대수 적용
-    const activeTruckCount =
-      store.useEc || store.isEcSelfConsumption
-        ? store.truckCount > 0
-          ? store.truckCount
-          : 3
-        : 0;
+    // [핵심 수정] EC 대수 계산: 자가소비면 설정값, 이동형이면 트럭수
+    let activeEcCount = 0;
+    if (isEcSelfConsumption) {
+      activeEcCount = ecSelfConsumptionCount || 1;
+    } else if (store.useEc) {
+      activeEcCount = store.truckCount > 0 ? store.truckCount : 3;
+    }
 
     const cycles = isEcSelfConsumption ? 1 : 4;
-    const ecCapacityAnnual = activeTruckCount * 100 * cycles * 365;
+    const ecCapacityAnnual = activeEcCount * 100 * cycles * 365;
 
     const annualGen = simpleAnnualGen;
     let annualSelf = store.monthlyData.reduce(
@@ -187,15 +193,12 @@ export default function PreviewSummary() {
     else if (store.moduleTier === 'ECONOMY')
       currentSolarPrice = config.price_solar_economy;
 
-    // [핵심 수정] 자가소비 모드면 프리미엄 여부 상관없이 자가소비 단가 최우선 적용
     if (isEcSelfConsumption) {
       targetEcPrice = config.unit_price_ec_self;
-      // 프리미엄일 때(오른쪽 비교군) 이름만 다르게 표시 (선택 사항)
       modelName = isPremium
         ? 'EC 자가소비 (수익 극대화)'
         : 'EC 자가소비 (배터리)';
     } else {
-      // 자가소비 아닐 때(이동형) 기존 로직
       if (isPremium) {
         targetEcPrice = config.unit_price_ec_5_0;
         modelName = 'REC 5.0 (예상)';
@@ -219,10 +222,10 @@ export default function PreviewSummary() {
       fixedRationalizationSavings;
 
     // 인건비: 이동형일 때만
-    const isMovingEcMode = activeTruckCount > 0 && !isEcSelfConsumption;
+    const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
     const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    // 유지보수율: 이동형 25%, 그 외 5% (한도 적용)
+    // 유지보수율: 이동형 25%, 그 외 5%
     let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
     let scenarioMaintenanceRate = targetBaseRate;
 
@@ -236,17 +239,17 @@ export default function PreviewSummary() {
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
+    // [핵심 수정] 투자비 계산 (store.ts 로직과 일치)
     const solarCost = (capacity / 100) * currentSolarPrice;
-    const ecCost = activeTruckCount * config.price_ec_unit;
+    const ecCost = activeEcCount * config.price_ec_unit;
 
-    // 트랙터 비용: 이동형일 때만
     let infraCost = 0;
-    if (activeTruckCount > 0) {
-      if (isEcSelfConsumption) {
-        infraCost = config.price_platform;
-      } else {
-        infraCost = config.price_tractor + config.price_platform;
-      }
+    if (isEcSelfConsumption) {
+      // 자가소비: 트랙터 0원, 플랫폼 1식 포함
+      infraCost = config.price_platform;
+    } else if (store.useEc && activeEcCount > 0) {
+      // 이동형: 트랙터 포함, 플랫폼 포함
+      infraCost = config.price_tractor + config.price_platform;
     }
 
     const investUk = solarCost + ecCost + infraCost;
@@ -271,7 +274,7 @@ export default function PreviewSummary() {
         ? 'TYPE A. EC 자가소비 Plan'
         : 'TYPE A. REC 1.5 Plan (자가소비형)',
       invest: investUk,
-      ecCount: activeTruckCount,
+      ecCount: activeEcCount,
       annualProfit: annualNetProfitWon / 100000000,
       totalProfit20: totalNet20Won / 100000000,
       roiYears: roiYears,
@@ -284,7 +287,7 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
-  // 하단 비교 섹션 (기존 동일)
+  // 하단 비교 섹션
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
@@ -468,7 +471,8 @@ export default function PreviewSummary() {
       {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
         <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
           <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
-            <LucideBattery size={14} /> EC 자가소비 (배터리형) 적용중
+            <LucideBattery size={14} /> EC 자가소비 (배터리형) 적용중 (
+            {ecSelfConsumptionCount}대)
           </span>
         </div>
       )}

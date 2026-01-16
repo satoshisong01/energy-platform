@@ -168,6 +168,7 @@ interface ProposalState {
   isRationalizationEnabled: boolean;
   isSurplusDiscarded: boolean;
   isEcSelfConsumption: boolean;
+  ecSelfConsumptionCount: number;
   degradationRate: number;
   totalInvestment: number;
   recAveragePrice: number;
@@ -295,7 +296,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     unit_price_savings: 136.47,
     unit_price_ec_1_5: 261.45,
     unit_price_ec_5_0: 441.15,
-    unit_price_ec_self: 155.5,
+    unit_price_ec_self: 153.73,
     loan_rate_rps: 1.75,
     loan_rate_factoring: 5.1,
     rental_price_per_kw: 20000,
@@ -322,15 +323,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
 
-  // [수정] 초기값: EC 끄기, 트럭 0대, 유지보수 5%
   useEc: false,
   truckCount: 0,
   maintenanceRate: 5.0,
-
   isMaintenanceAuto: true,
   isRationalizationEnabled: false,
   isSurplusDiscarded: false,
   isEcSelfConsumption: false,
+  ecSelfConsumptionCount: 1,
   degradationRate: 0.5,
   totalInvestment: 0,
   recAveragePrice: 80,
@@ -377,8 +377,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ),
     })),
   setMonthlyData: (data) => set({ monthlyData: data }),
-
-  // [수정된 간결한 버전]
   copyJanToAll: () =>
     set((state) => {
       const jan = state.monthlyData[0];
@@ -387,7 +385,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return { monthlyData: newData };
     }),
-
   copyFieldToAll: (field) =>
     set((state) => {
       const firstVal = state.monthlyData[0][field];
@@ -406,34 +403,24 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => {
       let newState = { ...state, [field]: value };
 
-      // 1. [설정창] 'EC 자가소비(고정형)' 체크 변경 시
       if (field === 'isEcSelfConsumption') {
         if (value === true) {
-          // 고정형 ON: 이동형(useEc)은 끄지만, 용량 계산은 필요하므로 useEc를 false로 두되
-          // 계산 로직에서는 isEcSelfConsumption이 true면 계산하도록 함.
-          // UI상 체크박스를 끄기 위해 useEc = false.
           newState.useEc = false;
-          newState.maintenanceRate = 5.0; // 고정형은 5%
-
-          // 고정형이라도 용량 계산을 위해 truckCount는 유지 (없으면 3으로 세팅)
-          if (state.truckCount === 0) newState.truckCount = 3;
+          newState.maintenanceRate = 5.0;
+          newState.truckCount = 0;
+          if (!state.ecSelfConsumptionCount)
+            newState.ecSelfConsumptionCount = 1;
         } else {
-          // 고정형 OFF
-          // 이동형이 꺼져있다면 그냥 5% (아무것도 안씀)
           newState.maintenanceRate = 5.0;
         }
       }
 
-      // 2. [Step 4] '에너지 캐리어(이동형)' 체크 변경 시
       if (field === 'useEc') {
         if (value === true) {
-          // 이동형 ON: 고정형(자가소비)은 끔
           newState.isEcSelfConsumption = false;
-          newState.maintenanceRate = 25.0; // 이동형은 25% (한도 적용은 useEffect가 함)
-
+          newState.maintenanceRate = 25.0;
           if (state.truckCount === 0) newState.truckCount = 3;
         } else {
-          // 이동형 OFF: 자가소비도 끄고, 유지보수는 5%
           newState.isEcSelfConsumption = false;
           newState.maintenanceRate = 5.0;
           newState.truckCount = 0;
@@ -487,6 +474,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       selectedModel,
       truckCount,
       isEcSelfConsumption,
+      ecSelfConsumptionCount,
     } = state;
     let unitPrice = config.price_solar_standard;
     if (moduleTier === 'PREMIUM') unitPrice = config.price_solar_premium;
@@ -497,18 +485,19 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       tractorCost = 0,
       platformCost = 0;
 
-    // EC 비용 계산: 이동형(useEc)이거나 고정형(isEcSelfConsumption)일 때
-    if ((useEc || isEcSelfConsumption) && selectedModel !== 'KEPCO') {
-      ecCost = truckCount * config.price_ec_unit;
-
-      // 고정형이면 트랙터 비용 0원
+    if (selectedModel !== 'KEPCO') {
       if (isEcSelfConsumption) {
+        // [수정] 자가소비(고정형): 트랙터 0원, 운영플랫폼 1세트 비용 포함
+        const count = ecSelfConsumptionCount || 1;
+        ecCost = count * config.price_ec_unit;
         tractorCost = 0;
-      } else {
+        platformCost = config.price_platform; // 1세트 비용 적용
+      } else if (useEc) {
+        // 이동형
+        ecCost = truckCount * config.price_ec_unit;
         tractorCost = truckCount > 0 ? config.price_tractor : 0;
+        platformCost = truckCount > 0 ? config.price_platform : 0;
       }
-
-      platformCost = truckCount > 0 ? config.price_platform : 0;
     }
     set({ totalInvestment: solarCost + ecCost + tractorCost + platformCost });
   },
@@ -529,7 +518,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const isEcActive =
       (state.useEc || state.isEcSelfConsumption) &&
       state.selectedModel !== 'KEPCO';
-    const ecPart = isEcActive ? `_EC${state.truckCount}대` : '';
+    const ecPart = isEcActive
+      ? `_EC${state.useEc ? state.truckCount : state.ecSelfConsumptionCount}대`
+      : '';
     return `분석자료_${state.clientName}_${state.capacityKw}kW${ecPart}_${dateStr}`;
   },
 
@@ -580,6 +571,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
       isEcSelfConsumption: state.isEcSelfConsumption,
+      ecSelfConsumptionCount: state.ecSelfConsumptionCount,
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -660,6 +652,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
       isEcSelfConsumption: state.isEcSelfConsumption,
+      ecSelfConsumptionCount: state.ecSelfConsumptionCount,
       degradationRate: state.degradationRate,
       config: state.config,
       financialSettings: state.financialSettings,
@@ -780,6 +773,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           data.input_data.isRationalizationEnabled ?? false,
         isSurplusDiscarded: data.input_data.isSurplusDiscarded ?? false,
         isEcSelfConsumption: data.input_data.isEcSelfConsumption ?? false,
+        ecSelfConsumptionCount: data.input_data.ecSelfConsumptionCount ?? 1,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
         config: { ...get().config, ...(data.input_data.config || {}) },
@@ -802,7 +796,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
-  // [수정] 초기화 시에도 5% / EC 끔
   resetProposal: () => {
     set({
       siteImage: null,
@@ -838,12 +831,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         max_gap: 136.47,
         max_usage: 0,
       },
-
-      // [Reset Defaults]
       useEc: false,
       truckCount: 0,
       maintenanceRate: 5.0,
-
       totalInvestment: 0,
       recAveragePrice: 80,
       tariffPresets: DEFAULT_TARIFFS,
@@ -851,6 +841,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isRationalizationEnabled: false,
       isSurplusDiscarded: false,
       isEcSelfConsumption: false,
+      ecSelfConsumptionCount: 1,
     });
   },
 
@@ -869,6 +860,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isSurplusDiscarded,
       contractType,
       isEcSelfConsumption,
+      ecSelfConsumptionCount,
     } = state;
 
     const totalInvestment = state.totalInvestment * 100000000;
@@ -913,10 +905,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         0,
         initialAnnualGen - annualSelfConsumptionCalc
       );
-      const cyclesPerDay = isEcSelfConsumption ? 1 : 4;
-      const ecCapacityAnnual = truckCount * 100 * cyclesPerDay * 365;
 
-      // EC 충전량 계산 (이동형 or 고정형)
+      // 용량 계산 분기
+      let ecCapacityAnnual = 0;
+      if (isEcSelfConsumption) {
+        const count = ecSelfConsumptionCount || 1;
+        ecCapacityAnnual = count * 100 * 1 * 365;
+      } else {
+        ecCapacityAnnual = truckCount * 100 * 4 * 365;
+      }
+
       if (useEc || isEcSelfConsumption) {
         volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
       }
@@ -967,7 +965,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         totalRationalizationSavings;
     }
 
-    // 인건비: 이동형일 때만 발생
     const laborCostWon =
       truckCount > 0 &&
       useEc &&
