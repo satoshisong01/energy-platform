@@ -18,8 +18,13 @@ const EmptyCell = () => (
 
 export default function PreviewComparisonTable() {
   const store = useProposalStore();
-  const { config, recAveragePrice, setRecAveragePrice, financialSettings } =
-    store;
+  const {
+    config,
+    recAveragePrice,
+    setRecAveragePrice,
+    financialSettings,
+    isEcSelfConsumption, // [NEW] 자가소비 여부 가져오기
+  } = store;
 
   // 스토어에서 계산된 결과 가져오기
   const results = store.getSimulationResults();
@@ -45,6 +50,9 @@ export default function PreviewComparisonTable() {
     repaymentPeriod: 9,
   };
 
+  // [NEW] 임대/구독 표시 여부 (자가소비면 숨김)
+  const showRentSub = !isEcSelfConsumption;
+
   return (
     <div className={styles.container}>
       <div
@@ -57,7 +65,7 @@ export default function PreviewComparisonTable() {
       >
         <h3 className={styles.title}>05. 금융 모델별 수익성 비교 분석</h3>
 
-        {/* [NEW] REC 평균가격 조정 입력 (인쇄 시 숨김) */}
+        {/* REC 평균가격 조정 입력 (인쇄 시 숨김) */}
         <div className="no-print flex items-center gap-2 text-sm bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
           <span className="font-bold text-yellow-800">REC 평균가격:</span>
           <input
@@ -73,7 +81,7 @@ export default function PreviewComparisonTable() {
       <div className={styles.tableWrapper}>
         <table className={styles.compTable}>
           <thead>
-            <tr className='text-[15px]'>
+            <tr className="text-[15px]">
               <th className={styles.colLabel}>구분</th>
               <th className={styles.colSelf}>
                 자기자본
@@ -90,16 +98,22 @@ export default function PreviewComparisonTable() {
                 <br />
                 <span className={styles.subText}>{fac.interestRate}%</span>
               </th>
-              <th className={styles.colRental}>
-                RE100연계
-                <br />
-                <span className={styles.subText}>임대형</span>
-              </th>
-              <th className={styles.colSub}>
-                구독
-                <br />
-                <span className={styles.subText}>서비스</span>
-              </th>
+
+              {/* [수정] 조건부 렌더링 */}
+              {showRentSub && (
+                <>
+                  <th className={styles.colRental}>
+                    RE100연계
+                    <br />
+                    <span className={styles.subText}>임대형</span>
+                  </th>
+                  <th className={styles.colSub}>
+                    구독
+                    <br />
+                    <span className={styles.subText}>서비스</span>
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -127,8 +141,12 @@ export default function PreviewComparisonTable() {
                   (자부담 {100 - fac.loanRatio}%)
                 </span>
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
 
             {/* 2. 연간 수입 (Gross) */}
@@ -145,12 +163,16 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.val} text-[15px]`}>
                 {toWon(results.annualGrossRevenue)} 원
               </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.rental_revenue_yr)} 원
-              </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.sub_revenue_yr)} 원
-              </td>
+              {showRentSub && (
+                <>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.rental_revenue_yr)} 원
+                  </td>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.sub_revenue_yr)} 원
+                  </td>
+                </>
+              )}
             </tr>
 
             {/* O&M */}
@@ -167,8 +189,12 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valRed} text-[15px]`}>
                 -{toWon(results.annualMaintenanceCost)} 원
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
 
             {/* 3. 연간 영업 이익 (Net) */}
@@ -188,17 +214,20 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valBlue} text-[15px]`}>
                 {toWon(results.annualOperatingProfit)} 원
               </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.rental_revenue_yr)} 원
-              </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.sub_revenue_yr)} 원
-              </td>
+              {showRentSub && (
+                <>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.rental_revenue_yr)} 원
+                  </td>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.sub_revenue_yr)} 원
+                  </td>
+                </>
+              )}
             </tr>
 
             {/* 4. 금융 비용 */}
             <tr>
-              {/* RPS 거치 기간 라벨 동적 생성 */}
               <td className={`${styles.rowLabel} text-[13px]`}>
                 RPS / 연 이자 (1~{rps.gracePeriod}년)
               </td>
@@ -207,11 +236,14 @@ export default function PreviewComparisonTable() {
                 -{toWon(results.rps_interest_only)} 원
               </td>
               <EmptyCell />
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
-              {/* RPS 상환 기간 라벨 동적 생성 */}
               <td className={`${styles.rowLabel} text-[13px]`}>
                 RPS / 연 상환액 ({rps.gracePeriod + 1}~
                 {rps.gracePeriod + rps.repaymentPeriod}년)
@@ -221,11 +253,14 @@ export default function PreviewComparisonTable() {
                 -{toWon(Math.abs(results.rps_pmt))} 원
               </td>
               <EmptyCell />
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
-              {/* 팩토링 거치 기간 라벨 동적 생성 */}
               <td className={`${styles.rowLabel} text-[13px]`}>
                 팩토링 / 연 이자 (
                 {fac.gracePeriod === 1 ? '1' : `1~${fac.gracePeriod}`}년)
@@ -235,11 +270,14 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valRed} text-[15px]`}>
                 -{toWon(results.fac_interest_only)} 원
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
-              {/* 팩토링 상환 기간 라벨 동적 생성 */}
               <td className={`${styles.rowLabel} text-[13px]`}>
                 팩토링 / 연 상환액 ({fac.gracePeriod + 1}~
                 {fac.gracePeriod + fac.repaymentPeriod}년)
@@ -249,8 +287,12 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valRed} text-[15px]`}>
                 -{toWon(Math.abs(results.fac_pmt))} 원
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
 
             {/* 순수익 구간 */}
@@ -263,8 +305,12 @@ export default function PreviewComparisonTable() {
                 {toWon(results.rps_net_1_5)} 원
               </td>
               <EmptyCell />
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
               <td className={`${styles.rowLabel} text-[13px]`}>
@@ -276,8 +322,12 @@ export default function PreviewComparisonTable() {
                 {toWon(results.rps_net_6_15)} 원
               </td>
               <EmptyCell />
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
               <td className={`${styles.rowLabel} text-[13px]`}>
@@ -289,8 +339,12 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valBlue} text-[15px]`}>
                 {toWon(results.fac_net_1)} 원
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
             <tr>
               <td className={`${styles.rowLabel} text-[13px]`}>
@@ -302,8 +356,12 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.valBlue} text-[15px]`}>
                 {toWon(results.fac_net_2_10)} 원
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
 
             {/* 1 REC */}
@@ -329,18 +387,22 @@ export default function PreviewComparisonTable() {
               >
                 {results.rec_1000_common.toFixed(1)}
               </td>
-              <td
-                className={`${styles.val} text-[15px]`}
-                style={{ color: '#2563eb' }}
-              >
-                {results.rec_1000_rent.toFixed(1)}
-              </td>
-              <td
-                className={`${styles.val} text-[15px]`}
-                style={{ color: '#2563eb' }}
-              >
-                {results.rec_1000_sub.toFixed(1)}
-              </td>
+              {showRentSub && (
+                <>
+                  <td
+                    className={`${styles.val} text-[15px]`}
+                    style={{ color: '#2563eb' }}
+                  >
+                    {results.rec_1000_rent.toFixed(1)}
+                  </td>
+                  <td
+                    className={`${styles.val} text-[15px]`}
+                    style={{ color: '#2563eb' }}
+                  >
+                    {results.rec_1000_sub.toFixed(1)}
+                  </td>
+                </>
+              )}
             </tr>
 
             {/* REC 수익/연간 */}
@@ -360,12 +422,16 @@ export default function PreviewComparisonTable() {
               <td className={`${styles.val} text-[15px]`}>
                 {toWon(results.rec_annual_common)} 원
               </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.rec_annual_rent)} 원
-              </td>
-              <td className={`${styles.val} text-[15px]`}>
-                {toWon(results.rec_annual_sub)} 원
-              </td>
+              {showRentSub && (
+                <>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.rec_annual_rent)} 원
+                  </td>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.rec_annual_sub)} 원
+                  </td>
+                </>
+              )}
             </tr>
 
             {/* 5. 최종 결과 (20년 누적) */}
@@ -374,10 +440,16 @@ export default function PreviewComparisonTable() {
               <td>{(results.self_final_profit / 100000000).toFixed(2)} 억원</td>
               <td>{(results.rps_final_profit / 100000000).toFixed(2)} 억원</td>
               <td>{(results.fac_final_profit / 100000000).toFixed(2)} 억원</td>
-              <td>
-                {(results.rental_final_profit / 100000000).toFixed(2)} 억원
-              </td>
-              <td>{(results.sub_final_profit / 100000000).toFixed(2)} 억원</td>
+              {showRentSub && (
+                <>
+                  <td>
+                    {(results.rental_final_profit / 100000000).toFixed(2)} 억원
+                  </td>
+                  <td>
+                    {(results.sub_final_profit / 100000000).toFixed(2)} 억원
+                  </td>
+                </>
+              )}
             </tr>
 
             {/* 20년 수익 평균치 */}
@@ -386,8 +458,12 @@ export default function PreviewComparisonTable() {
               <td className={styles.val}>{toWon(self_avg)} 원</td>
               <td className={styles.val}>{toWon(rps_avg)} 원</td>
               <td className={styles.val}>{toWon(fac_avg)} 원</td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
 
             {/* ROI */}
@@ -402,8 +478,12 @@ export default function PreviewComparisonTable() {
               <td className={styles.val}>
                 {results.fac_roi_years.toFixed(2)} 년
               </td>
-              <EmptyCell />
-              <EmptyCell />
+              {showRentSub && (
+                <>
+                  <EmptyCell />
+                  <EmptyCell />
+                </>
+              )}
             </tr>
           </tbody>
         </table>

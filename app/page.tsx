@@ -27,6 +27,7 @@ import ProposalListModal from '../src/components/ProposalListModal';
 // [수정] App Router에서는 next/navigation을 사용해야 합니다.
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/client';
+import Step0_Summary from '@/src/components/Step0_Summary';
 
 export default function Home() {
   const router = useRouter();
@@ -203,6 +204,7 @@ export default function Home() {
             </div>
 
             <div className={styles.formContent}>
+              <Step0_Summary />
               <Step1_BasicInfo />
               <Step2_SiteInfo />
               <Step3_EnergyData />

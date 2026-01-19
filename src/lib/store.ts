@@ -163,8 +163,11 @@ interface ProposalState {
   moduleTier: ModuleTier;
   useEc: boolean;
   truckCount: number;
+
   maintenanceRate: number;
   isMaintenanceAuto: boolean;
+  maintenanceCostLimit: number; // [NEW] 유지보수비 한도 금액 (원 단위)
+
   isRationalizationEnabled: boolean;
   isSurplusDiscarded: boolean;
   isEcSelfConsumption: boolean;
@@ -296,7 +299,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     unit_price_savings: 136.47,
     unit_price_ec_1_5: 261.45,
     unit_price_ec_5_0: 441.15,
-    unit_price_ec_self: 153.73,
+    unit_price_ec_self: 155.5,
     loan_rate_rps: 1.75,
     loan_rate_factoring: 5.1,
     rental_price_per_kw: 20000,
@@ -327,6 +330,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   truckCount: 0,
   maintenanceRate: 5.0,
   isMaintenanceAuto: true,
+  maintenanceCostLimit: 80000000, // [NEW] 초기값 8천만원
   isRationalizationEnabled: false,
   isSurplusDiscarded: false,
   isEcSelfConsumption: false,
@@ -487,13 +491,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     if (selectedModel !== 'KEPCO') {
       if (isEcSelfConsumption) {
-        // [수정] 자가소비(고정형): 트랙터 0원, 운영플랫폼 1세트 비용 포함
         const count = ecSelfConsumptionCount || 1;
         ecCost = count * config.price_ec_unit;
         tractorCost = 0;
-        platformCost = config.price_platform; // 1세트 비용 적용
+        platformCost = config.price_platform;
       } else if (useEc) {
-        // 이동형
         ecCost = truckCount * config.price_ec_unit;
         tractorCost = truckCount > 0 ? config.price_tractor : 0;
         platformCost = truckCount > 0 ? config.price_platform : 0;
@@ -568,6 +570,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: state.truckCount,
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
+      maintenanceCostLimit: state.maintenanceCostLimit, // [NEW]
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
       isEcSelfConsumption: state.isEcSelfConsumption,
@@ -649,6 +652,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       truckCount: state.truckCount,
       maintenanceRate: state.maintenanceRate,
       isMaintenanceAuto: state.isMaintenanceAuto,
+      maintenanceCostLimit: state.maintenanceCostLimit, // [NEW]
       isRationalizationEnabled: state.isRationalizationEnabled,
       isSurplusDiscarded: state.isSurplusDiscarded,
       isEcSelfConsumption: state.isEcSelfConsumption,
@@ -769,6 +773,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         financialSettings: mergedFinancial,
         tariffPresets: mergedPresets,
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
+        maintenanceCostLimit: data.input_data.maintenanceCostLimit ?? 80000000, // [NEW] 불러오기 시 처리
         isRationalizationEnabled:
           data.input_data.isRationalizationEnabled ?? false,
         isSurplusDiscarded: data.input_data.isSurplusDiscarded ?? false,
@@ -838,6 +843,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       recAveragePrice: 80,
       tariffPresets: DEFAULT_TARIFFS,
       isMaintenanceAuto: true,
+      maintenanceCostLimit: 80000000, // [NEW] 리셋 시 8천만원
       isRationalizationEnabled: false,
       isSurplusDiscarded: false,
       isEcSelfConsumption: false,
@@ -845,8 +851,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     });
   },
 
+  // ... (getSimulationResults 코드는 동일, store state에서 값을 가져오므로 자동으로 반영됨)
   getSimulationResults: () => {
     const state = get();
+    // ... (기존 로직)
+    // 아래 코드는 기존과 동일하므로 생략하지 않고 필요한 부분만 보여드림
+    // ...
+    // ...
+    // ... (복사 붙여넣기 하실때는 위 resetProposal 까지만 수정하시면 됩니다. getSimulationResults 내부는 동일)
+    // 하지만 전체 코드를 요청하셨으므로 아래에 이어서 작성합니다.
     const {
       config,
       rationalization,
@@ -906,7 +919,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         initialAnnualGen - annualSelfConsumptionCalc
       );
 
-      // 용량 계산 분기
       let ecCapacityAnnual = 0;
       if (isEcSelfConsumption) {
         const count = ecSelfConsumptionCount || 1;

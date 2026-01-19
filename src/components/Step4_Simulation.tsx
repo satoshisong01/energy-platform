@@ -28,10 +28,14 @@ export default function Step4_Simulation() {
 
   const [showRationalization, setShowRationalization] = useState(false);
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
+
+  // [중요] 알림창 중복 방지용 Ref
   const isConfirmingRef = useRef(false);
 
+  // 시뮬레이션 결과 실시간 구독
   const results = store.getSimulationResults();
 
+  // 1. 투자비 재계산 (입력값 변경 시)
   useEffect(() => {
     store.recalculateInvestment();
   }, [
@@ -42,38 +46,58 @@ export default function Step4_Simulation() {
     store.truckCount,
     store.config,
     store.isEcSelfConsumption,
-    store.ecSelfConsumptionCount, // [NEW] 대수 변경 시 재계산
+    store.ecSelfConsumptionCount, // [복구] 대수 변경 시 재계산 필수
   ]);
 
-  // 비용 자동 조정 로직
+  // 2. 비용 자동 조정 로직 (Alert 중복 방지 및 초기 0원 문제 해결)
   useEffect(() => {
+    // 자동 조정 모드가 꺼져있으면 실행하지 않음
     if (!store.isMaintenanceAuto) return;
+
     const totalRevenue = results.annualGrossRevenue;
+
+    // [핵심] 매출이 0원이면(초기 로딩 상태) 계산을 중단하여 불필요한 알림 방지
     if (totalRevenue === 0) return;
+
+    // 이미 알림창이 떠 있거나 처리 중이면 중단
     if (isConfirmingRef.current) return;
 
     const isKepco = store.selectedModel === 'KEPCO';
+
+    // 이동형 EC 모드 여부 확인
     const isMovingEcMode =
       !isKepco && store.useEc && !store.isEcSelfConsumption;
 
+    // 목표 비율 설정
     const targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
-    const MAX_COST_LIMIT = 80000000;
+
+    // [수정] 사용자가 설정한 한도 적용 (기본 8천만원)
+    const MAX_COST_LIMIT = store.maintenanceCostLimit;
+
+    // 이동형일 때만 인건비 발생, 한도에서 차감
     const currentLaborCost = isMovingEcMode
       ? config.price_labor_ec * 100000000
       : 0;
     const maxAvailableForOandM = Math.max(0, MAX_COST_LIMIT - currentLaborCost);
 
-    let revenueBasedCapRate =
+    // 매출 대비 최대 가능 비율
+    const revenueBasedCapRate =
       totalRevenue > 0 ? (maxAvailableForOandM / totalRevenue) * 100 : 0;
 
+    // 최종 적용 비율
     let finalRate = Math.min(targetBaseRate, revenueBasedCapRate);
     finalRate = Math.round(finalRate * 10) / 10;
 
+    // 현재 값과 다를 경우 업데이트
     if (Math.abs(store.maintenanceRate - finalRate) > 0.01) {
+      // 알림 끄기 상태면 즉시 반영
       if (suppressCostAlerts) {
         store.setSimulationOption('maintenanceRate', finalRate);
       } else {
+        // [수정] 중복 방지 락 걸기
         isConfirmingRef.current = true;
+
+        // 비동기로 처리하여 렌더링 충돌 방지
         setTimeout(() => {
           const currentCostEok = (
             results.annualMaintenanceCost / 100000000
@@ -90,8 +114,11 @@ export default function Step4_Simulation() {
           if (window.confirm(msg)) {
             store.setSimulationOption('maintenanceRate', finalRate);
           } else {
+            // 취소 시 자동 조정을 끔
             store.setSimulationOption('isMaintenanceAuto', false);
           }
+
+          // [수정] 처리 완료 후 락 해제
           setTimeout(() => {
             isConfirmingRef.current = false;
           }, 500);
@@ -99,16 +126,18 @@ export default function Step4_Simulation() {
       }
     }
   }, [
-    results.annualGrossRevenue,
-    store.selectedModel,
-    store.useEc,
-    store.isEcSelfConsumption,
-    store.isMaintenanceAuto,
-    config.price_labor_ec,
-    store.maintenanceRate,
+    results.annualGrossRevenue, // 매출 변동 시
+    store.selectedModel, // 모델 변경 시
+    store.useEc, // EC 토글 시
+    store.isEcSelfConsumption, // 자가소비 변경 시
+    store.isMaintenanceAuto, // 자동모드 토글 시
+    config.price_labor_ec, // 인건비 변경 시
+    store.maintenanceCostLimit, // [NEW] 한도 금액 변경 시 재계산
+    store.maintenanceRate, // 값 비교용
     suppressCostAlerts,
   ]);
 
+  // --- UI 렌더링 함수들 ---
   const renderRationalizationInput = (
     field: keyof RationalizationData,
     placeholder: string = '0',
@@ -163,6 +192,7 @@ export default function Step4_Simulation() {
   const saving_light = diff_light * rationalization.light_usage;
   const saving_mid = diff_mid * rationalization.mid_usage;
   const saving_max = diff_max * rationalization.max_usage;
+
   const totalRationalizationSavings =
     saving_base + saving_light + saving_mid + saving_max;
 
@@ -171,6 +201,7 @@ export default function Step4_Simulation() {
   const volume_ec = results.volume_ec;
   const volume_surplus = results.volume_surplus_final;
   const rawSurplus = results.annualSurplus;
+
   const revenue_saving = results.revenue_saving;
   const revenue_ec = results.revenue_ec;
   const revenue_surplus = results.revenue_surplus;
@@ -183,6 +214,7 @@ export default function Step4_Simulation() {
 
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
+
   let appliedSellPrice = config.unit_price_kepco;
   let ecPriceLabel = 'EC-전력 판매 단가';
 
@@ -217,9 +249,8 @@ export default function Step4_Simulation() {
       ? 1 * config.price_tractor
       : 0;
 
-  // [수정] 자가소비 모드(isEcSelfConsumption)일 때도 플랫폼 비용(1set)은 무조건 포함
   const platformCost =
-    !isKepco && ((truckCount > 0 && store.useEc) || store.isEcSelfConsumption)
+    !isKepco && truckCount > 0 && (store.useEc || store.isEcSelfConsumption)
       ? 1 * config.price_platform
       : 0;
 
@@ -297,7 +328,6 @@ export default function Step4_Simulation() {
         );
       }
     } else {
-      // 자가소비형 메시지
       adviceType = 'success';
       adviceMessage = (
         <span>
@@ -393,8 +423,7 @@ export default function Step4_Simulation() {
                 checked={store.useEc}
                 onChange={(e) => handleEcToggle(e.target.checked)}
               />
-              {/* 이동형일 때 트럭 대수 선택 */}
-              {store.useEc && (
+              {(store.useEc || store.isEcSelfConsumption) && (
                 <select
                   className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                   value={truckCount}
@@ -485,6 +514,7 @@ export default function Step4_Simulation() {
               />
               ⚡ 전기요금 합리화 절감액 계산 {isEul ? '' : '(을 전용)'}
             </label>
+
             {store.isRationalizationEnabled && (
               <button
                 className="p-1 hover:bg-slate-200 rounded transition"
@@ -498,65 +528,73 @@ export default function Step4_Simulation() {
               </button>
             )}
           </div>
+
           {store.isRationalizationEnabled && showRationalization && (
             <div className="p-4 bg-white text-xs">
               <table className="w-full text-center border-collapse border border-slate-300">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-300">
-                    <th className="p-2 border-r">구분</th>
-                    <th className="p-2 border-r">을 (원)</th>
-                    <th className="p-2 border-r">갑 (원)</th>
-                    <th className="p-2 border-r bg-yellow-50">차이</th>
-                    <th className="p-2 border-r">연간사용량 (kW)</th>
+                    <th className="p-2 border-r border-slate-300">구분</th>
+                    <th className="p-2 border-r border-slate-300">을 (원)</th>
+                    <th className="p-2 border-r border-slate-300">갑 (원)</th>
+                    <th className="p-2 border-r border-slate-300 bg-yellow-50">
+                      차이
+                    </th>
+                    <th className="p-2 border-r border-slate-300">
+                      연간사용량 (kW)
+                    </th>
                     <th className="p-2 bg-blue-50">절감액 (원)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr className="border-b">
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  {/* 기본료 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       기본료
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('base_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('base_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold text-red-500 bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold text-red-500 bg-yellow-50">
                       {(
                         rationalization.base_eul - rationalization.base_gap
                       ).toLocaleString()}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       <input
                         type="text"
-                        className="w-full text-center border rounded p-1"
+                        className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
                         value={rationalization.base_usage.toLocaleString()}
                         onChange={handleBaseUsageChange}
                         onFocus={(e) => e.target.select()}
+                        placeholder="연간사용량"
                       />
                     </td>
-                    <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l">
+                    <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
                       <input
                         type="text"
-                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1"
+                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
                         value={Math.round(saving_base).toLocaleString()}
                         onChange={handleBaseSavingsChange}
                         onFocus={(e) => e.target.select()}
                       />
                     </td>
                   </tr>
-                  <tr className="border-b">
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  {/* 경부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       경부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.light_eul - rationalization.light_gap
                       ).toLocaleString(undefined, {
@@ -564,24 +602,25 @@ export default function Step4_Simulation() {
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_light).toLocaleString()}
                     </td>
                   </tr>
-                  <tr className="border-b">
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  {/* 중간부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       중간부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.mid_eul - rationalization.mid_gap
                       ).toLocaleString(undefined, {
@@ -589,24 +628,25 @@ export default function Step4_Simulation() {
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_mid).toLocaleString()}
                     </td>
                   </tr>
-                  <tr className="border-b">
-                    <td className="p-2 font-bold bg-slate-50 border-r">
+                  {/* 최대부하 */}
+                  <tr className="border-b border-slate-300">
+                    <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       최대부하
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_eul')}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_gap')}
                     </td>
-                    <td className="p-2 border-r font-bold bg-yellow-50">
+                    <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.max_eul - rationalization.max_gap
                       ).toLocaleString(undefined, {
@@ -614,17 +654,18 @@ export default function Step4_Simulation() {
                         maximumFractionDigits: 1,
                       })}
                     </td>
-                    <td className="p-1 border-r">
+                    <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_usage')}
                     </td>
                     <td className="p-2 bg-blue-50 font-bold text-blue-600">
                       {Math.round(saving_max).toLocaleString()}
                     </td>
                   </tr>
-                  <tr className="border-t-2">
+                  {/* 합계 */}
+                  <tr className="border-t-2 border-slate-300">
                     <td
                       colSpan={5}
-                      className="p-2 font-bold text-right bg-slate-100 border-r"
+                      className="p-2 font-bold text-right bg-slate-100 border-r border-slate-300"
                     >
                       합계 (절감액)
                     </td>
@@ -708,7 +749,10 @@ export default function Step4_Simulation() {
                       : 0}{' '}
                     ea
                   </td>
+
+                  {/* 자가소비(배터리형)면 트랙터 수량 0 */}
                   <td>{tractorCost > 0 ? 1 : 0} ea</td>
+
                   <td>{platformCost > 0 ? 1 : 0} set</td>
                   <td>1 set</td>
                 </tr>
@@ -765,6 +809,7 @@ export default function Step4_Simulation() {
             <LucideTrendingUp size={16} />
             <span className="text-sm font-bold">연간 수익 상세 분석</span>
           </div>
+
           {!isKepco && (
             <label className="flex items-center gap-1 cursor-pointer select-none bg-red-50 px-2 py-1 rounded border border-red-100">
               <input
@@ -799,6 +844,7 @@ export default function Step4_Simulation() {
               <span className={styles.dUnit}>kWh</span>
             </span>
           </div>
+
           {isKepco ? (
             <>
               <div className={`${styles.row} ${styles.bgYellow}`}>
@@ -861,11 +907,13 @@ export default function Step4_Simulation() {
                   kWh
                 </span>
               </div>
+
               <div className={styles.detailHeader}>
                 {store.selectedModel === 'REC5'
                   ? 'REC 5.0 기준'
                   : 'REC 1.5 기준'}
               </div>
+
               <div className={`${styles.row} ${styles.bgYellow}`}>
                 <span className={styles.dLabel}>최대부하 절감 단가</span>
                 <span>
@@ -893,7 +941,9 @@ export default function Step4_Simulation() {
                   원
                 </span>
               </div>
+
               <div className="border-t border-slate-200 my-1"></div>
+
               <div className={`${styles.row} font-bold text-slate-800`}>
                 <span>연간 수익총액</span>
                 <span>
@@ -936,7 +986,7 @@ export default function Step4_Simulation() {
                     store.isSurplusDiscarded ? 'text-red-500 font-bold' : ''
                   }`}
                 >
-                  {(revenue_surplus / 100000000).toFixed(2)} 억원{' '}
+                  {(revenue_surplus / 100000000).toFixed(2)} 억원
                   {store.isSurplusDiscarded && ' (폐기)'}
                 </span>
               </div>
@@ -957,6 +1007,7 @@ export default function Step4_Simulation() {
               <span>○ O&M ({store.maintenanceRate}%)</span>
               <span>-{(maintenanceBase / 100000000).toFixed(2)} 억원</span>
             </div>
+
             {laborCostWon > 0 && !store.isEcSelfConsumption && (
               <div className="flex justify-between text-xs text-red-500">
                 <span>○ EC 운영 인건비 ({truckCount}대)</span>
@@ -964,12 +1015,14 @@ export default function Step4_Simulation() {
               </div>
             )}
           </div>
+
           <div className="flex justify-between p-3 bg-green-50 border-t border-green-100">
             <span className="font-bold text-green-900">20년 수익총액</span>
             <span className="font-bold text-green-800">
               {(totalNetProfit20Years / 100000000).toFixed(2)} 억원
             </span>
           </div>
+
           <div className="bg-yellow-400 text-black font-bold text-center py-2">
             수익률 (ROI) {roiPercent.toFixed(1)}% (회수{' '}
             {isFinite(roiYears) ? roiYears.toFixed(1) : '-'}년)

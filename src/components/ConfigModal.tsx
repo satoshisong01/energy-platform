@@ -310,7 +310,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                 </span>
                               </label>
 
-                              {/* [NEW] 자가소비 모드 활성화 시 대수 입력창 */}
                               {store.isEcSelfConsumption && (
                                 <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
                                   <input
@@ -375,28 +374,54 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                             <label className="block text-xs font-semibold text-gray-500">
                               유지보수 비율
                             </label>
-                            <label className="flex items-center gap-1 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                className="w-3 h-3 accent-blue-600 rounded"
-                                checked={store.isMaintenanceAuto}
-                                onChange={(e) =>
-                                  store.setSimulationOption(
-                                    'isMaintenanceAuto',
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              <span
-                                className={`text-[10px] font-bold transition-colors ${
-                                  store.isMaintenanceAuto
-                                    ? 'text-blue-600'
-                                    : 'text-gray-400'
-                                }`}
-                              >
-                                자동 조정
-                              </span>
-                            </label>
+
+                            {/* [NEW] 자동 조정 체크박스 + 한도 입력란 */}
+                            <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-1 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  className="w-3 h-3 accent-blue-600 rounded"
+                                  checked={store.isMaintenanceAuto}
+                                  onChange={(e) =>
+                                    store.setSimulationOption(
+                                      'isMaintenanceAuto',
+                                      e.target.checked
+                                    )
+                                  }
+                                />
+                                <span
+                                  className={`text-[10px] font-bold transition-colors ${
+                                    store.isMaintenanceAuto
+                                      ? 'text-blue-600'
+                                      : 'text-gray-400'
+                                  }`}
+                                >
+                                  자동 조정
+                                </span>
+                              </label>
+
+                              {store.isMaintenanceAuto && (
+                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
+                                  <span className="text-[10px] text-gray-400">
+                                    한도:
+                                  </span>
+                                  <input
+                                    type="number"
+                                    className="w-20 p-0.5 text-[10px] text-right border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                                    value={store.maintenanceCostLimit}
+                                    onChange={(e) =>
+                                      store.setSimulationOption(
+                                        'maintenanceCostLimit',
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                  />
+                                  <span className="text-[10px] text-gray-400">
+                                    원
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="relative">
                             <input
@@ -421,8 +446,18 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           </div>
                           <div className="mt-1 text-[10px] text-gray-400">
                             {store.isMaintenanceAuto
-                              ? '* 한도(8천만원) 내에서 최대 25%까지 자동 최적화됩니다.'
-                              : '* 사용자가 입력한 비율로 고정됩니다. (단, 8천만원 초과 시 조정됨)'}
+                              ? `* 한도(${
+                                  Math.round(
+                                    (store.maintenanceCostLimit / 100000000) *
+                                      10
+                                  ) / 10
+                                }억원) 내에서 최대 25%까지 자동 최적화됩니다.`
+                              : `* 사용자가 입력한 비율로 고정됩니다. (단, ${
+                                  Math.round(
+                                    (store.maintenanceCostLimit / 100000000) *
+                                      10
+                                  ) / 10
+                                }억원 초과 시 조정됨)`}
                           </div>
                         </div>
 

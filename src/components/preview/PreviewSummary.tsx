@@ -19,10 +19,9 @@ export default function PreviewSummary() {
     isSurplusDiscarded,
     contractType,
     isEcSelfConsumption,
-    ecSelfConsumptionCount, // [NEW] 고정형 댓수 가져오기
+    ecSelfConsumptionCount,
   } = store;
 
-  // [합리화 절감액]
   const calculateRationalizationSavings = () => {
     if (!isRationalizationEnabled) return 0;
     const isEul = contractType.includes('(을)');
@@ -40,7 +39,6 @@ export default function PreviewSummary() {
   const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
-  // [공통] 발전량
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * 3.64 * days;
@@ -48,7 +46,6 @@ export default function PreviewSummary() {
 
   const [showExpansion, setShowExpansion] = useState(false);
 
-  // [EC 적용 상태]
   const [applyEc, setApplyEc] = useState(
     (store.useEc || store.isEcSelfConsumption) &&
       store.selectedModel !== 'KEPCO'
@@ -65,7 +62,6 @@ export default function PreviewSummary() {
     store.setSimulationOption('useEc', checked);
   };
 
-  // ... (기초 데이터) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -109,9 +105,10 @@ export default function PreviewSummary() {
 
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
-  const MAX_LIMIT = 80000000;
 
-  // [1] 한전 데이터
+  // [수정] 사용자가 설정한 한도 사용
+  const MAX_LIMIT = store.maintenanceCostLimit;
+
   const calculateKepcoData = () => {
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -159,11 +156,9 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // [2] 시나리오별 데이터 (수정됨)
   const getScenarioData = (isPremium: boolean) => {
     const isGap = contractType.includes('(갑)');
 
-    // [핵심 수정] EC 대수 계산: 자가소비면 설정값, 이동형이면 트럭수
     let activeEcCount = 0;
     if (isEcSelfConsumption) {
       activeEcCount = ecSelfConsumptionCount || 1;
@@ -221,11 +216,9 @@ export default function PreviewSummary() {
       revenue_surplus +
       fixedRationalizationSavings;
 
-    // 인건비: 이동형일 때만
     const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
     const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    // 유지보수율: 이동형 25%, 그 외 5%
     let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
     let scenarioMaintenanceRate = targetBaseRate;
 
@@ -239,16 +232,13 @@ export default function PreviewSummary() {
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
     const annualNetProfitWon = grossRevenue - maintenanceCost;
 
-    // [핵심 수정] 투자비 계산 (store.ts 로직과 일치)
     const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = activeEcCount * config.price_ec_unit;
 
     let infraCost = 0;
     if (isEcSelfConsumption) {
-      // 자가소비: 트랙터 0원, 플랫폼 1식 포함
       infraCost = config.price_platform;
     } else if (store.useEc && activeEcCount > 0) {
-      // 이동형: 트랙터 포함, 플랫폼 포함
       infraCost = config.price_tractor + config.price_platform;
     }
 
@@ -287,7 +277,6 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
-  // 하단 비교 섹션
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
