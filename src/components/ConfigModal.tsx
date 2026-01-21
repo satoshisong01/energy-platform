@@ -259,7 +259,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
 
                         {/* EC 판매 (REC 1.5) + 자가소비 체크박스 및 대수 입력 */}
                         <div className="col-span-1 p-3 border border-slate-200 rounded bg-slate-50">
-                          {/* 1. 이동형 (기본) */}
                           <div
                             className={`mb-3 ${store.isEcSelfConsumption ? 'opacity-50' : ''}`}
                           >
@@ -281,7 +280,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                             />
                           </div>
 
-                          {/* 2. 자가소비형 (체크박스 + 대수 입력) */}
                           <div className="pt-2 border-t border-slate-200">
                             <div className="flex justify-between items-center mb-2">
                               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -363,7 +361,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                         3. 시뮬레이션 기준 비율 / 설정
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
-                        {/* [NEW] 적정 용량 산출 비율 */}
+                        {/* 적정 용량 산출 비율 */}
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 mb-1">
                             적정 용량 산출 비율 (평당)
@@ -407,6 +405,30 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                             />
                             <span className="absolute right-3 top-2 text-gray-400 text-sm">
                               W
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* [NEW] 일조량 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            일조량 (시간/일)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={store.config.solar_radiation}
+                              onChange={(e) =>
+                                store.updateConfig(
+                                  'solar_radiation',
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                            <span className="absolute right-3 top-2 text-gray-400 text-sm">
+                              시간
                             </span>
                           </div>
                         </div>
@@ -592,7 +614,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {/* 금융 정책 설정 (기존 동일) */}
+                    {/* 금융 정책 설정 */}
                     <section>
                       <h3 className="text-sm font-bold text-blue-600 mb-4 uppercase tracking-wider border-b pb-2 border-blue-100 flex items-center gap-2">
                         RPS 정책자금 설정
@@ -754,7 +776,7 @@ const ConfigInput = ({
   label,
   field,
   store,
-  step = 0.01, // [NEW] step prop 추가
+  step = 0.01,
 }: {
   label: string;
   field: keyof SystemConfig;

@@ -23,6 +23,9 @@ export default function PreviewSummary() {
     maintenanceCostLimit,
   } = store;
 
+  // [NEW] 자가소비(고정형) 모드면 임대/구독 숨김 여부
+  const showRentSub = !isEcSelfConsumption;
+
   // [합리화 절감액]
   const calculateRationalizationSavings = () => {
     if (!isRationalizationEnabled) return 0;
@@ -41,9 +44,12 @@ export default function PreviewSummary() {
   const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
+  // [수정] 일조량 설정값 사용
+  const solarRadiation = config.solar_radiation || 3.8;
+
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
-    return acc + store.capacityKw * 3.64 * days;
+    return acc + store.capacityKw * solarRadiation * days;
   }, 0);
 
   const [showExpansion, setShowExpansion] = useState(false);
@@ -79,7 +85,7 @@ export default function PreviewSummary() {
   let totalBillSavings = 0;
   store.monthlyData.forEach((data) => {
     const days = new Date(2025, data.month, 0).getDate();
-    const autoGen = capacity * 3.64 * days;
+    const autoGen = capacity * solarRadiation * days;
     const selfConsum = data.selfConsumption;
     const usageSaving =
       Math.min(autoGen, selfConsum) *
@@ -125,8 +131,7 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // [수정] 한전도 수동 설정 시 store 값 따르도록 변경 (선택 사항)
-    // 기본은 5.0이지만, 전체 수동 설정이면 store.maintenanceRate 적용
+    // 한전도 수동 설정 시 store 값 따르도록 변경
     let appliedRate = store.isMaintenanceAuto ? 5.0 : store.maintenanceRate;
 
     let tempCost = annualRevenue * (appliedRate / 100);
@@ -227,23 +232,16 @@ export default function PreviewSummary() {
     const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
     const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    // [핵심 수정] 유지보수 비율 결정 로직
-    // 1. 수동 모드면 사용자가 입력한 값(store.maintenanceRate)을 그대로 사용 (예: 10%)
-    // 2. 자동 모드면 기존 로직(5% vs 25% + 한도 체크) 수행
-
+    // 유지보수 비율 결정 로직
     let scenarioMaintenanceRate = 0;
 
     if (!store.isMaintenanceAuto) {
-      // 수동 모드: Store 값 강제 적용
       scenarioMaintenanceRate = store.maintenanceRate;
     } else {
-      // 자동 모드: 계산 로직 수행
       let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
-
       const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
       let revenueBasedCapRate =
         grossRevenue > 0 ? (maxAvailableForOandM / grossRevenue) * 100 : 0;
-
       scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
       scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
     }
@@ -467,7 +465,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 배터리형 적용 상태 배지 */}
+      {/* 배터리형 적용 상태 배지 (자가소비 모드일 때만 노출) */}
       {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
         <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
           <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
@@ -576,36 +574,43 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
-          <div className={styles.compRow}>
-            <span className={styles.compLabel}>RE100 임대</span>
-            <span className={styles.compValue}>
-              {re100RentalRevenueUk.toFixed(2)} 억
-            </span>
-            <span className="text-xs font-bold text-blue-600 mx-2">
-              REC {re100Rec.toFixed(1)}
-            </span>
-            <span className={styles.compSub}>
-              (절감{' '}
-              <span className="text-blue-600">
-                {re100RentalSavingRate.toFixed(2)}%
-              </span>
-              )
-            </span>
-          </div>
-          <div className={styles.compRow}>
-            <span className={styles.compLabel}>구독 서비스</span>
-            <span className={styles.compValue}>
-              {subRevenueUk.toFixed(2)} 억
-            </span>
-            <span className="text-xs font-bold text-blue-600 mx-2">
-              REC {subRec.toFixed(1)}
-            </span>
-            <span className={styles.compSub}>
-              (절감{' '}
-              <span className="text-blue-600">{subSavingRate.toFixed(2)}%</span>
-              )
-            </span>
-          </div>
+          {/* [수정] 자가소비 모드면 임대/구독 숨김 */}
+          {showRentSub && (
+            <>
+              <div className={styles.compRow}>
+                <span className={styles.compLabel}>RE100 임대</span>
+                <span className={styles.compValue}>
+                  {re100RentalRevenueUk.toFixed(2)} 억
+                </span>
+                <span className="text-xs font-bold text-blue-600 mx-2">
+                  REC {re100Rec.toFixed(1)}
+                </span>
+                <span className={styles.compSub}>
+                  (절감{' '}
+                  <span className="text-blue-600">
+                    {re100RentalSavingRate.toFixed(2)}%
+                  </span>
+                  )
+                </span>
+              </div>
+              <div className={styles.compRow}>
+                <span className={styles.compLabel}>구독 서비스</span>
+                <span className={styles.compValue}>
+                  {subRevenueUk.toFixed(2)} 억
+                </span>
+                <span className="text-xs font-bold text-blue-600 mx-2">
+                  REC {subRec.toFixed(1)}
+                </span>
+                <span className={styles.compSub}>
+                  (절감{' '}
+                  <span className="text-blue-600">
+                    {subSavingRate.toFixed(2)}%
+                  </span>
+                  )
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

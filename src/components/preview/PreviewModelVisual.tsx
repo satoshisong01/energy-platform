@@ -15,24 +15,30 @@ import {
 } from 'recharts';
 import styles from './PreviewModelVisual.module.css';
 
-// [수정] 차트 데이터 생성 로직 (EC 방전 로직 추가)
+// [수정] 차트 데이터 생성 로직 (EC 방전 로직 추가 + 일조량 반영)
 const useChartData = () => {
   const store = useProposalStore();
+  // [수정] config 가져오기
+  const { config } = store;
 
   // 1. 연간 데이터 가져오기
   const totalUsageYear = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
-    0
+    0,
   );
+
+  // [수정] 일조량 설정값 사용 (기본 3.8)
+  const solarRadiation = config.solar_radiation || 3.8;
+
   const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
-    return acc + store.capacityKw * 3.64 * days;
+    return acc + store.capacityKw * solarRadiation * days;
   }, 0);
 
   // 2. 실제 잉여 전력량 계산
   const totalSelfConsumption = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
-    0
+    0,
   );
 
   // 3. 하루 평균 데이터 계산
@@ -78,7 +84,12 @@ const useChartData = () => {
 
   // --- [Step 2] EC 방전 시뮬레이션 (밤 시간대 사용량 커버) ---
   // EC 사용 조건: EC 옵션이 켜져있고, 한전 모델이 아닐 때
-  if (store.useEc && store.selectedModel !== 'KEPCO') {
+  // [수정] EC 활성화 조건: (이동형 OR 자가소비형) AND (Not 한전)
+  const isEcActive =
+    (store.useEc || store.isEcSelfConsumption) &&
+    store.selectedModel !== 'KEPCO';
+
+  if (isEcActive) {
     let remainingEnergy = dailyTotalSurplus; // 배터리 잔량 (하루 잉여량만큼 충전되었다고 가정)
 
     // 전략: 저녁(16시~)부터 사용하고, 남으면 새벽(0시~)에 사용
@@ -273,19 +284,28 @@ export function PreviewModelGraph() {
   );
 }
 
-// ... (PreviewModelImage 컴포넌트는 기존과 동일하므로 생략) ...
+// 이미지 컴포넌트 (변경사항 없음, 그대로 유지)
 export function PreviewModelImage() {
   const store = useProposalStore();
   const isKepco = store.selectedModel === 'KEPCO';
-  const truckCount = store.truckCount;
+  const { truckCount, isEcSelfConsumption, ecSelfConsumptionCount } = store;
 
-  const videoSrc = truckCount === 2 ? '/videos/direct.mp4' : '/videos/egc.mp4';
+  // [수정] 자가소비형일 경우의 이미지나 텍스트 처리가 필요하다면 여기서 분기
+  const ecCount = isEcSelfConsumption ? ecSelfConsumptionCount : truckCount;
+
+  const videoSrc = ecCount === 2 ? '/videos/direct.mp4' : '/videos/egc.mp4';
   const videoCaptureImage =
-    truckCount === 2 ? '/images/direct_capture.png' : '/images/egc_capture.png';
+    ecCount === 2 ? '/images/direct_capture.png' : '/images/egc_capture.png';
   const kepcoImageSrc = '/images/direct_sale.jpg';
-  const title = isKepco
-    ? '한전 판매형 프로세스'
-    : `에너지 캐리어(EC) 운송 프로세스 (${truckCount}대 운용)`;
+
+  let title = '';
+  if (isKepco) {
+    title = '한전 판매형 프로세스';
+  } else if (isEcSelfConsumption) {
+    title = `에너지 캐리어(EC) 자가소비 프로세스 (고정형 ${ecCount}대 운용)`;
+  } else {
+    title = `에너지 캐리어(EC) 운송 프로세스 (${ecCount}대 운용)`;
+  }
 
   return (
     <div className={styles.container}>

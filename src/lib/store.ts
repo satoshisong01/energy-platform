@@ -42,7 +42,9 @@ export interface FinancialSettings {
 }
 
 export type SystemConfig = {
-  // [NEW] 설정 변수들
+  // [NEW] 일조량 (시간/일) - 기본 3.8
+  solar_radiation: number;
+
   solar_panel_wattage: number; // 모듈 개당 출력 (W)
   solar_capacity_factor: number; // 용량 산출 비율 (평수 / N)
 
@@ -292,7 +294,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     max_usage: 0,
   },
   config: {
-    // [NEW] 기본 설정값
+    // [NEW] 기본 설정값: 일조량 3.8
+    solar_radiation: 3.8,
     solar_panel_wattage: 645,
     solar_capacity_factor: 2.0,
 
@@ -377,7 +380,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const totalM2 = areas.reduce((sum, area) => sum + area.valueM2, 0);
     const totalPyeong = totalM2 * 0.3025;
 
-    // [수정] 용량 산출 비율 적용 (기본 2.0)
     const factor = state.config.solar_capacity_factor || 2.0;
     const capacity = Math.floor(totalPyeong / factor);
 
@@ -454,11 +456,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     get().recalculateInvestment();
   },
 
-  // [수정] Config 업데이트 시 용량 재계산 로직 추가
   updateConfig: (field, value) => {
     set((state) => ({ config: { ...state.config, [field]: value } }));
 
-    // 비율이 변경되면 용량도 재계산
     if (field === 'solar_capacity_factor') {
       get().recalculateCapacity(get().roofAreas);
     } else {
@@ -872,7 +872,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     });
   },
 
-  // ... (getSimulationResults 코드는 동일, store state에서 값을 가져오므로 자동으로 반영됨)
   getSimulationResults: () => {
     const state = get();
     const {
@@ -894,9 +893,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const totalInvestment = state.totalInvestment * 100000000;
     const totalInvestmentUk = state.totalInvestment;
 
+    // [수정] 3.64 -> config.solar_radiation
+    const solarRadiation = config.solar_radiation || 3.8;
+
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
-      return acc + capacityKw * 3.64 * days;
+      return acc + capacityKw * solarRadiation * days;
     }, 0);
 
     let volume_self = 0,
@@ -1034,8 +1036,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const fac_net_1 = annualOperatingProfit - fac_interest_only;
     const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
+    // [수정] 3.64 -> solarRadiation
     const rental_revenue_yr =
-      capacityKw * 0.2 * config.unit_price_kepco * 3.64 * 365 +
+      capacityKw * 0.2 * config.unit_price_kepco * solarRadiation * 365 +
       capacityKw * 0.8 * config.rental_price_per_kw;
     const rental_final_profit = rental_revenue_yr * 20;
     const price_standard = 210.5;
@@ -1055,7 +1058,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
-    const rec_1000_rent = (capacityKw * 0.2 * 3.64 * 365) / 1000;
+    // [수정] 3.64 -> solarRadiation
+    const rec_1000_rent = (capacityKw * 0.2 * solarRadiation * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;

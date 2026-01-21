@@ -22,7 +22,7 @@ import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
 // ----------------------------------------------------------------
-// [수정] 페이지 하단 Footer 컴포넌트
+// [Footer] 페이지 하단 Footer 컴포넌트
 // ----------------------------------------------------------------
 const PageFooter = ({ page }: { page: number }) => {
   const store = useProposalStore();
@@ -43,7 +43,15 @@ const PageFooter = ({ page }: { page: number }) => {
 
 export default function PreviewPanel() {
   const store = useProposalStore();
-  const { config, rationalization, truckCount, isSurplusDiscarded } = store;
+  // [수정] config 추가 가져오기
+  const {
+    config,
+    rationalization,
+    truckCount,
+    isSurplusDiscarded,
+    isEcSelfConsumption,
+    ecSelfConsumptionCount,
+  } = store;
 
   const handlePrint = () => {
     window.print();
@@ -52,11 +60,14 @@ export default function PreviewPanel() {
   const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
 
   // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산
+  // [1] 월별 데이터 계산 (일조량 설정 반영)
   // ----------------------------------------------------------------
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
-    const dailyGenHours = 3.64;
+
+    // [수정] 하드코딩(3.64) 제거 -> 설정값(solar_radiation) 사용 (기본 3.8)
+    const dailyGenHours = config.solar_radiation || 3.8;
+
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
@@ -66,11 +77,11 @@ export default function PreviewPanel() {
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
     const totalUsage = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
-      0
+      0,
     );
     const totalSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0
+      0,
     );
     const dynamicPeakRatio = totalUsage > 0 ? totalSelf / totalUsage : 0;
 
@@ -78,7 +89,7 @@ export default function PreviewPanel() {
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw
+        data.baseBill - store.baseRate * data.peakKw,
       );
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
@@ -130,7 +141,7 @@ export default function PreviewPanel() {
       totalSavings: 0,
       afterBill: 0,
       surplusRevenue: 0,
-    }
+    },
   );
 
   const savingRate =
@@ -174,7 +185,7 @@ export default function PreviewPanel() {
                 발전시스템 분석자료
               </span>
 
-              {/* [NEW] 한전 판매 가능/불가능 상태 표시 배지 */}
+              {/* 한전 판매 가능/불가능 상태 표시 배지 */}
               <span
                 style={{
                   fontSize: '0.5em',
@@ -195,9 +206,12 @@ export default function PreviewPanel() {
             <h2 className={styles.subTitle}>
               - {store.clientName} (태양광발전{' '}
               {store.capacityKw.toLocaleString()}kW
-              {store.useEc && store.truckCount > 0
-                ? `, EC ${store.truckCount}대`
-                : ''}
+              {/* EC 상태 표시 로직 */}
+              {isEcSelfConsumption
+                ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
+                : store.useEc && truckCount > 0
+                  ? `, 이동형 EC ${truckCount}대`
+                  : ''}
               ) -
             </h2>
           </div>

@@ -35,7 +35,7 @@ const NumberInput = ({
       setTempValue(
         value !== undefined && value !== null
           ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-          : ''
+          : '',
       );
     }
   }, [value, isFocused]);
@@ -86,12 +86,12 @@ const NumberInput = ({
 
 export default function Step3_EnergyData() {
   const store = useProposalStore();
+  // [수정] config 가져오기
+  const { config } = store;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // [수정] Store에 있는 tariffPresets를 사용하도록 변경
   const handleTariffChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedName = e.target.value;
-    // store.tariffPresets 에서 찾기
     const opt = store.tariffPresets.find((t) => t.name === selectedName);
 
     if (opt) {
@@ -104,7 +104,7 @@ export default function Step3_EnergyData() {
   const updateStore = (
     month: number,
     field: keyof MonthlyData,
-    value: number
+    value: number,
   ) => {
     store.updateMonthlyData(month, field, value);
   };
@@ -126,7 +126,7 @@ export default function Step3_EnergyData() {
     </button>
   );
 
-  // 엑셀 업로드 핸들러 (반올림 적용됨)
+  // 엑셀 업로드 핸들러
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -159,7 +159,6 @@ export default function Step3_EnergyData() {
         newData.push({
           month: month,
           year: year,
-          // [수정] Math.round 적용
           usageKwh: Math.round(Number(row[1]) || 0),
           selfConsumption: Math.round(Number(row[2]) || 0),
           peakKw: Math.round(Number(row[3]) || 0),
@@ -193,18 +192,21 @@ export default function Step3_EnergyData() {
   // 계산 로직
   const totalUsageInput = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
-    0
+    0,
   );
   const totalSelfConsumptionInput = store.monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
-    0
+    0,
   );
   const dynamicPeakRatio =
     totalUsageInput > 0 ? totalSelfConsumptionInput / totalUsageInput : 0;
 
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
-    const dailyGenHours = 3.64;
+
+    // [수정] 설정된 일조량 사용 (없으면 기본값 3.8)
+    const dailyGenHours = config.solar_radiation || 3.8;
+
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
@@ -216,7 +218,7 @@ export default function Step3_EnergyData() {
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw
+        data.baseBill - store.baseRate * data.peakKw,
       );
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
@@ -265,7 +267,7 @@ export default function Step3_EnergyData() {
       totalSavings: 0,
       afterBill: 0,
       surplusRevenue: 0,
-    }
+    },
   );
 
   const savingRate =
@@ -273,7 +275,6 @@ export default function Step3_EnergyData() {
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
 
-  // [NEW] (갑) 요금제 확인용 변수
   const isGap = store.contractType.includes('(갑)');
 
   return (
@@ -309,7 +310,6 @@ export default function Step3_EnergyData() {
               value={store.contractType}
               onChange={handleTariffChange}
             >
-              {/* [수정] store.tariffPresets를 매핑하여 동적으로 옵션 생성 */}
               {store.tariffPresets.map((opt) => (
                 <option key={opt.id} value={opt.name}>
                   {opt.name}
@@ -329,13 +329,11 @@ export default function Step3_EnergyData() {
               <div
                 className={styles.inputReadOnly}
                 style={{
-                  // [수정] (갑)이면 회색, 아니면 녹색 스타일 적용
                   backgroundColor: isGap ? '#f3f4f6' : '#f0fdf4',
                   color: isGap ? '#9ca3af' : '#16a34a',
                   borderColor: isGap ? '#e5e7eb' : '#bbf7d0',
                 }}
               >
-                {/* [수정] (갑)이면 0 표시, 아니면 실제 값 표시 */}
                 {isGap ? '0' : store.unitPriceSavings.toLocaleString()} 원
               </div>
             </div>
@@ -524,7 +522,7 @@ export default function Step3_EnergyData() {
                         updateStore(row.month, 'solarGeneration', val)
                       }
                       placeholder={Math.round(
-                        row.autoSolarGen
+                        row.autoSolarGen,
                       ).toLocaleString()}
                       className={styles.textBlue}
                     />
