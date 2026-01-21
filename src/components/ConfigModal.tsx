@@ -35,7 +35,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
     const defaultName = store.proposalName || `${store.clientName} 분석자료`;
     const name = window.prompt(
       '분석자료 저장 이름을 입력해주세요:',
-      defaultName
+      defaultName,
     );
 
     if (name !== null) {
@@ -54,7 +54,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
   const handleFinancialChange = (
     type: 'rps' | 'factoring',
     field: string,
-    value: string
+    value: string,
   ) => {
     const numValue = parseFloat(value) || 0;
     const currentSettings = store.financialSettings || {
@@ -261,9 +261,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                         <div className="col-span-1 p-3 border border-slate-200 rounded bg-slate-50">
                           {/* 1. 이동형 (기본) */}
                           <div
-                            className={`mb-3 ${
-                              store.isEcSelfConsumption ? 'opacity-50' : ''
-                            }`}
+                            className={`mb-3 ${store.isEcSelfConsumption ? 'opacity-50' : ''}`}
                           >
                             <label className="block text-xs font-semibold text-gray-500 mb-1">
                               EC 판매 (REC 1.5 / 이동형)
@@ -277,7 +275,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               onChange={(e) =>
                                 store.updateConfig(
                                   'unit_price_ec_1_5',
-                                  Number(e.target.value)
+                                  Number(e.target.value),
                                 )
                               }
                             />
@@ -294,16 +292,12 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   onChange={(e) =>
                                     store.setSimulationOption(
                                       'isEcSelfConsumption',
-                                      e.target.checked
+                                      e.target.checked,
                                     )
                                   }
                                 />
                                 <span
-                                  className={`text-xs font-bold flex items-center gap-1 ${
-                                    store.isEcSelfConsumption
-                                      ? 'text-green-700'
-                                      : 'text-gray-500'
-                                  }`}
+                                  className={`text-xs font-bold flex items-center gap-1 ${store.isEcSelfConsumption ? 'text-green-700' : 'text-gray-500'}`}
                                 >
                                   <LucideBattery size={14} />
                                   EC 자가소비 (배터리형) 적용
@@ -322,7 +316,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                       if (val > 0)
                                         store.setSimulationOption(
                                           'ecSelfConsumptionCount',
-                                          val
+                                          val,
                                         );
                                     }}
                                   />
@@ -346,7 +340,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   onChange={(e) =>
                                     store.updateConfig(
                                       'unit_price_ec_self',
-                                      Number(e.target.value)
+                                      Number(e.target.value),
                                     )
                                   }
                                 />
@@ -366,16 +360,88 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                     {/* 3. 시뮬레이션 비율 */}
                     <div>
                       <h3 className="text-sm font-bold text-orange-600 mb-4 uppercase tracking-wider border-b pb-2 border-orange-100">
-                        3. 시뮬레이션 기준 비율 (단위: %)
+                        3. 시뮬레이션 기준 비율 / 설정
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
+                        {/* [NEW] 적정 용량 산출 비율 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            적정 용량 산출 비율 (평당)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={store.config.solar_capacity_factor}
+                              onChange={(e) =>
+                                store.updateConfig(
+                                  'solar_capacity_factor',
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                            <span className="absolute right-3 top-2 text-gray-400 text-sm">
+                              / N
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 모듈 개당 출력 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            모듈 개당 출력 (W)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="10"
+                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={store.config.solar_panel_wattage}
+                              onChange={(e) =>
+                                store.updateConfig(
+                                  'solar_panel_wattage',
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                            <span className="absolute right-3 top-2 text-gray-400 text-sm">
+                              W
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 매년 발전 감소율 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            매년 발전 감소율
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                              value={store.degradationRate}
+                              onChange={(e) =>
+                                store.setSimulationOption(
+                                  'degradationRate',
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                            <span className="absolute right-3 top-2 text-gray-400 text-sm">
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 유지보수 비율 + 한도 설정 */}
                         <div>
                           <div className="flex justify-between items-end mb-1">
                             <label className="block text-xs font-semibold text-gray-500">
                               유지보수 비율
                             </label>
 
-                            {/* [NEW] 자동 조정 체크박스 + 한도 입력란 */}
                             <div className="flex items-center gap-2">
                               <label className="flex items-center gap-1 cursor-pointer select-none">
                                 <input
@@ -385,7 +451,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   onChange={(e) =>
                                     store.setSimulationOption(
                                       'isMaintenanceAuto',
-                                      e.target.checked
+                                      e.target.checked,
                                     )
                                   }
                                 />
@@ -401,22 +467,22 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               </label>
 
                               {store.isMaintenanceAuto && (
-                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
-                                  <span className="text-[10px] text-gray-400">
+                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-1 bg-blue-50 px-1 py-0.5 rounded border border-blue-100">
+                                  <span className="text-[9px] text-blue-600 font-bold whitespace-nowrap">
                                     한도:
                                   </span>
                                   <input
                                     type="number"
-                                    className="w-20 p-0.5 text-[10px] text-right border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                                    className="w-16 p-0.5 text-[10px] text-right border border-blue-200 rounded focus:ring-1 focus:ring-blue-500 outline-none text-blue-700 font-bold bg-white"
                                     value={store.maintenanceCostLimit}
                                     onChange={(e) =>
                                       store.setSimulationOption(
                                         'maintenanceCostLimit',
-                                        Number(e.target.value)
+                                        Number(e.target.value),
                                       )
                                     }
                                   />
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[9px] text-blue-600">
                                     원
                                   </span>
                                 </div>
@@ -436,7 +502,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               onChange={(e) =>
                                 store.setSimulationOption(
                                   'maintenanceRate',
-                                  Number(e.target.value)
+                                  Number(e.target.value),
                                 )
                               }
                             />
@@ -446,41 +512,8 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           </div>
                           <div className="mt-1 text-[10px] text-gray-400">
                             {store.isMaintenanceAuto
-                              ? `* 한도(${
-                                  Math.round(
-                                    (store.maintenanceCostLimit / 100000000) *
-                                      10
-                                  ) / 10
-                                }억원) 내에서 최대 25%까지 자동 최적화됩니다.`
-                              : `* 사용자가 입력한 비율로 고정됩니다. (단, ${
-                                  Math.round(
-                                    (store.maintenanceCostLimit / 100000000) *
-                                      10
-                                  ) / 10
-                                }억원 초과 시 조정됨)`}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">
-                            매년 발전 감소율
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="0.1"
-                              className="w-full p-2 border border-gray-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
-                              value={store.degradationRate}
-                              onChange={(e) =>
-                                store.setSimulationOption(
-                                  'degradationRate',
-                                  Number(e.target.value)
-                                )
-                              }
-                            />
-                            <span className="absolute right-3 top-2 text-gray-400 text-sm">
-                              %
-                            </span>
+                              ? `* 한도(${Math.round((store.maintenanceCostLimit / 100000000) * 10) / 10}억원) 내에서 최대 25%까지 자동 최적화됩니다.`
+                              : `* 사용자가 입력한 비율로 고정됩니다. (단, ${Math.round((store.maintenanceCostLimit / 100000000) * 10) / 10}억원 초과 시 조정됨)`}
                           </div>
                         </div>
                       </div>
@@ -509,7 +542,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   store.updateTariffPreset(
                                     index,
                                     'name',
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                               />
@@ -526,7 +559,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   store.updateTariffPreset(
                                     index,
                                     'baseRate',
-                                    Number(e.target.value)
+                                    Number(e.target.value),
                                   )
                                 }
                               />
@@ -544,7 +577,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                   store.updateTariffPreset(
                                     index,
                                     'savings',
-                                    Number(e.target.value)
+                                    Number(e.target.value),
                                   )
                                 }
                               />
@@ -605,7 +638,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                 handleFinancialChange(
                                   'rps',
                                   'repaymentPeriod',
-                                  v
+                                  v,
                                 )
                               }
                             />
@@ -646,7 +679,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               handleFinancialChange(
                                 'factoring',
                                 'interestRate',
-                                v
+                                v,
                               )
                             }
                             step={0.01}
@@ -661,7 +694,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                 handleFinancialChange(
                                   'factoring',
                                   'gracePeriod',
-                                  v
+                                  v,
                                 )
                               }
                             />
@@ -675,7 +708,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                                 handleFinancialChange(
                                   'factoring',
                                   'repaymentPeriod',
-                                  v
+                                  v,
                                 )
                               }
                             />
@@ -721,10 +754,12 @@ const ConfigInput = ({
   label,
   field,
   store,
+  step = 0.01, // [NEW] step prop 추가
 }: {
   label: string;
   field: keyof SystemConfig;
   store: any;
+  step?: number;
 }) => (
   <div>
     <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -732,7 +767,7 @@ const ConfigInput = ({
     </label>
     <input
       type="number"
-      step="0.01"
+      step={step}
       className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-right"
       value={store.config[field]}
       onChange={(e) => store.updateConfig(field, Number(e.target.value))}

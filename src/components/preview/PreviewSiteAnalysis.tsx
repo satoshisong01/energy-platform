@@ -7,20 +7,21 @@ import { LucideArrowDown } from 'lucide-react';
 
 export default function PreviewSiteAnalysis() {
   const store = useProposalStore();
-  const { roofAreas, capacityKw, address, siteImage } = store;
+  const { roofAreas, capacityKw, address, siteImage, config } = store;
 
-  // 1. 전체 면적 m² 계산 (Store의 roofAreas 기반 실시간 계산)
+  // 1. 전체 면적 m² 계산
   const totalAreaM2 = roofAreas.reduce(
     (acc, cur) => acc + (cur.valueM2 || 0),
-    0
+    0,
   );
 
-  // 2. 평수 계산 (m² / 3.3058)
+  // 2. 평수 계산 (단순 표시용)
   const totalAreaPyeong = totalAreaM2 / 3.3058;
 
-  // 3. 모듈 수량 (640W 기준)
+  // 3. 모듈 수량 (설정값 사용, 기본값 645W)
+  const panelWatt = config.solar_panel_wattage || 645;
   const moduleCount =
-    capacityKw > 0 ? Math.round((capacityKw * 1000) / 640) : 0;
+    capacityKw > 0 ? Math.round((capacityKw * 1000) / panelWatt) : 0;
 
   return (
     <div className={styles.container}>
@@ -36,7 +37,6 @@ export default function PreviewSiteAnalysis() {
           <div className={styles.areaInfoBox}>
             <span className={styles.label}>공장 지붕 면적</span>
             <span className={styles.valMain}>
-              {/* 소수점 반올림하여 정수 혹은 소수점 1자리로 표현 */}
               {Math.round(totalAreaPyeong).toLocaleString()} 평
             </span>
             <span className={styles.valSub}>
@@ -84,7 +84,7 @@ export default function PreviewSiteAnalysis() {
             />
           </div>
 
-          {/* 최적 설치 공간 (빨간 박스) */}
+          {/* 최적 설치 공간 (Step 2에서 결정된 용량 표시) */}
           <div className={styles.optimalBox}>
             <div className={styles.optLabel}>최적 설치 공간</div>
             <div className={styles.optVal}>
@@ -92,7 +92,7 @@ export default function PreviewSiteAnalysis() {
             </div>
           </div>
 
-          {/* 한전 최대 발전 (녹색 박스) */}
+          {/* 한전 최대 발전 */}
           <div className={styles.kepcoBox}>
             <div className={styles.kepLabel}>한전최대발전</div>
             <div className={styles.kepVal}>
@@ -100,11 +100,11 @@ export default function PreviewSiteAnalysis() {
             </div>
           </div>
 
-          {/* 모듈 정보 (작게 표시) */}
+          {/* 모듈 정보 (설정된 Watt 반영) */}
           <div className={styles.moduleInfo}>
             <div className={styles.moduleRow}>
               <span className="font-bold text-slate-600">모듈 출력</span>
-              <span>640 W</span>
+              <span>{panelWatt} W</span>
             </div>
             <div className={styles.moduleRow}>
               <span className="font-bold text-slate-600">설치 수량</span>

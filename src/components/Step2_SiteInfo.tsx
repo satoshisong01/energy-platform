@@ -9,7 +9,7 @@ import {
   LucidePlus,
   LucideTrash2,
   LucideLayoutGrid,
-  LucideArrowRightCircle, // 아이콘 추가
+  LucideArrowRightCircle,
 } from 'lucide-react';
 
 export default function Step2_SiteInfo() {
@@ -19,32 +19,24 @@ export default function Step2_SiteInfo() {
   // 1. 총 면적 계산
   const totalAreaM2 = store.roofAreas.reduce(
     (acc, cur) => acc + (cur.valueM2 || 0),
-    0
+    0,
   );
 
   // 2. 평수 계산
   const totalAreaPyeong = totalAreaM2 / 3.3058;
 
-  // 3. 최대 설치 가능 용량 (평수 / 2)
-  const calculatedMaxCapacity = Math.floor(totalAreaPyeong / 2);
+  // 3. 최대 설치 가능 용량 (평수 / 설정값) [NEW]
+  const factor = store.config.solar_capacity_factor || 2.0;
+  const calculatedMaxCapacity = Math.floor(totalAreaPyeong / factor);
 
-  // 4. 모듈 수량 계산
+  // 4. 모듈 수량 계산 (설정값 사용)
+  const panelWatt = store.config.solar_panel_wattage || 645;
   const panelCount =
-    store.capacityKw > 0 ? Math.round((store.capacityKw * 1000) / 640) : 0;
+    store.capacityKw > 0
+      ? Math.round((store.capacityKw * 1000) / panelWatt)
+      : 0;
 
-  // -----------------------------------------------------------------------
-  // [수정 포인트] 자동 동기화 로직 삭제 (주석 처리)
-  // 이유: 불러오기 시 저장된 값(예: 225kW)을 계산된 값(125kW)으로 덮어쓰는 문제 방지
-  // -----------------------------------------------------------------------
-  /*
-  useEffect(() => {
-    if (calculatedMaxCapacity > 0) {
-      store.setCapacityKw(calculatedMaxCapacity);
-    }
-  }, [calculatedMaxCapacity]);
-  */
-
-  // [기능 추가] 최대 용량을 클릭하면 실제 용량에 적용하는 핸들러
+  // 최대 용량 적용 핸들러
   const applyMaxCapacity = () => {
     if (calculatedMaxCapacity > 0) {
       store.setCapacityKw(calculatedMaxCapacity);
@@ -150,7 +142,7 @@ export default function Step2_SiteInfo() {
                     store.updateRoofArea(
                       area.id,
                       'valueM2',
-                      Number(e.target.value)
+                      Number(e.target.value),
                     )
                   }
                 />
@@ -197,14 +189,14 @@ export default function Step2_SiteInfo() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          {/* 왼쪽: 자동 계산된 최대값 (클릭하여 적용 가능하도록 변경) */}
+          {/* 왼쪽: 자동 계산된 최대값 */}
           <div
             className="group cursor-pointer"
             onClick={applyMaxCapacity}
             title="클릭하여 설계값에 적용"
           >
             <label className="block text-xs font-bold text-slate-500 mb-1 group-hover:text-blue-600 transition-colors">
-              최대 설치 가능 (평수 / 2)
+              최대 설치 가능 (평수 / {factor})
             </label>
             <div className="relative">
               <input
@@ -216,7 +208,6 @@ export default function Step2_SiteInfo() {
               <span className="absolute right-3 top-2 text-xs text-slate-500 font-bold pt-0.5 group-hover:text-blue-500">
                 kW
               </span>
-              {/* 클릭 유도 아이콘 */}
               <div className="absolute left-3 top-2.5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
                 <LucideArrowRightCircle size={16} />
               </div>
@@ -226,7 +217,7 @@ export default function Step2_SiteInfo() {
             </div>
           </div>
 
-          {/* 오른쪽: 실제 설계 용량 (수정 가능) */}
+          {/* 오른쪽: 실제 설계 용량 */}
           <div>
             <label className="block text-xs font-bold text-blue-700 mb-1">
               실제 설비 용량 (설계값)
@@ -245,7 +236,7 @@ export default function Step2_SiteInfo() {
             </div>
             <div className="flex justify-end items-center gap-1 text-[11px] text-blue-500 mt-1 font-bold">
               <LucideLayoutGrid size={12} />
-              모듈 약 {panelCount.toLocaleString()}장 예상
+              모듈({panelWatt}W) 약 {panelCount.toLocaleString()}장 예상
             </div>
           </div>
         </div>
