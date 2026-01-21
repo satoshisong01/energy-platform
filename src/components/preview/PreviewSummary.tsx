@@ -20,8 +20,10 @@ export default function PreviewSummary() {
     contractType,
     isEcSelfConsumption,
     ecSelfConsumptionCount,
+    maintenanceCostLimit,
   } = store;
 
+  // [합리화 절감액]
   const calculateRationalizationSavings = () => {
     if (!isRationalizationEnabled) return 0;
     const isEul = contractType.includes('(을)');
@@ -48,13 +50,13 @@ export default function PreviewSummary() {
 
   const [applyEc, setApplyEc] = useState(
     (store.useEc || store.isEcSelfConsumption) &&
-      store.selectedModel !== 'KEPCO'
+      store.selectedModel !== 'KEPCO',
   );
 
   useEffect(() => {
     setApplyEc(
       (store.useEc || store.isEcSelfConsumption) &&
-        store.selectedModel !== 'KEPCO'
+        store.selectedModel !== 'KEPCO',
     );
   }, [store.useEc, store.isEcSelfConsumption, store.selectedModel]);
 
@@ -62,15 +64,16 @@ export default function PreviewSummary() {
     store.setSimulationOption('useEc', checked);
   };
 
+  // ... (기본 데이터 계산) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
-    0
+    0,
   );
   const re100Rate = totalUsage > 0 ? (simpleAnnualGen / totalUsage) * 100 : 0;
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
-    0
+    0,
   );
 
   let totalBillSavings = 0;
@@ -83,11 +86,11 @@ export default function PreviewSummary() {
       (store.unitPriceSavings || config.unit_price_savings);
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
-      0
+      0,
     );
     const totalSelfYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0
+      0,
     );
     const dynamicPeakRatio =
       totalUsageYear > 0 ? totalSelfYear / totalUsageYear : 0;
@@ -95,7 +98,7 @@ export default function PreviewSummary() {
     if (data.peakKw > 0) {
       baseBillSaving = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw
+        data.baseBill - store.baseRate * data.peakKw,
       );
     } else {
       baseBillSaving = data.baseBill * dynamicPeakRatio;
@@ -106,9 +109,10 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  // [수정] 사용자가 설정한 한도 사용
-  const MAX_LIMIT = store.maintenanceCostLimit;
+  // 사용자 설정 한도 사용
+  const MAX_LIMIT = maintenanceCostLimit;
 
+  // [1] 한전 데이터
   const calculateKepcoData = () => {
     let solarPrice = config.price_solar_standard;
     if (store.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -120,11 +124,14 @@ export default function PreviewSummary() {
     const investUk = solarCost;
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
-    const baseRate = 5.0;
-    let appliedRate = baseRate;
+
+    // [수정] 한전도 수동 설정 시 store 값 따르도록 변경 (선택 사항)
+    // 기본은 5.0이지만, 전체 수동 설정이면 store.maintenanceRate 적용
+    let appliedRate = store.isMaintenanceAuto ? 5.0 : store.maintenanceRate;
+
     let tempCost = annualRevenue * (appliedRate / 100);
 
-    if (tempCost > MAX_LIMIT) {
+    if (store.isMaintenanceAuto && tempCost > MAX_LIMIT) {
       if (annualRevenue > 0) {
         const rawRate = (MAX_LIMIT / annualRevenue) * 100;
         appliedRate = Math.floor(rawRate * 100) / 100;
@@ -156,6 +163,7 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
+  // [2] 시나리오 데이터
   const getScenarioData = (isPremium: boolean) => {
     const isGap = contractType.includes('(갑)');
 
@@ -172,7 +180,7 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     let annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0
+      0,
     );
     if (isGap) annualSelf = 0;
 
@@ -219,14 +227,26 @@ export default function PreviewSummary() {
     const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
     const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
-    let scenarioMaintenanceRate = targetBaseRate;
+    // [핵심 수정] 유지보수 비율 결정 로직
+    // 1. 수동 모드면 사용자가 입력한 값(store.maintenanceRate)을 그대로 사용 (예: 10%)
+    // 2. 자동 모드면 기존 로직(5% vs 25% + 한도 체크) 수행
 
-    const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
-    let revenueBasedCapRate =
-      grossRevenue > 0 ? (maxAvailableForOandM / grossRevenue) * 100 : 0;
-    scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
-    scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
+    let scenarioMaintenanceRate = 0;
+
+    if (!store.isMaintenanceAuto) {
+      // 수동 모드: Store 값 강제 적용
+      scenarioMaintenanceRate = store.maintenanceRate;
+    } else {
+      // 자동 모드: 계산 로직 수행
+      let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
+
+      const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
+      let revenueBasedCapRate =
+        grossRevenue > 0 ? (maxAvailableForOandM / grossRevenue) * 100 : 0;
+
+      scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
+      scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
+    }
 
     const maintenanceCost =
       (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
@@ -261,8 +281,8 @@ export default function PreviewSummary() {
           ? 'TYPE B. EC 자가소비 Plan'
           : 'TYPE B. REC 5.0 Plan (수익 극대화)'
         : isEcSelfConsumption
-        ? 'TYPE A. EC 자가소비 Plan'
-        : 'TYPE A. REC 1.5 Plan (자가소비형)',
+          ? 'TYPE A. EC 자가소비 Plan'
+          : 'TYPE A. REC 1.5 Plan (자가소비형)',
       invest: investUk,
       ecCount: activeEcCount,
       annualProfit: annualNetProfitWon / 100000000,
@@ -277,6 +297,7 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
+  // 하단 비교 섹션
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
     totalBillBefore > 0
@@ -378,9 +399,7 @@ export default function PreviewSummary() {
         </div>
       </div>
       <div
-        className={`${styles.card} ${styles.cardTotal} ${
-          d.isPro ? styles.cardHighlight : ''
-        }`}
+        className={`${styles.card} ${styles.cardTotal} ${d.isPro ? styles.cardHighlight : ''}`}
       >
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -390,9 +409,7 @@ export default function PreviewSummary() {
         <div className={styles.cardBody}>
           <div className={styles.totalRow}>
             <div
-              className={`${styles.mainValue} ${
-                d.isPro ? styles.textHighlight : ''
-              }`}
+              className={`${styles.mainValue} ${d.isPro ? styles.textHighlight : ''}`}
             >
               {toUk(d.totalProfit20)} <span className={styles.unit}>억원</span>
             </div>
@@ -423,11 +440,7 @@ export default function PreviewSummary() {
         <div className="flex items-center gap-2">
           {contractType.includes('(을)') && (
             <div
-              className={`text-xs font-bold px-2 py-1 rounded border ${
-                isRationalizationEnabled
-                  ? 'bg-blue-50 text-blue-600 border-blue-200'
-                  : 'bg-slate-100 text-slate-500 border-slate-200'
-              }`}
+              className={`text-xs font-bold px-2 py-1 rounded border ${isRationalizationEnabled ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
             >
               {isRationalizationEnabled
                 ? '요금합리화 가능'
@@ -445,9 +458,7 @@ export default function PreviewSummary() {
               <span className="font-bold text-slate-700">EC 적용</span>
             </label>
             <button
-              className={`${styles.expandBtn} ${
-                showExpansion ? styles.active : ''
-              }`}
+              className={`${styles.expandBtn} ${showExpansion ? styles.active : ''}`}
               onClick={() => setShowExpansion(!showExpansion)}
             >
               {showExpansion ? '닫기' : 'REC 5.0 비교'}
@@ -456,7 +467,7 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 배터리형 적용 상태 배지 (자가소비 모드일 때만 노출) */}
+      {/* 배터리형 적용 상태 배지 */}
       {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
         <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
           <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
