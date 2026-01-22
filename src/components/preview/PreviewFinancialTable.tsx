@@ -47,11 +47,14 @@ export default function PreviewFinancialTable() {
       : 0;
   const tractorCount = tractorCost > 0 ? 1 : 0;
 
-  // 4. 운영플랫폼 (이동형이든 고정형이든 사용 시 1식 발생)
+  // [수정] 4. 운영플랫폼 (용량 비례 자동 계산, Max 0.3억)
+  // 엑셀 공식: Min( (용량/100)*0.1, 0.3 )
+  const calculatedPlatformCost = Math.min((store.capacityKw / 100) * 0.1, 0.3);
+
   const platformCost =
     selectedModel !== 'KEPCO' &&
     ((useEc && truckCount > 0) || isEcSelfConsumption)
-      ? config.price_platform
+      ? calculatedPlatformCost // 1식이므로 그대로 사용
       : 0;
   const platformCount = platformCost > 0 ? 1 : 0;
 
@@ -140,7 +143,8 @@ export default function PreviewFinancialTable() {
             <td>운영플랫폼</td>
             <td>1 set</td>
             <td>{platformCount} set</td>
-            <td>{config.price_platform.toFixed(2)}</td>
+            {/* [수정] 단가에 계산된 값 표시 */}
+            <td>{calculatedPlatformCost.toFixed(2)}</td>
             <td className={styles.textBold}>{platformCost.toFixed(2)}</td>
           </tr>
 
@@ -149,7 +153,7 @@ export default function PreviewFinancialTable() {
             <td colSpan={4} className={styles.textRight}>
               초기 투자비 합계
             </td>
-            {/* store에서 계산된 정확한 합계 사용 */}
+            {/* store에서 계산된 정확한 합계 사용 (자동 검증됨) */}
             <td>{results.totalInvestmentUk.toFixed(2)}</td>
           </tr>
           <tr className={styles.bgTotal} style={{ backgroundColor: '#334155' }}>
@@ -166,7 +170,7 @@ export default function PreviewFinancialTable() {
         </tbody>
       </table>
 
-      {/* B. 연간 수익 분석 테이블 */}
+      {/* B. 연간 수익 분석 테이블 (기존 유지) */}
       <table className={styles.finTable}>
         <thead className={styles.bgBlueHeader}>
           <tr>

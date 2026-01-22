@@ -506,6 +506,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     if (moduleTier === 'ECONOMY') unitPrice = config.price_solar_economy;
 
     const solarCost = (capacityKw / 100) * unitPrice;
+
+    // [NEW] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
+    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
+    const calculatedPlatformCost = Math.min((capacityKw / 100) * 0.1, 0.3);
+
     let ecCost = 0,
       tractorCost = 0,
       platformCost = 0;
@@ -515,14 +520,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         const count = ecSelfConsumptionCount || 1;
         ecCost = count * config.price_ec_unit;
         tractorCost = 0;
-        platformCost = config.price_platform;
+        // 자가소비형: 플랫폼 비용만 발생 (수식 적용)
+        platformCost = calculatedPlatformCost;
       } else if (useEc) {
         ecCost = truckCount * config.price_ec_unit;
         tractorCost = truckCount > 0 ? config.price_tractor : 0;
-        platformCost = truckCount > 0 ? config.price_platform : 0;
+        // 이동형: 트랙터 + 플랫폼 비용 (수식 적용)
+        platformCost = truckCount > 0 ? calculatedPlatformCost : 0;
       }
     }
-    set({ totalInvestment: solarCost + ecCost + tractorCost + platformCost });
+    set({
+      totalInvestment: solarCost + ecCost + tractorCost + platformCost,
+    });
   },
 
   setCapacityKw: (val) => {
@@ -773,7 +782,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       const savedFin = data.input_data.financialSettings || {};
       const mergedFinancial = {
         rps: { ...defaultFin.rps, ...(savedFin.rps || {}) },
-        factoring: { ...defaultFin.factoring, ...(savedFin.factoring || {}) },
+        factoring: {
+          ...defaultFin.factoring,
+          ...(savedFin.factoring || {}),
+        },
       };
 
       let finalCapacity = data.input_data.capacityKw;
@@ -890,8 +902,37 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ecSelfConsumptionCount,
     } = state;
 
-    const totalInvestment = state.totalInvestment * 100000000;
-    const totalInvestmentUk = state.totalInvestment;
+    // [NEW] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
+    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
+    const calculatedPlatformCost = Math.min((capacityKw / 100) * 0.1, 0.3);
+
+    // [Mod] Recalculate total investment for accuracy inside simulation
+    let solarPrice = config.price_solar_standard;
+    if (state.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
+    else if (state.moduleTier === 'ECONOMY')
+      solarPrice = config.price_solar_economy;
+
+    const solarCost = (capacityKw / 100) * solarPrice;
+
+    let activeEcCount = 0;
+    if (isEcSelfConsumption) activeEcCount = ecSelfConsumptionCount || 1;
+    else if (useEc) activeEcCount = truckCount > 0 ? truckCount : 3;
+
+    let ecCost = 0;
+    let infraCost = 0; // tractor + platform
+
+    if (selectedModel !== 'KEPCO') {
+      ecCost = activeEcCount * config.price_ec_unit;
+      if (isEcSelfConsumption) {
+        infraCost = calculatedPlatformCost;
+      } else if (useEc && truckCount > 0) {
+        infraCost = config.price_tractor + calculatedPlatformCost;
+      }
+    }
+
+    const calculatedTotalInvestment = solarCost + ecCost + infraCost;
+    const totalInvestment = calculatedTotalInvestment * 100000000;
+    const totalInvestmentUk = calculatedTotalInvestment;
 
     // [수정] 3.64 -> config.solar_radiation
     const solarRadiation = config.solar_radiation || 3.8;

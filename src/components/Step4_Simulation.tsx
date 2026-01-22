@@ -141,7 +141,7 @@ export default function Step4_Simulation() {
   const renderRationalizationInput = (
     field: keyof RationalizationData,
     placeholder: string = '0',
-    extraClass: string = ''
+    extraClass: string = '',
   ) => {
     const value = rationalization[field];
     return (
@@ -249,9 +249,13 @@ export default function Step4_Simulation() {
       ? 1 * config.price_tractor
       : 0;
 
+  // [수정] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
+  // config.price_platform 대신 계산된 값을 사용
+  const calculatedPlatformCost = Math.min((store.capacityKw / 100) * 0.1, 0.3);
+
   const platformCost =
-    !isKepco && truckCount > 0 && (store.useEc || store.isEcSelfConsumption)
-      ? 1 * config.price_platform
+    !isKepco && (store.useEc || store.isEcSelfConsumption)
+      ? 1 * calculatedPlatformCost // 무조건 1식이므로 1을 곱함
       : 0;
 
   let totalInvestment20Years = 0;
@@ -507,7 +511,7 @@ export default function Step4_Simulation() {
                 onChange={(e) =>
                   store.setSimulationOption(
                     'isRationalizationEnabled',
-                    e.target.checked
+                    e.target.checked,
                   )
                 }
                 className="w-4 h-4 accent-blue-600 disabled:bg-slate-200"
@@ -745,8 +749,8 @@ export default function Step4_Simulation() {
                     {store.isEcSelfConsumption
                       ? store.ecSelfConsumptionCount
                       : store.useEc
-                      ? truckCount
-                      : 0}{' '}
+                        ? truckCount
+                        : 0}{' '}
                     ea
                   </td>
 
@@ -761,7 +765,8 @@ export default function Step4_Simulation() {
                   <td>{solarPrice.toFixed(2)} 억</td>
                   <td>{config.price_ec_unit.toFixed(2)} 억</td>
                   <td>{config.price_tractor.toFixed(2)} 억</td>
-                  <td>{config.price_platform.toFixed(2)} 억</td>
+                  {/* [수정] 단가 표시 부분: 계산된 값 적용 */}
+                  <td>{calculatedPlatformCost.toFixed(2)} 억</td>
                   <td>{maintenanceTableValue.toFixed(2)} 억</td>
                 </tr>
                 <tr className="font-bold text-slate-800 bg-slate-50">
@@ -819,7 +824,7 @@ export default function Step4_Simulation() {
                 onChange={(e) =>
                   store.setSimulationOption(
                     'isSurplusDiscarded',
-                    e.target.checked
+                    e.target.checked,
                   )
                 }
               />

@@ -160,7 +160,6 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
             {/* ✅ 4번 탭: 상세 옵션 설정 (단가 + 금융) */}
             {activeTab === 3 && (
               <div className="max-w-4xl mx-auto">
-                {/* 4번 탭 내부 서브 탭 */}
                 <div className="flex space-x-4 mb-6 border-b border-gray-100 pb-2">
                   <button
                     onClick={() => setActiveConfigSubTab('basic')}
@@ -217,11 +216,17 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           field="price_tractor"
                           store={store}
                         />
-                        <ConfigInput
-                          label="운영 플랫폼"
-                          field="price_platform"
-                          store={store}
-                        />
+
+                        {/* [수정] 운영 플랫폼: 입력 필드 제거 -> 자동 계산 안내 표시 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">
+                            운영 플랫폼
+                          </label>
+                          <div className="w-full p-2 border border-gray-200 rounded bg-gray-100 text-right text-sm text-gray-500 font-medium">
+                            용량 비례 자동 산출 (Max 0.3억)
+                          </div>
+                        </div>
+
                         <ConfigInput
                           label="EC 운영 인건비"
                           field="price_labor_ec"
@@ -355,7 +360,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                       </div>
                     </div>
 
-                    {/* 3. 시뮬레이션 비율 */}
+                    {/* 3. 시뮬레이션 비율 - 기존 디자인 유지 */}
                     <div>
                       <h3 className="text-sm font-bold text-orange-600 mb-4 uppercase tracking-wider border-b pb-2 border-orange-100">
                         3. 시뮬레이션 기준 비율 / 설정
@@ -409,7 +414,7 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           </div>
                         </div>
 
-                        {/* [NEW] 일조량 */}
+                        {/* [NEW - 추가됨] 일조량 (시간/일) */}
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 mb-1">
                             일조량 (시간/일)

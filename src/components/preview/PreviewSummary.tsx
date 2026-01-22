@@ -253,11 +253,17 @@ export default function PreviewSummary() {
     const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = activeEcCount * config.price_ec_unit;
 
+    // [수정] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
+    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
+    const calculatedPlatformCost = Math.min((capacity / 100) * 0.1, 0.3);
+
     let infraCost = 0;
     if (isEcSelfConsumption) {
-      infraCost = config.price_platform;
+      // 자가소비형: 플랫폼 비용만 발생 (수식 적용)
+      infraCost = calculatedPlatformCost;
     } else if (store.useEc && activeEcCount > 0) {
-      infraCost = config.price_tractor + config.price_platform;
+      // 이동형: 트랙터 + 플랫폼 비용 (수식 적용)
+      infraCost = config.price_tractor + calculatedPlatformCost;
     }
 
     const investUk = solarCost + ecCost + infraCost;
@@ -277,10 +283,10 @@ export default function PreviewSummary() {
       title: isPremium
         ? isEcSelfConsumption
           ? 'TYPE B. EC 자가소비 Plan'
-          : 'TYPE B. REC 5.0 Plan (수익 극대화)'
+          : 'TYPE B. REC 5.0 Plan'
         : isEcSelfConsumption
           ? 'TYPE A. EC 자가소비 Plan'
-          : 'TYPE A. REC 1.5 Plan (자가소비형)',
+          : 'TYPE A. REC 1.5 Plan',
       invest: investUk,
       ecCount: activeEcCount,
       annualProfit: annualNetProfitWon / 100000000,
@@ -397,7 +403,9 @@ export default function PreviewSummary() {
         </div>
       </div>
       <div
-        className={`${styles.card} ${styles.cardTotal} ${d.isPro ? styles.cardHighlight : ''}`}
+        className={`${styles.card} ${styles.cardTotal} ${
+          d.isPro ? styles.cardHighlight : ''
+        }`}
       >
         <div
           className={`${styles.cardHeader} ${d.isPro ? styles.headerPro : ''}`}
@@ -407,7 +415,9 @@ export default function PreviewSummary() {
         <div className={styles.cardBody}>
           <div className={styles.totalRow}>
             <div
-              className={`${styles.mainValue} ${d.isPro ? styles.textHighlight : ''}`}
+              className={`${styles.mainValue} ${
+                d.isPro ? styles.textHighlight : ''
+              }`}
             >
               {toUk(d.totalProfit20)} <span className={styles.unit}>억원</span>
             </div>
@@ -438,7 +448,11 @@ export default function PreviewSummary() {
         <div className="flex items-center gap-2">
           {contractType.includes('(을)') && (
             <div
-              className={`text-xs font-bold px-2 py-1 rounded border ${isRationalizationEnabled ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+              className={`text-xs font-bold px-2 py-1 rounded border ${
+                isRationalizationEnabled
+                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}
             >
               {isRationalizationEnabled
                 ? '요금합리화 가능'
@@ -456,7 +470,9 @@ export default function PreviewSummary() {
               <span className="font-bold text-slate-700">EC 적용</span>
             </label>
             <button
-              className={`${styles.expandBtn} ${showExpansion ? styles.active : ''}`}
+              className={`${styles.expandBtn} ${
+                showExpansion ? styles.active : ''
+              }`}
               onClick={() => setShowExpansion(!showExpansion)}
             >
               {showExpansion ? '닫기' : 'REC 5.0 비교'}
