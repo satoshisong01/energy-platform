@@ -257,7 +257,7 @@ export default function Step3_EnergyData() {
 
     // [중요 수정] 판매 단가 동기화
     // 기존: store.unitPriceSell (구버전 변수) -> 수정: config.unit_price_kepco (설정값)
-    const unitPriceSell = config.unit_price_kepco || 192.79;
+    const unitPriceSell = config.unit_price_kepco || 210;
 
     // 6. 잉여수익 계산
     const surplusRevenue = surplusPower * unitPriceSell;

@@ -98,7 +98,7 @@ export default function PreviewPanel() {
     const afterBill = Math.max(0, data.totalBill - totalSavings);
     
     // [수정 2] 잉여수익 계산 시 설정된 판매단가(SMP+REC) 사용
-    const unitPriceSell = config.unit_price_kepco || 192.79;
+    const unitPriceSell = config.unit_price_kepco || 210;
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {

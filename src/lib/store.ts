@@ -275,7 +275,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     solarGeneration: 0,
   })),
   unitPriceSavings: 210.5,
-  unitPriceSell: 192.79,
+  unitPriceSell: 210,
   peakReductionRatio: 0.359,
   energyNote: '',
   rationalization: {
@@ -306,7 +306,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     price_tractor: 0.4,
     price_platform: 0.3,
     price_labor_ec: 0.4,
-    unit_price_kepco: 192.79,
+    unit_price_kepco: 210,
     unit_price_savings: 136.47,
     unit_price_ec_1_5: 261.45,
     unit_price_ec_5_0: 441.15,
