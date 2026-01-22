@@ -18,7 +18,13 @@ export default function PreviewSiteAnalysis() {
   // 2. 평수 계산 (단순 표시용)
   const totalAreaPyeong = totalAreaM2 / 3.3058;
 
-  // 3. 모듈 수량 (설정값 사용, 기본값 645W)
+  // [수정] 3. 면적 대비 이론적 최대 용량 계산 (Step2와 동일 로직)
+  // 설정된 비율(기본 2.0평당 1kW)로 나눔
+  const capacityFactor = config.solar_capacity_factor || 2.0;
+  const maxPotentialKw =
+    totalAreaPyeong > 0 ? Math.floor(totalAreaPyeong / capacityFactor) : 0;
+
+  // 4. 모듈 수량 (사용자가 입력한 최종 용량 기준, 기본값 645W)
   const panelWatt = config.solar_panel_wattage || 645;
   const moduleCount =
     capacityKw > 0 ? Math.round((capacityKw * 1000) / panelWatt) : 0;
@@ -69,10 +75,11 @@ export default function PreviewSiteAnalysis() {
         <div className={styles.rightPanel}>
           <div className={styles.subHeader}>태양광설치 가능 공간</div>
 
+          {/* [수정] 최대 가능 발전: 면적 기반 계산값 표시 */}
           <div className={styles.capacityRow}>
             <span>최대가능발전</span>
             <span className={styles.capacityVal}>
-              {capacityKw.toLocaleString()} kW
+              {maxPotentialKw.toLocaleString()} kW
             </span>
           </div>
 
@@ -84,7 +91,7 @@ export default function PreviewSiteAnalysis() {
             />
           </div>
 
-          {/* 최적 설치 공간 (Step 2에서 결정된 용량 표시) */}
+          {/* 최적 설치 공간: 사용자가 입력한(조정한) 용량 표시 */}
           <div className={styles.optimalBox}>
             <div className={styles.optLabel}>최적 설치 공간</div>
             <div className={styles.optVal}>
@@ -92,11 +99,11 @@ export default function PreviewSiteAnalysis() {
             </div>
           </div>
 
-          {/* 한전 최대 발전 */}
+          {/* [수정] 한전 최대 발전: 보통 최대 가능 용량을 따라가거나 동일하게 표시 */}
           <div className={styles.kepcoBox}>
             <div className={styles.kepLabel}>한전최대발전</div>
             <div className={styles.kepVal}>
-              {capacityKw.toLocaleString()} kW
+              {maxPotentialKw.toLocaleString()} kW
             </div>
           </div>
 
