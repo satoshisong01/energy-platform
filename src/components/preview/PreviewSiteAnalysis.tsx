@@ -103,7 +103,8 @@ export default function PreviewSiteAnalysis() {
           <div className={styles.kepcoBox}>
             <div className={styles.kepLabel}>한전최대발전</div>
             <div className={styles.kepVal}>
-              {maxPotentialKw.toLocaleString()} kW
+              {/* {maxPotentialKw.toLocaleString()} kW */}
+              {capacityKw.toLocaleString()} kW
             </div>
           </div>
 
