@@ -22,7 +22,7 @@ import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 const round2 = (num: number) => Math.round(num * 100) / 100;
 
 // ----------------------------------------------------------------
-// [Footer] 페이지 하단 Footer 컴포넌트
+// [수정] 페이지 하단 Footer 컴포넌트
 // ----------------------------------------------------------------
 const PageFooter = ({ page }: { page: number }) => {
   const store = useProposalStore();
@@ -43,7 +43,6 @@ const PageFooter = ({ page }: { page: number }) => {
 
 export default function PreviewPanel() {
   const store = useProposalStore();
-  // [수정] config 추가 가져오기
   const {
     config,
     rationalization,
@@ -65,7 +64,7 @@ export default function PreviewPanel() {
   const computedData = store.monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
 
-    // [수정] 하드코딩(3.64) 제거 -> 설정값(solar_radiation) 사용 (기본 3.8)
+    // [수정 1] 하드코딩(3.64) 제거 -> 설정값(solar_radiation) 사용 (기본 3.8)
     const dailyGenHours = config.solar_radiation || 3.8;
 
     const autoSolarGen = store.capacityKw * dailyGenHours * days;
@@ -77,11 +76,11 @@ export default function PreviewPanel() {
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
     const totalUsage = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
-      0,
+      0
     );
     const totalSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0,
+      0
     );
     const dynamicPeakRatio = totalUsage > 0 ? totalSelf / totalUsage : 0;
 
@@ -89,7 +88,7 @@ export default function PreviewPanel() {
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw,
+        data.baseBill - store.baseRate * data.peakKw
       );
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
@@ -97,7 +96,9 @@ export default function PreviewPanel() {
 
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
-    const unitPriceSell = store.unitPriceSell || 192.79;
+    
+    // [수정 2] 잉여수익 계산 시 설정된 판매단가(SMP+REC) 사용
+    const unitPriceSell = config.unit_price_kepco || 192.79;
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {
@@ -141,7 +142,7 @@ export default function PreviewPanel() {
       totalSavings: 0,
       afterBill: 0,
       surplusRevenue: 0,
-    },
+    }
   );
 
   const savingRate =
@@ -149,6 +150,15 @@ export default function PreviewPanel() {
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
+
+  // [수정 3] 누락되었던 연간 발전량 계산 함수 추가 (헤더 표시용)
+  const calculateAnnualGen = () => {
+    const solarRadiation = config.solar_radiation || 3.8;
+    return store.monthlyData.reduce((acc, cur) => {
+      const days = new Date(2025, cur.month, 0).getDate();
+      return acc + store.capacityKw * solarRadiation * days;
+    }, 0);
+  };
 
   // ----------------------------------------------------------------
   // UI 렌더링
@@ -166,6 +176,7 @@ export default function PreviewPanel() {
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
             <p className={styles.companySub}>FIRST C&D Inc.</p>
           </div>
+          {/* 상단 컨트롤바가 따로 없으므로 여기 버튼 유지 */}
           <button
             onClick={handlePrint}
             className={`${styles.printButton} no-print`}
@@ -210,10 +221,14 @@ export default function PreviewPanel() {
               {isEcSelfConsumption
                 ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
                 : store.useEc && truckCount > 0
-                  ? `, 이동형 EC ${truckCount}대`
-                  : ''}
+                ? `, 이동형 EC ${truckCount}대`
+                : ''}
               ) -
             </h2>
+            {/* [추가] 일조량 표시 */}
+            <div className="text-xs text-slate-500 mt-1">
+               * 적용 일조량: {config.solar_radiation || 3.8} 시간/일
+            </div>
           </div>
           <div className={styles.contractCard}>
             <div className={styles.contractLabel}>적용 계약 종별</div>
