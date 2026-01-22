@@ -8,10 +8,11 @@ import {
   LucideTable,
   LucideUpload,
   LucideArrowDownToLine,
+  LucideZap, // 아이콘 추가
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// ... (NumberInput 컴포넌트) ...
+// ... (NumberInput 컴포넌트는 기존과 동일) ...
 interface NumberInputProps {
   value: number;
   onChange: (val: number) => void;
@@ -86,8 +87,8 @@ const NumberInput = ({
 
 export default function Step3_EnergyData() {
   const store = useProposalStore();
-  // [수정] config 가져오기
-  const { config } = store;
+  // [중요] config를 가져와야 판매단가/일조량에 접근 가능
+  const { config, monthlyData, capacityKw } = store;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTariffChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -107,6 +108,23 @@ export default function Step3_EnergyData() {
     value: number,
   ) => {
     store.updateMonthlyData(month, field, value);
+  };
+
+  // [기능 추가] 예상 발전량 자동 계산 버튼 핸들러
+  // 사용자가 일일이 입력하지 않고, 설정된 일조량 기반으로 자동 채우기
+  const calculateAutoUsage = () => {
+    const solarRadiation = config.solar_radiation || 3.8;
+    const newData = monthlyData.map((d) => {
+      const days = getDaysInMonth(d.month);
+      // 발전량 = 용량 * 일조량 * 일수 (반올림하여 정수화)
+      const gen = Math.round(capacityKw * solarRadiation * days);
+
+      return {
+        ...d,
+        solarGeneration: gen,
+      };
+    });
+    store.setMonthlyData(newData);
   };
 
   // 일괄적용 버튼
@@ -189,31 +207,41 @@ export default function Step3_EnergyData() {
     reader.readAsBinaryString(file);
   };
 
-  // 계산 로직
-  const totalUsageInput = store.monthlyData.reduce(
+  // ----------------------------------------------------------------------
+  // [핵심 수정] 실시간 계산 로직 (엑셀과 값 맞추기)
+  // ----------------------------------------------------------------------
+  const totalUsageInput = monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
     0,
   );
-  const totalSelfConsumptionInput = store.monthlyData.reduce(
+  const totalSelfConsumptionInput = monthlyData.reduce(
     (acc, cur) => acc + cur.selfConsumption,
     0,
   );
   const dynamicPeakRatio =
     totalUsageInput > 0 ? totalSelfConsumptionInput / totalUsageInput : 0;
 
-  const computedData = store.monthlyData.map((data) => {
+  const computedData = monthlyData.map((data) => {
     const days = getDaysInMonth(data.month);
 
-    // [수정] 설정된 일조량 사용 (없으면 기본값 3.8)
+    // 1. 일조량 설정 반영
     const dailyGenHours = config.solar_radiation || 3.8;
 
-    const autoSolarGen = store.capacityKw * dailyGenHours * days;
+    // 2. 자동 발전량 계산 (반올림하여 정수화 - 엑셀과 통일성 유지)
+    const autoSolarGen = Math.round(store.capacityKw * dailyGenHours * days);
+
+    // 3. 실제 적용 발전량 (사용자 입력값이 있으면 우선 사용)
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
+
+    // 4. 잉여전력 = 발전량 - 자가소비 (음수 방지)
     const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
+
+    // 5. 절감액 계산
     const unitPriceSavings = store.unitPriceSavings || 136.47;
     const maxLoadSavings =
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
+
     let baseBillSavings = 0;
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
@@ -223,15 +251,21 @@ export default function Step3_EnergyData() {
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
     }
+
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
-    const unitPriceSell = store.unitPriceSell || 192.79;
+
+    // [중요 수정] 판매 단가 동기화
+    // 기존: store.unitPriceSell (구버전 변수) -> 수정: config.unit_price_kepco (설정값)
+    const unitPriceSell = config.unit_price_kepco || 192.79;
+
+    // 6. 잉여수익 계산
     const surplusRevenue = surplusPower * unitPriceSell;
 
     return {
       ...data,
-      solarGeneration,
-      autoSolarGen,
+      solarGeneration, // 계산된 발전량 (또는 입력값)
+      autoSolarGen, // 참고용 자동계산값
       surplusPower,
       maxLoadSavings,
       baseBillSavings,
@@ -241,6 +275,7 @@ export default function Step3_EnergyData() {
     };
   });
 
+  // 합계 계산
   const totals = computedData.reduce(
     (acc, cur) => ({
       usageKwh: acc.usageKwh + cur.usageKwh,
@@ -274,7 +309,6 @@ export default function Step3_EnergyData() {
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
-
   const isGap = store.contractType.includes('(갑)');
 
   return (
@@ -285,6 +319,15 @@ export default function Step3_EnergyData() {
         </h3>
 
         <div className="flex gap-2">
+          {/* [추가] 예상 발전량 자동 계산 버튼 */}
+          <button
+            onClick={calculateAutoUsage}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded transition font-bold"
+            title="용량과 일조량을 기반으로 발전량 데이터를 자동 생성합니다."
+          >
+            <LucideZap size={14} /> 예상 발전량 자동 계산
+          </button>
+
           <input
             type="file"
             accept=".xlsx, .xls"
@@ -512,7 +555,7 @@ export default function Step3_EnergyData() {
                     />
                   </td>
 
-                  {/* 발전량 */}
+                  {/* 발전량 (예상발전량 placeholder 표시) */}
                   <td
                     className={`${styles.resultCell} ${styles.textBlue} ${styles.bold}`}
                   >
@@ -521,9 +564,7 @@ export default function Step3_EnergyData() {
                       onChange={(val) =>
                         updateStore(row.month, 'solarGeneration', val)
                       }
-                      placeholder={Math.round(
-                        row.autoSolarGen,
-                      ).toLocaleString()}
+                      placeholder={row.autoSolarGen.toLocaleString()}
                       className={styles.textBlue}
                     />
                   </td>
@@ -579,6 +620,7 @@ export default function Step3_EnergyData() {
                   </td>
                 </tr>
               ))}
+              {/* 합계 행 */}
               <tr
                 style={{
                   borderTop: '2px solid #cbd5e1',
