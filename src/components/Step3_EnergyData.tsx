@@ -8,7 +8,6 @@ import {
   LucideTable,
   LucideUpload,
   LucideArrowDownToLine,
-  LucideZap, // 아이콘 추가
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -108,23 +107,6 @@ export default function Step3_EnergyData() {
     value: number,
   ) => {
     store.updateMonthlyData(month, field, value);
-  };
-
-  // [기능 추가] 예상 발전량 자동 계산 버튼 핸들러
-  // 사용자가 일일이 입력하지 않고, 설정된 일조량 기반으로 자동 채우기
-  const calculateAutoUsage = () => {
-    const solarRadiation = config.solar_radiation || 3.8;
-    const newData = monthlyData.map((d) => {
-      const days = getDaysInMonth(d.month);
-      // 발전량 = 용량 * 일조량 * 일수 (반올림하여 정수화)
-      const gen = Math.round(capacityKw * solarRadiation * days);
-
-      return {
-        ...d,
-        solarGeneration: gen,
-      };
-    });
-    store.setMonthlyData(newData);
   };
 
   // 일괄적용 버튼
@@ -319,15 +301,7 @@ export default function Step3_EnergyData() {
         </h3>
 
         <div className="flex gap-2">
-          {/* [추가] 예상 발전량 자동 계산 버튼 */}
-          <button
-            onClick={calculateAutoUsage}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 rounded transition font-bold"
-            title="용량과 일조량을 기반으로 발전량 데이터를 자동 생성합니다."
-          >
-            <LucideZap size={14} /> 예상 발전량 자동 계산
-          </button>
-
+          {/* [수정] 자동 계산 버튼 제거됨 */}
           <input
             type="file"
             accept=".xlsx, .xls"
