@@ -76,11 +76,11 @@ export default function PreviewPanel() {
       Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
     const totalUsage = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
-      0
+      0,
     );
     const totalSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0
+      0,
     );
     const dynamicPeakRatio = totalUsage > 0 ? totalSelf / totalUsage : 0;
 
@@ -88,7 +88,7 @@ export default function PreviewPanel() {
     if (data.peakKw > 0) {
       baseBillSavings = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw
+        data.baseBill - store.baseRate * data.peakKw,
       );
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
@@ -96,7 +96,7 @@ export default function PreviewPanel() {
 
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
-    
+
     // [수정 2] 잉여수익 계산 시 설정된 판매단가(SMP+REC) 사용
     const unitPriceSell = config.unit_price_kepco || 210;
     const surplusRevenue = surplusPower * unitPriceSell;
@@ -142,7 +142,7 @@ export default function PreviewPanel() {
       totalSavings: 0,
       afterBill: 0,
       surplusRevenue: 0,
-    }
+    },
   );
 
   const savingRate =
@@ -221,13 +221,13 @@ export default function PreviewPanel() {
               {isEcSelfConsumption
                 ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
                 : store.useEc && truckCount > 0
-                ? `, 이동형 EC ${truckCount}대`
-                : ''}
+                  ? `, 이동형 EC ${truckCount}대`
+                  : ''}
               ) -
             </h2>
             {/* [추가] 일조량 표시 */}
             <div className="text-xs text-slate-500 mt-1">
-               * 적용 일조량: {config.solar_radiation || 3.8} 시간/일
+              * 적용 일조량: {config.solar_radiation || 3.8} 시간/일
             </div>
           </div>
           <div className={styles.contractCard}>
@@ -236,7 +236,7 @@ export default function PreviewPanel() {
           </div>
         </div>
 
-        <div style={{ width: '100%', marginTop: '20px' }}>
+        <div style={{ width: '100%', marginTop: '10px' }}>
           <PreviewSummary />
         </div>
         <PageFooter page={1} />

@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 
-// ------------------------------------------------------------------
-// 1. 타입 정의 (Data Types)
-// ------------------------------------------------------------------
+// ... (RoofArea, MonthlyData 등 기존 타입 정의 유지) ...
 
 export type RoofArea = {
   id: string;
@@ -42,12 +40,9 @@ export interface FinancialSettings {
 }
 
 export type SystemConfig = {
-  // [NEW] 일조량 (시간/일) - 기본 3.8
   solar_radiation: number;
-
-  solar_panel_wattage: number; // 모듈 개당 출력 (W)
-  solar_capacity_factor: number; // 용량 산출 비율 (평수 / N)
-
+  solar_panel_wattage: number;
+  solar_capacity_factor: number;
   price_solar_premium: number;
   price_solar_standard: number;
   price_solar_economy: number;
@@ -99,6 +94,7 @@ export type ProposalMeta = {
   updated_at: string;
 };
 
+// [수정] 상세 내역 필드 3개 추가 (totalSolarRevenue20, totalRationalization20, totalMaintenance20)
 type SimulationResult = {
   totalInvestment: number;
   totalInvestmentUk: number;
@@ -117,6 +113,12 @@ type SimulationResult = {
   annualMaintenanceCost: number;
   laborCostWon: number;
   self_final_profit: number;
+
+  // [NEW] 20년 상세 내역
+  totalSolarRevenue20: number;
+  totalRationalization20: number;
+  totalMaintenance20: number;
+
   rps_final_profit: number;
   fac_final_profit: number;
   rental_final_profit: number;
@@ -253,6 +255,7 @@ const DEFAULT_TARIFFS: TariffPreset[] = [
 ];
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
+  // ... (초기 상태값들은 기존과 동일, 생략 없이 유지) ...
   siteImage: null,
   proposalId: null,
   proposalName: '',
@@ -294,11 +297,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     max_usage: 0,
   },
   config: {
-    // [NEW] 기본 설정값: 일조량 3.8
     solar_radiation: 3.8,
     solar_panel_wattage: 645,
     solar_capacity_factor: 2.0,
-
     price_solar_premium: 0.97,
     price_solar_standard: 0.9,
     price_solar_economy: 0.84,
@@ -336,7 +337,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   tariffPresets: DEFAULT_TARIFFS,
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
-
   useEc: false,
   truckCount: 0,
   maintenanceRate: 5.0,
@@ -379,10 +379,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const state = get();
     const totalM2 = areas.reduce((sum, area) => sum + area.valueM2, 0);
     const totalPyeong = totalM2 * 0.3025;
-
     const factor = state.config.solar_capacity_factor || 2.0;
     const capacity = Math.floor(totalPyeong / factor);
-
     set({ totalAreaPyeong: Math.round(totalPyeong), capacityKw: capacity });
     get().recalculateInvestment();
   },
@@ -417,11 +415,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => ({
       rationalization: { ...state.rationalization, [field]: value },
     })),
-
   setSimulationOption: (field, value) => {
     set((state) => {
       let newState = { ...state, [field]: value };
-
       if (field === 'isEcSelfConsumption') {
         if (value === true) {
           newState.useEc = false;
@@ -433,7 +429,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           newState.maintenanceRate = 5.0;
         }
       }
-
       if (field === 'useEc') {
         if (value === true) {
           newState.isEcSelfConsumption = false;
@@ -445,20 +440,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           newState.truckCount = 0;
         }
       }
-
       return newState;
     });
     get().recalculateInvestment();
   },
-
   setTruckCount: (count) => {
     set({ truckCount: count });
     get().recalculateInvestment();
   },
-
   updateConfig: (field, value) => {
     set((state) => ({ config: { ...state.config, [field]: value } }));
-
     if (field === 'solar_capacity_factor') {
       get().recalculateCapacity(get().roofAreas);
     } else {
@@ -488,7 +479,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     if (state.contractType === updated.name)
       get().setContractType(updated.name, updated.baseRate, updated.savings);
   },
-
   recalculateInvestment: () => {
     const state = get();
     const {
@@ -506,9 +496,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     if (moduleTier === 'ECONOMY') unitPrice = config.price_solar_economy;
 
     const solarCost = (capacityKw / 100) * unitPrice;
-
-    // [NEW] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
-    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
     const calculatedPlatformCost = Math.min((capacityKw / 100) * 0.1, 0.3);
 
     let ecCost = 0,
@@ -520,12 +507,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         const count = ecSelfConsumptionCount || 1;
         ecCost = count * config.price_ec_unit;
         tractorCost = 0;
-        // 자가소비형: 플랫폼 비용만 발생 (수식 적용)
         platformCost = calculatedPlatformCost;
       } else if (useEc) {
         ecCost = truckCount * config.price_ec_unit;
         tractorCost = truckCount > 0 ? config.price_tractor : 0;
-        // 이동형: 트랙터 + 플랫폼 비용 (수식 적용)
         platformCost = truckCount > 0 ? calculatedPlatformCost : 0;
       }
     }
@@ -533,13 +518,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestment: solarCost + ecCost + tractorCost + platformCost,
     });
   },
-
   setCapacityKw: (val) => {
     set({ capacityKw: val });
     get().recalculateInvestment();
   },
   setRecAveragePrice: (price) => set({ recAveragePrice: price }),
-
   getProposalFileName: () => {
     const state = get();
     const date = new Date();
@@ -555,7 +538,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       : '';
     return `분석자료_${state.clientName}_${state.capacityKw}kW${ecPart}_${dateStr}`;
   },
-
   checkDuplicateName: async (name, excludeId) => {
     let query = supabase
       .from('proposals')
@@ -569,7 +551,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
     return data && data.length > 0;
   },
-
   saveProposal: async (customName) => {
     const state = get();
     const defaultName = get().getProposalFileName();
@@ -582,7 +563,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       alert('❌ 이미 같은 이름의 분석자료가 존재합니다.');
       return false;
     }
-
     const saveData = {
       clientName: state.clientName,
       targetDate: state.targetDate,
@@ -613,7 +593,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       siteImage: state.siteImage,
       capacityKw: state.capacityKw,
     };
-
     try {
       if (state.proposalId) {
         const { error } = await supabase
@@ -654,7 +633,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return false;
     }
   },
-
   saveAsProposal: async (customName) => {
     const state = get();
     const isDuplicate = await get().checkDuplicateName(customName);
@@ -664,7 +642,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return false;
     }
-
     const saveData = {
       clientName: state.clientName,
       targetDate: state.targetDate,
@@ -694,7 +671,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       recAveragePrice: state.recAveragePrice,
       capacityKw: state.capacityKw,
     };
-
     try {
       const { data, error } = await supabase
         .from('proposals')
@@ -720,7 +696,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return false;
     }
   },
-
   renameProposal: async (id, newName) => {
     const isDuplicate = await get().checkDuplicateName(newName, id);
     if (isDuplicate) {
@@ -744,7 +719,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return false;
     }
   },
-
   fetchProposalList: async () => {
     try {
       const { data, error } = await supabase
@@ -758,7 +732,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       return [];
     }
   },
-
   loadProposal: async (id) => {
     try {
       const { data, error } = await supabase
@@ -768,7 +741,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         .single();
       if (error) throw error;
       if (!data) throw new Error('데이터 없음');
-
       const savedPresets = data.input_data.tariffPresets || [];
       const newPresets = DEFAULT_TARIFFS.filter(
         (def) =>
@@ -777,7 +749,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       const mergedPresets = [...savedPresets, ...newPresets].sort(
         (a, b) => a.id - b.id,
       );
-
       const defaultFin = get().financialSettings;
       const savedFin = data.input_data.financialSettings || {};
       const mergedFinancial = {
@@ -787,7 +758,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           ...(savedFin.factoring || {}),
         },
       };
-
       let finalCapacity = data.input_data.capacityKw;
       if (finalCapacity === undefined || finalCapacity === null) {
         const totalM2 = (data.input_data.roofAreas || []).reduce(
@@ -797,7 +767,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         const totalPyeong = totalM2 * 0.3025;
         finalCapacity = Math.floor(totalPyeong / 2);
       }
-
       set({
         proposalId: data.id,
         proposalName: data.proposal_name || data.client_name,
@@ -822,7 +791,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       alert(`불러오기 실패: ${error.message}`);
     }
   },
-
   deleteProposal: async (id) => {
     try {
       const { error } = await supabase.from('proposals').delete().eq('id', id);
@@ -833,7 +801,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       alert(`삭제 실패: ${error.message}`);
     }
   },
-
   resetProposal: () => {
     set({
       siteImage: null,
@@ -883,7 +850,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ecSelfConsumptionCount: 1,
     });
   },
-
   getSimulationResults: () => {
     const state = get();
     const {
@@ -902,24 +868,20 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       ecSelfConsumptionCount,
     } = state;
 
-    // [NEW] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
-    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
+    // 1. 투자비 계산 (플랫폼 비용 자동화 포함)
     const calculatedPlatformCost = Math.min((capacityKw / 100) * 0.1, 0.3);
-
-    // [Mod] Recalculate total investment for accuracy inside simulation
     let solarPrice = config.price_solar_standard;
     if (state.moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
     else if (state.moduleTier === 'ECONOMY')
       solarPrice = config.price_solar_economy;
 
     const solarCost = (capacityKw / 100) * solarPrice;
-
     let activeEcCount = 0;
     if (isEcSelfConsumption) activeEcCount = ecSelfConsumptionCount || 1;
     else if (useEc) activeEcCount = truckCount > 0 ? truckCount : 3;
 
     let ecCost = 0;
-    let infraCost = 0; // tractor + platform
+    let infraCost = 0;
 
     if (selectedModel !== 'KEPCO') {
       ecCost = activeEcCount * config.price_ec_unit;
@@ -931,12 +893,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
 
     const calculatedTotalInvestment = solarCost + ecCost + infraCost;
-    const totalInvestment = calculatedTotalInvestment * 100000000;
-    const totalInvestmentUk = calculatedTotalInvestment;
 
-    // [수정] 3.64 -> config.solar_radiation
+    // [중요] 투자비 에누리 (10만원 단위 절삭) 적용
+    const rawTotalInvestment = calculatedTotalInvestment * 100000000;
+    const totalInvestment = Math.floor(rawTotalInvestment / 100000) * 100000;
+    const totalInvestmentUk = totalInvestment / 100000000;
+
+    // 2. 연간 기본 데이터 계산
     const solarRadiation = config.solar_radiation || 3.8;
-
     const initialAnnualGen = monthlyData.reduce((acc, cur) => {
       const days = new Date(2025, cur.month, 0).getDate();
       return acc + capacityKw * solarRadiation * days;
@@ -1035,6 +999,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         totalRationalizationSavings;
     }
 
+    // 3. 비용 계산 (1차년도 기준 고정값)
     const laborCostWon =
       truckCount > 0 &&
       useEc &&
@@ -1042,26 +1007,49 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       !isEcSelfConsumption
         ? config.price_labor_ec * 100000000
         : 0;
+
+    // [주의] 유지보수비는 "1차년도 매출" 기준으로 산정하여 20년간 고정
     const annualMaintenanceCost =
       (annualGrossRevenue * state.maintenanceRate) / 100 + laborCostWon;
-    const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost;
+    const annualOperatingProfit = annualGrossRevenue - annualMaintenanceCost; // 1차년도 순수익
 
+    // 4. [수정됨] 20년 누적 수익 계산 (항목별 분리 적용)
     const degradationRateDecimal = -(state.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
-    const self_final_profit =
-      (annualOperatingProfit * (1 - Math.pow(R, n))) / (1 - R);
 
+    // (1) 태양광 발전 기반 수익 (매년 감소)
+    //     항목: 자가소비절감 + EC판매 + 잉여판매
+    const annualSolarRevenue = revenue_saving + revenue_ec + revenue_surplus;
+    //     등비수열 합: A * (1 - R^n) / (1 - R)
+    const totalSolarRevenue20 =
+      (annualSolarRevenue * (1 - Math.pow(R, n))) / (1 - R);
+
+    // (2) 전기요금 합리화 절감액 (매년 고정, 감소 안 함)
+    const totalRationalization20 = totalRationalizationSavings * 20;
+
+    // (3) 유지보수 비용 (매년 고정, 감소 안 함)
+    const totalMaintenance20 = annualMaintenanceCost * 20;
+
+    // (4) 최종 20년 누적 순수익
+    //     = (태양광20년 + 합리화20년) - 유지보수20년
+    const self_final_profit =
+      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
+
+    // --- 금융 비용 처리 (절삭된 totalInvestment 사용) ---
     const rps = financialSettings.rps;
     const rps_rate = rps.interestRate / 100;
     const rps_loan = totalInvestment * (rps.loanRatio / 100);
     const rps_equity = totalInvestment * (rps.equityRatio / 100);
     const rps_interest_only = rps_loan * rps_rate;
     const rps_pmt = PMT(rps_rate, rps.repaymentPeriod, -rps_loan);
+
+    // RPS 최종수익 = (순수익 합계) - (총 이자 및 원금 상환액)
     const rps_final_profit =
       self_final_profit -
       rps_interest_only * rps.gracePeriod -
       Math.abs(rps_pmt) * rps.repaymentPeriod;
+
     const rps_net_1_5 = annualOperatingProfit - rps_interest_only;
     const rps_net_6_15 = annualOperatingProfit + rps_pmt;
 
@@ -1070,18 +1058,21 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const fac_loan = totalInvestment * (fac.loanRatio / 100);
     const fac_interest_only = fac_loan * fac_rate;
     const fac_pmt = PMT(fac_rate, fac.repaymentPeriod, -fac_loan);
+
     const fac_final_profit =
       self_final_profit -
       fac_interest_only * fac.gracePeriod -
       Math.abs(fac_pmt) * fac.repaymentPeriod;
+
     const fac_net_1 = annualOperatingProfit - fac_interest_only;
     const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
-    // [수정] 3.64 -> solarRadiation
+    // 임대/구독 등 기타 계산
     const rental_revenue_yr =
       capacityKw * 0.2 * config.unit_price_kepco * solarRadiation * 365 +
       capacityKw * 0.8 * config.rental_price_per_kw;
     const rental_final_profit = rental_revenue_yr * 20;
+
     const price_standard = 210.5;
     const annualSelfConsumptionForSub = monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
@@ -1099,7 +1090,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
-    // [수정] 3.64 -> solarRadiation
     const rec_1000_rent = (capacityKw * 0.2 * solarRadiation * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
     const rec_annual_common = rec_1000_common * recPrice * 1000;
@@ -1114,8 +1104,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       fac_final_profit / 20 > 0 ? totalInvestment / (fac_final_profit / 20) : 0;
 
     return {
-      totalInvestment,
-      totalInvestmentUk,
+      totalInvestment, // 절삭된 금액
+      totalInvestmentUk, // 절삭된 억 단위
       initialAnnualGen,
       annualSelfConsumption:
         selectedModel === 'KEPCO' || isGap
@@ -1141,6 +1131,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       annualMaintenanceCost,
       laborCostWon,
       self_final_profit,
+      // [NEW] 20년 상세 내역 반환
+      totalSolarRevenue20,
+      totalRationalization20,
+      totalMaintenance20,
       rps_final_profit,
       fac_final_profit,
       rental_final_profit,

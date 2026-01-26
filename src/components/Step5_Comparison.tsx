@@ -10,11 +10,19 @@ const toWon = (val: number) => Math.round(val).toLocaleString();
 
 export default function Step5_Comparison() {
   const store = useProposalStore();
-  // [수정] isEcSelfConsumption 추가 가져오기
   const { config, financialSettings, isEcSelfConsumption } = store;
 
-  // 중앙 계산 로직 호출
+  // 중앙 계산 로직 호출 (store.ts에서 이미 투자비 절삭 완료)
   const results = store.getSimulationResults();
+
+  // [수정] 화면 표시용 연간 수입 (Gross) - 합리화 절감액 제외 (순수 발전 수익만)
+  // Step4, PreviewFinancialTable과 기준 통일
+  const displayedAnnualGross =
+    results.revenue_saving + results.revenue_ec + results.revenue_surplus;
+
+  // [수정] 화면 표시용 연간 영업 이익 (Net) - 위 Gross 기준
+  const displayedAnnualNet =
+    displayedAnnualGross - results.annualMaintenanceCost;
 
   // 20년 수익 평균치 계산
   const self_avg = results.self_final_profit / 20;
@@ -36,7 +44,6 @@ export default function Step5_Comparison() {
     repaymentPeriod: 9,
   };
 
-  // [수정] 임대/구독 모델 표시 여부 (자가소비 모드면 숨김)
   const showRentSub = !isEcSelfConsumption;
 
   // AI 분석 멘트 생성용 모델 리스트
@@ -45,13 +52,13 @@ export default function Step5_Comparison() {
       id: 'self',
       name: '자기자본',
       profit: results.self_final_profit,
-      invest: results.totalInvestment,
+      invest: results.totalInvestment, // 이미 절삭된 금액
     },
     {
       id: 'rps',
       name: 'RPS 정책자금',
       profit: results.rps_final_profit,
-      invest: results.rps_equity,
+      invest: results.rps_equity, // 자부담금 (절삭된 투자비 기반)
     },
     { id: 'fac', name: '팩토링', profit: results.fac_final_profit, invest: 0 },
     {
@@ -63,21 +70,19 @@ export default function Step5_Comparison() {
     { id: 'sub', name: '구독', profit: results.sub_final_profit, invest: 0 },
   ];
 
-  // [수정] 자가소비 모드면 임대/구독 모델 필터링
   if (!showRentSub) {
     models = models.filter((m) => m.id !== 'rent' && m.id !== 'sub');
   }
 
   const bestProfitModel = models.reduce((prev, current) =>
-    prev.profit > current.profit ? prev : current
+    prev.profit > current.profit ? prev : current,
   );
 
-  // 무투자 모델 비교 (팩토링 포함)
   const noInvestModels = models.filter((m) => m.invest === 0);
   const bestNoInvestModel =
     noInvestModels.length > 0
       ? noInvestModels.reduce((prev, current) =>
-          prev.profit > current.profit ? prev : current
+          prev.profit > current.profit ? prev : current,
         )
       : null;
 
@@ -102,7 +107,6 @@ export default function Step5_Comparison() {
     ? `(무투자 모델 대비 +${(profitDiff / 100000000).toFixed(1)}억 이득)`
     : '';
 
-  // [Helper] 빈 셀 스타일
   const EmptyCell = () => (
     <td
       className={`${styles.val} bg-gray-300 text-gray-400 cursor-not-allowed`}
@@ -140,7 +144,6 @@ export default function Step5_Comparison() {
                 <br />
                 <span className={styles.subText}>{fac.interestRate}%</span>
               </th>
-              {/* [수정] 조건부 렌더링 */}
               {showRentSub && (
                 <>
                   <th className={styles.colRental}>
@@ -188,18 +191,12 @@ export default function Step5_Comparison() {
               )}
             </tr>
 
-            {/* 2. 연간 수입 (Gross) */}
+            {/* 2. 연간 수입 (Gross) - [수정] 합리화 제외 */}
             <tr className={styles.rowGroupStart}>
               <td className={styles.rowHeader}>연간 수입 (Gross)</td>
-              <td className={styles.val}>
-                {toWon(results.annualGrossRevenue)} 원
-              </td>
-              <td className={styles.val}>
-                {toWon(results.annualGrossRevenue)} 원
-              </td>
-              <td className={styles.val}>
-                {toWon(results.annualGrossRevenue)} 원
-              </td>
+              <td className={styles.val}>{toWon(displayedAnnualGross)} 원</td>
+              <td className={styles.val}>{toWon(displayedAnnualGross)} 원</td>
+              <td className={styles.val}>{toWon(displayedAnnualGross)} 원</td>
               {showRentSub && (
                 <>
                   <td className={styles.val}>
@@ -232,20 +229,14 @@ export default function Step5_Comparison() {
               )}
             </tr>
 
-            {/* 3. 연간 영업 이익 (Net) */}
+            {/* 3. 연간 영업 이익 (Net) - [수정] Gross 수정분 반영 */}
             <tr className="bg-blue-50">
               <td className={styles.rowHeader} style={{ color: '#1e40af' }}>
                 연간 영업이익(Net)
               </td>
-              <td className={styles.valBlue}>
-                {toWon(results.annualOperatingProfit)} 원
-              </td>
-              <td className={styles.valBlue}>
-                {toWon(results.annualOperatingProfit)} 원
-              </td>
-              <td className={styles.valBlue}>
-                {toWon(results.annualOperatingProfit)} 원
-              </td>
+              <td className={styles.valBlue}>{toWon(displayedAnnualNet)} 원</td>
+              <td className={styles.valBlue}>{toWon(displayedAnnualNet)} 원</td>
+              <td className={styles.valBlue}>{toWon(displayedAnnualNet)} 원</td>
               {showRentSub && (
                 <>
                   <td className={styles.val}>

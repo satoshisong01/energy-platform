@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 const round2 = (num: number) => Math.round(num * 100) / 100;
+const toUk = (val: number) => (val / 100000000).toFixed(2);
 
 export default function Step4_Simulation() {
   const store = useProposalStore();
@@ -46,58 +47,42 @@ export default function Step4_Simulation() {
     store.truckCount,
     store.config,
     store.isEcSelfConsumption,
-    store.ecSelfConsumptionCount, // [복구] 대수 변경 시 재계산 필수
+    store.ecSelfConsumptionCount,
   ]);
 
-  // 2. 비용 자동 조정 로직 (Alert 중복 방지 및 초기 0원 문제 해결)
+  // 2. 비용 자동 조정 로직
   useEffect(() => {
-    // 자동 조정 모드가 꺼져있으면 실행하지 않음
     if (!store.isMaintenanceAuto) return;
 
-    const totalRevenue = results.annualGrossRevenue;
+    // 로직 내부용 변수 (전체 매출 기준)
+    const revenueForCalc = results.annualGrossRevenue;
 
-    // [핵심] 매출이 0원이면(초기 로딩 상태) 계산을 중단하여 불필요한 알림 방지
-    if (totalRevenue === 0) return;
-
-    // 이미 알림창이 떠 있거나 처리 중이면 중단
+    if (revenueForCalc === 0) return;
     if (isConfirmingRef.current) return;
 
     const isKepco = store.selectedModel === 'KEPCO';
-
-    // 이동형 EC 모드 여부 확인
     const isMovingEcMode =
       !isKepco && store.useEc && !store.isEcSelfConsumption;
 
-    // 목표 비율 설정
     const targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
-
-    // [수정] 사용자가 설정한 한도 적용 (기본 8천만원)
     const MAX_COST_LIMIT = store.maintenanceCostLimit;
 
-    // 이동형일 때만 인건비 발생, 한도에서 차감
     const currentLaborCost = isMovingEcMode
       ? config.price_labor_ec * 100000000
       : 0;
     const maxAvailableForOandM = Math.max(0, MAX_COST_LIMIT - currentLaborCost);
 
-    // 매출 대비 최대 가능 비율
     const revenueBasedCapRate =
-      totalRevenue > 0 ? (maxAvailableForOandM / totalRevenue) * 100 : 0;
+      revenueForCalc > 0 ? (maxAvailableForOandM / revenueForCalc) * 100 : 0;
 
-    // 최종 적용 비율
     let finalRate = Math.min(targetBaseRate, revenueBasedCapRate);
     finalRate = Math.round(finalRate * 10) / 10;
 
-    // 현재 값과 다를 경우 업데이트
     if (Math.abs(store.maintenanceRate - finalRate) > 0.01) {
-      // 알림 끄기 상태면 즉시 반영
       if (suppressCostAlerts) {
         store.setSimulationOption('maintenanceRate', finalRate);
       } else {
-        // [수정] 중복 방지 락 걸기
         isConfirmingRef.current = true;
-
-        // 비동기로 처리하여 렌더링 충돌 방지
         setTimeout(() => {
           const currentCostEok = (
             results.annualMaintenanceCost / 100000000
@@ -114,11 +99,9 @@ export default function Step4_Simulation() {
           if (window.confirm(msg)) {
             store.setSimulationOption('maintenanceRate', finalRate);
           } else {
-            // 취소 시 자동 조정을 끔
             store.setSimulationOption('isMaintenanceAuto', false);
           }
 
-          // [수정] 처리 완료 후 락 해제
           setTimeout(() => {
             isConfirmingRef.current = false;
           }, 500);
@@ -126,14 +109,14 @@ export default function Step4_Simulation() {
       }
     }
   }, [
-    results.annualGrossRevenue, // 매출 변동 시
-    store.selectedModel, // 모델 변경 시
-    store.useEc, // EC 토글 시
-    store.isEcSelfConsumption, // 자가소비 변경 시
-    store.isMaintenanceAuto, // 자동모드 토글 시
-    config.price_labor_ec, // 인건비 변경 시
-    store.maintenanceCostLimit, // [NEW] 한도 금액 변경 시 재계산
-    store.maintenanceRate, // 값 비교용
+    results.annualGrossRevenue,
+    store.selectedModel,
+    store.useEc,
+    store.isEcSelfConsumption,
+    store.isMaintenanceAuto,
+    config.price_labor_ec,
+    store.maintenanceCostLimit,
+    store.maintenanceRate,
     suppressCostAlerts,
   ]);
 
@@ -205,12 +188,18 @@ export default function Step4_Simulation() {
   const revenue_saving = results.revenue_saving;
   const revenue_ec = results.revenue_ec;
   const revenue_surplus = results.revenue_surplus;
-  const totalRevenue = results.annualGrossRevenue;
+
+  // [수정] 화면 표시용 연간 수익 합계 (합리화 절감액 제외)
+  const displayedAnnualGrossRevenue =
+    revenue_saving + revenue_ec + revenue_surplus;
 
   const laborCostWon = results.laborCostWon;
   const totalAnnualCost = results.annualMaintenanceCost;
   const maintenanceBase = totalAnnualCost - laborCostWon;
-  const netProfit = results.annualOperatingProfit;
+
+  // [수정] 화면 표시용 연간 순수익 (합리화 제외 수익 - 비용)
+  const displayedAnnualNetProfit =
+    displayedAnnualGrossRevenue - totalAnnualCost;
 
   const appliedSavingsPrice =
     store.unitPriceSavings || config.unit_price_savings;
@@ -228,6 +217,7 @@ export default function Step4_Simulation() {
       appliedSellPrice = config.unit_price_ec_5_0;
   }
 
+  // 투자비 관련
   const totalInitialInvestment = results.totalInvestment / 100000000;
   const maintenanceTableValue = totalAnnualCost / 100000000;
 
@@ -249,13 +239,12 @@ export default function Step4_Simulation() {
       ? 1 * config.price_tractor
       : 0;
 
-  // [수정] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
-  // config.price_platform 대신 계산된 값을 사용
+  // 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
   const calculatedPlatformCost = Math.min((store.capacityKw / 100) * 0.1, 0.3);
 
   const platformCost =
     !isKepco && (store.useEc || store.isEcSelfConsumption)
-      ? 1 * calculatedPlatformCost // 무조건 1식이므로 1을 곱함
+      ? 1 * calculatedPlatformCost // 1식이므로 그대로 사용
       : 0;
 
   let totalInvestment20Years = 0;
@@ -273,6 +262,7 @@ export default function Step4_Simulation() {
   const platformSplit = round2(platformCost / 20);
   const maintenanceSplit = round2(maintenanceTableValue);
 
+  // [수정] 20년 수익 총액 (store에서 계산된 값: 수익감소 + 합리화고정 - 비용고정)
   const totalNetProfit20Years = results.self_final_profit;
   const roiYears = results.self_roi_years;
   const roiPercent =
@@ -551,7 +541,7 @@ export default function Step4_Simulation() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {/* 기본료 */}
+                  {/* 합리화 표 생략 없이 그대로 유지 */}
                   <tr className="border-b border-slate-300">
                     <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       기본료
@@ -570,24 +560,20 @@ export default function Step4_Simulation() {
                     <td className="p-1 border-r border-slate-300">
                       <input
                         type="text"
-                        className="w-full text-center border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full text-center border rounded p-1"
                         value={rationalization.base_usage.toLocaleString()}
                         onChange={handleBaseUsageChange}
-                        onFocus={(e) => e.target.select()}
-                        placeholder="연간사용량"
                       />
                     </td>
                     <td className="p-1 bg-blue-50 font-bold text-blue-600 border-l border-slate-300">
                       <input
                         type="text"
-                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full text-center bg-blue-50 font-bold text-blue-600 border rounded p-1"
                         value={Math.round(saving_base).toLocaleString()}
                         onChange={handleBaseSavingsChange}
-                        onFocus={(e) => e.target.select()}
                       />
                     </td>
                   </tr>
-                  {/* 경부하 */}
                   <tr className="border-b border-slate-300">
                     <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       경부하
@@ -601,10 +587,7 @@ export default function Step4_Simulation() {
                     <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.light_eul - rationalization.light_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
+                      ).toLocaleString()}
                     </td>
                     <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('light_usage')}
@@ -613,7 +596,6 @@ export default function Step4_Simulation() {
                       {Math.round(saving_light).toLocaleString()}
                     </td>
                   </tr>
-                  {/* 중간부하 */}
                   <tr className="border-b border-slate-300">
                     <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       중간부하
@@ -627,10 +609,7 @@ export default function Step4_Simulation() {
                     <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.mid_eul - rationalization.mid_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
+                      ).toLocaleString()}
                     </td>
                     <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('mid_usage')}
@@ -639,7 +618,6 @@ export default function Step4_Simulation() {
                       {Math.round(saving_mid).toLocaleString()}
                     </td>
                   </tr>
-                  {/* 최대부하 */}
                   <tr className="border-b border-slate-300">
                     <td className="p-2 font-bold bg-slate-50 border-r border-slate-300">
                       최대부하
@@ -653,10 +631,7 @@ export default function Step4_Simulation() {
                     <td className="p-2 border-r border-slate-300 font-bold bg-yellow-50">
                       {(
                         rationalization.max_eul - rationalization.max_gap
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}
+                      ).toLocaleString()}
                     </td>
                     <td className="p-1 border-r border-slate-300">
                       {renderRationalizationInput('max_usage')}
@@ -665,7 +640,6 @@ export default function Step4_Simulation() {
                       {Math.round(saving_max).toLocaleString()}
                     </td>
                   </tr>
-                  {/* 합계 */}
                   <tr className="border-t-2 border-slate-300">
                     <td
                       colSpan={5}
@@ -753,10 +727,7 @@ export default function Step4_Simulation() {
                         : 0}{' '}
                     ea
                   </td>
-
-                  {/* 자가소비(배터리형)면 트랙터 수량 0 */}
                   <td>{tractorCost > 0 ? 1 : 0} ea</td>
-
                   <td>{platformCost > 0 ? 1 : 0} set</td>
                   <td>1 set</td>
                 </tr>
@@ -765,7 +736,6 @@ export default function Step4_Simulation() {
                   <td>{solarPrice.toFixed(2)} 억</td>
                   <td>{config.price_ec_unit.toFixed(2)} 억</td>
                   <td>{config.price_tractor.toFixed(2)} 억</td>
-                  {/* [수정] 단가 표시 부분: 계산된 값 적용 */}
                   <td>{calculatedPlatformCost.toFixed(2)} 억</td>
                   <td>{maintenanceTableValue.toFixed(2)} 억</td>
                 </tr>
@@ -866,7 +836,7 @@ export default function Step4_Simulation() {
                 <span>** 연간 전기판매수익</span>
                 <span>
                   <span className={styles.dVal}>
-                    {(totalRevenue / 100000000).toFixed(2)}
+                    {(displayedAnnualGrossRevenue / 100000000).toFixed(2)}
                   </span>{' '}
                   억원
                 </span>
@@ -951,9 +921,10 @@ export default function Step4_Simulation() {
 
               <div className={`${styles.row} font-bold text-slate-800`}>
                 <span>연간 수익총액</span>
+                {/* [수정] 합리화 제외한 발전 수익만 표시 */}
                 <span>
                   <span className={styles.dVal}>
-                    {(totalRevenue / 100000000).toFixed(2)}
+                    {(displayedAnnualGrossRevenue / 100000000).toFixed(2)}
                   </span>{' '}
                   억원
                 </span>
@@ -974,14 +945,9 @@ export default function Step4_Simulation() {
                   {(revenue_ec / 100000000).toFixed(2)} 억원
                 </span>
               </div>
-              <div className={styles.row}>
-                <span className="text-xs text-gray-500 pl-2">
-                  ○ 전기요금합리화절감액{isEul ? '(을)' : '(갑)'}
-                </span>
-                <span className="text-xs">
-                  {(totalRationalizationSavings / 100000000).toFixed(2)} 억원
-                </span>
-              </div>
+
+              {/* [수정] 전기요금합리화절감액 행 삭제됨 */}
+
               <div className={styles.row}>
                 <span className="text-xs text-gray-500 pl-2">
                   ○ 잉여 한전판매 수익
@@ -1004,7 +970,8 @@ export default function Step4_Simulation() {
                 연간 실제 수익 (Net)
               </span>
               <span className="text-xl font-extrabold text-blue-600">
-                {(netProfit / 100000000).toFixed(2)}
+                {/* [수정] 순수 발전 수익 기준 Net 표시 */}
+                {(displayedAnnualNetProfit / 100000000).toFixed(2)}
                 <span className="text-sm">억원</span>
               </span>
             </div>
@@ -1021,11 +988,30 @@ export default function Step4_Simulation() {
             )}
           </div>
 
-          <div className="flex justify-between p-3 bg-green-50 border-t border-green-100">
-            <span className="font-bold text-green-900">20년 수익총액</span>
-            <span className="font-bold text-green-800">
-              {(totalNetProfit20Years / 100000000).toFixed(2)} 억원
-            </span>
+          <div className="flex flex-col p-3 bg-green-50 border-t border-green-100">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-green-900">20년 수익총액</span>
+              <span className="font-bold text-green-800 text-lg">
+                {(totalNetProfit20Years / 100000000).toFixed(2)} 억원
+              </span>
+            </div>
+
+            {/* [NEW] 20년 수익 상세 내역 (엑셀 형식) */}
+            <div className="flex flex-col mt-2 gap-1 text-xs text-slate-500 border-t border-green-200 pt-2">
+              <div className="flex justify-between">
+                <span>(+) 태양광발전수익 (20년, 효율감소반영)</span>
+                <span>{toUk(results.totalSolarRevenue20)} 억원</span>
+              </div>
+              {/* 항상 표시 (0원이라도 표시) */}
+              <div className="flex justify-between text-blue-600">
+                <span>(+) 전기요금합리화절감액 (20년)</span>
+                <span>+{toUk(results.totalRationalization20)} 억원</span>
+              </div>
+              <div className="flex justify-between text-red-500">
+                <span>(-) 유지보수 및 운영비 (20년, 고정)</span>
+                <span>-{toUk(results.totalMaintenance20)} 억원</span>
+              </div>
+            </div>
           </div>
 
           <div className="bg-yellow-400 text-black font-bold text-center py-2">

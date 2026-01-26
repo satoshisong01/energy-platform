@@ -16,20 +16,17 @@ export default function PreviewFinancialTable() {
     ecSelfConsumptionCount,
   } = store;
 
-  // 스토어 계산 함수 호출 (전체 합계 등은 여기서 가져옴)
+  // 스토어 계산 함수 호출
   const results = store.getSimulationResults();
 
-  // --- [수정] 투자비 세부 항목 독립 계산 (Store 로직과 일치화) ---
-
-  // 1. 태양광
+  // 1. 태양광 투자비
   let solarPrice = config.price_solar_standard;
   if (moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
   if (moduleTier === 'ECONOMY') solarPrice = config.price_solar_economy;
   const solarCount = store.capacityKw / 100;
   const solarCost = solarCount * solarPrice;
 
-  // 2. 에너지캐리어 (EC)
-  // 고정형이면 설정된 대수, 이동형이면 트럭 대수
+  // 2. 에너지캐리어 (EC) 투자비
   let activeEcCount = 0;
   if (selectedModel !== 'KEPCO') {
     if (isEcSelfConsumption) {
@@ -40,21 +37,20 @@ export default function PreviewFinancialTable() {
   }
   const ecCost = activeEcCount * config.price_ec_unit;
 
-  // 3. 이동트랙터 (이동형일 때만 발생)
+  // 3. 이동트랙터 투자비
   const tractorCost =
     selectedModel !== 'KEPCO' && useEc && !isEcSelfConsumption && truckCount > 0
       ? config.price_tractor
       : 0;
   const tractorCount = tractorCost > 0 ? 1 : 0;
 
-  // [수정] 4. 운영플랫폼 (용량 비례 자동 계산, Max 0.3억)
-  // 엑셀 공식: Min( (용량/100)*0.1, 0.3 )
+  // 4. 운영플랫폼 투자비 (자동 계산)
   const calculatedPlatformCost = Math.min((store.capacityKw / 100) * 0.1, 0.3);
 
   const platformCost =
     selectedModel !== 'KEPCO' &&
     ((useEc && truckCount > 0) || isEcSelfConsumption)
-      ? calculatedPlatformCost // 1식이므로 그대로 사용
+      ? calculatedPlatformCost
       : 0;
   const platformCount = platformCost > 0 ? 1 : 0;
 
@@ -70,18 +66,34 @@ export default function PreviewFinancialTable() {
     if (selectedModel === 'REC5') appliedSellPrice = config.unit_price_ec_5_0;
   }
 
-  // ROI (총 수익률) 계산
-  const totalCost20 =
-    results.totalInvestment + results.annualMaintenanceCost * 20;
-  const profitRate =
-    totalCost20 > 0 ? (results.self_final_profit / totalCost20) * 100 : 0;
-
   // EC 운용 상태 텍스트
   let ecStatusText = '미운용';
   if (selectedModel !== 'KEPCO') {
     if (isEcSelfConsumption) ecStatusText = `자가소비형 (${activeEcCount}대)`;
     else if (useEc) ecStatusText = `이동형 (${activeEcCount}대)`;
   }
+
+  // 연간 수익 표 계산 (합리화 제외)
+  const displayedAnnualGross =
+    results.revenue_saving + results.revenue_ec + results.revenue_surplus;
+  const displayedAnnualNet =
+    displayedAnnualGross - results.annualMaintenanceCost;
+
+  // --- [수정] ROI 및 투자총액 계산 오류 수정 ---
+
+  // 1. 20년 총 비용 (원 단위 합산)
+  // results.totalMaintenance20은 이미 store에서 (연간비용 * 20) 원 단위로 계산되어 옴
+  const totalCost20Won = results.totalInvestment + results.totalMaintenance20;
+
+  // 2. ROI 계산
+  const profitRate =
+    totalCost20Won > 0 ? (results.self_final_profit / totalCost20Won) * 100 : 0;
+
+  // 3. 20년 투자총액 표시용 (원 -> 억 변환)
+  const totalInvest20Uk = totalCost20Won / 100000000;
+
+  // 헬퍼 함수: 억 단위 변환
+  const toUk = (val: number) => (val / 100000000).toFixed(2);
 
   return (
     <div className={styles.financialSection}>
@@ -143,7 +155,6 @@ export default function PreviewFinancialTable() {
             <td>운영플랫폼</td>
             <td>1 set</td>
             <td>{platformCount} set</td>
-            {/* [수정] 단가에 계산된 값 표시 */}
             <td>{calculatedPlatformCost.toFixed(2)}</td>
             <td className={styles.textBold}>{platformCost.toFixed(2)}</td>
           </tr>
@@ -153,24 +164,20 @@ export default function PreviewFinancialTable() {
             <td colSpan={4} className={styles.textRight}>
               초기 투자비 합계
             </td>
-            {/* store에서 계산된 정확한 합계 사용 (자동 검증됨) */}
+            {/* 억 단위 변환 */}
             <td>{results.totalInvestmentUk.toFixed(2)}</td>
           </tr>
           <tr className={styles.bgTotal} style={{ backgroundColor: '#334155' }}>
             <td colSpan={4} className={styles.textRight}>
               20년 투자총액 (유지보수 포함)
             </td>
-            <td>
-              {(
-                results.totalInvestmentUk +
-                (results.annualMaintenanceCost * 20) / 100000000
-              ).toFixed(2)}
-            </td>
+            {/* [수정] 계산된 억 단위 값 사용 */}
+            <td>{totalInvest20Uk.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
 
-      {/* B. 연간 수익 분석 테이블 (기존 유지) */}
+      {/* B. 연간 수익 분석 테이블 (합리화 제외) */}
       <table className={styles.finTable}>
         <thead className={styles.bgBlueHeader}>
           <tr>
@@ -183,7 +190,7 @@ export default function PreviewFinancialTable() {
         </thead>
         <tbody>
           <tr>
-            <td rowSpan={4} className={styles.textBold}>
+            <td rowSpan={3} className={styles.textBold}>
               수익
             </td>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
@@ -195,9 +202,7 @@ export default function PreviewFinancialTable() {
             <td className={styles.bgYellowRow}>
               {appliedSavingsPrice.toLocaleString()}
             </td>
-            <td className={styles.textRight}>
-              {(results.revenue_saving / 100000000).toFixed(2)}
-            </td>
+            <td className={styles.textRight}>{toUk(results.revenue_saving)}</td>
           </tr>
           <tr>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
@@ -212,7 +217,7 @@ export default function PreviewFinancialTable() {
               {config.unit_price_kepco.toLocaleString()}
             </td>
             <td className={styles.textRight}>
-              {(results.revenue_surplus / 100000000).toFixed(2)}
+              {toUk(results.revenue_surplus)}
             </td>
           </tr>
           <tr>
@@ -225,19 +230,7 @@ export default function PreviewFinancialTable() {
             <td className={styles.bgYellowRow}>
               {appliedSellPrice.toLocaleString()}
             </td>
-            <td className={styles.textRight}>
-              {(results.revenue_ec / 100000000).toFixed(2)}
-            </td>
-          </tr>
-          <tr>
-            <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
-              ④ 전기요금합리화절감액
-            </td>
-            <td className={styles.bgPinkRow}>-</td>
-            <td className={styles.bgYellowRow}>-</td>
-            <td className={styles.textRight}>
-              {(results.totalRationalizationSavings / 100000000).toFixed(2)}
-            </td>
+            <td className={styles.textRight}>{toUk(results.revenue_ec)}</td>
           </tr>
 
           {/* 총계 */}
@@ -245,9 +238,7 @@ export default function PreviewFinancialTable() {
             <td colSpan={4} className={styles.textRight}>
               연간 수익 총액
             </td>
-            <td className={styles.textBlue}>
-              {(results.annualGrossRevenue / 100000000).toFixed(2)}
-            </td>
+            <td className={styles.textBlue}>{toUk(displayedAnnualGross)}</td>
           </tr>
           <tr>
             <td className={styles.textBold}>비용</td>
@@ -262,7 +253,7 @@ export default function PreviewFinancialTable() {
             <td>-</td>
             <td>-</td>
             <td className={`${styles.textRight} ${styles.textRed}`}>
-              -{(results.annualMaintenanceCost / 100000000).toFixed(2)}
+              -{toUk(results.annualMaintenanceCost)}
             </td>
           </tr>
           <tr className={styles.bgTotal}>
@@ -270,25 +261,72 @@ export default function PreviewFinancialTable() {
               연간 실제 순수익 (Net Profit)
             </td>
             <td style={{ fontSize: '1.1rem', color: '#fbbf24' }}>
-              {(results.annualOperatingProfit / 100000000).toFixed(2)} 억
+              {toUk(displayedAnnualNet)} 억
             </td>
           </tr>
         </tbody>
       </table>
 
       {/* 최종 결론 */}
-      <div className={styles.badgeWrapper}>
+      <div className={styles.badgeWrapper} style={{ alignItems: 'flex-start' }}>
         <div className={styles.finalMetricBox} style={{ marginRight: '2rem' }}>
-          <span className={styles.finalLabel}>20년 누적 수익</span>
-          <span className={styles.finalValue} style={{ color: '#16a34a' }}>
-            {(results.self_final_profit / 100000000).toFixed(2)}
-          </span>
-          <span className={styles.finalUnit}>억</span>
+          <span className={styles.finalLabel} style={{width: '100%'}}>20년 누적 수익</span>
+
+          {/* [수정] 줄바꿈 방지를 위해 flex row 적용 */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+            <span className={styles.finalValue} style={{ color: '#16a34a' }}>
+              {toUk(results.self_final_profit)}
+            </span>
+            <span className={styles.finalUnit}>억</span>
+          </div>
+
+          {/* 20년 수익 상세 내역 */}
+          <div
+            style={{
+              marginTop: '0.5rem',
+              paddingTop: '0.5rem',
+              borderTop: '1px solid #e2e8f0',
+              fontSize: '0.75rem',
+              color: '#64748b',
+              width: '100%',
+              minWidth: '200px', // 최소 너비 확보
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>태양광발전수익(20년)</span>
+              <span>+{toUk(results.totalSolarRevenue20)}억</span>
+            </div>
+            {/* 항상 표시 (0원이어도) */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: '#2563eb',
+              }}
+            >
+              <span>전기요금합리화절감액(20년)</span>
+              <span>+{toUk(results.totalRationalization20)}억</span>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: '#dc2626',
+              }}
+            >
+              <span>유지보수 및 운영비(20년)</span>
+              <span>-{toUk(results.totalMaintenance20)}억</span>
+            </div>
+          </div>
         </div>
+
         <div className={styles.finalMetricBox}>
           <span className={styles.finalLabel}>총 수익률(ROI)</span>
-          <span className={styles.finalValue}>{profitRate.toFixed(1)}</span>
-          <span className={styles.finalUnit}>%</span>
+          {/* [수정] 줄바꿈 방지 */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+            <span className={styles.finalValue}>{profitRate.toFixed(1)}</span>
+            <span className={styles.finalUnit}>%</span>
+          </div>
         </div>
       </div>
     </div>

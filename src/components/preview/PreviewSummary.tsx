@@ -23,7 +23,7 @@ export default function PreviewSummary() {
     maintenanceCostLimit,
   } = store;
 
-  // [NEW] 자가소비(고정형) 모드면 임대/구독 숨김 여부
+  // 자가소비(고정형) 모드면 임대/구독 숨김 여부
   const showRentSub = !isEcSelfConsumption;
 
   // [합리화 절감액]
@@ -44,7 +44,7 @@ export default function PreviewSummary() {
   const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
-  // [수정] 일조량 설정값 사용
+  // 일조량 설정값 사용
   const solarRadiation = config.solar_radiation || 3.8;
 
   const simpleAnnualGen = store.monthlyData.reduce((acc, cur) => {
@@ -70,7 +70,6 @@ export default function PreviewSummary() {
     store.setSimulationOption('useEc', checked);
   };
 
-  // ... (기본 데이터 계산) ...
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -115,7 +114,6 @@ export default function PreviewSummary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  // 사용자 설정 한도 사용
   const MAX_LIMIT = maintenanceCostLimit;
 
   // [1] 한전 데이터
@@ -131,9 +129,7 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     const annualRevenue = annualGen * config.unit_price_kepco;
 
-    // 한전도 수동 설정 시 store 값 따르도록 변경
     let appliedRate = store.isMaintenanceAuto ? 5.0 : store.maintenanceRate;
-
     let tempCost = annualRevenue * (appliedRate / 100);
 
     if (store.isMaintenanceAuto && tempCost > MAX_LIMIT) {
@@ -146,13 +142,18 @@ export default function PreviewSummary() {
     }
     const maintenanceCost = annualRevenue * (appliedRate / 100);
     const annualNetProfit = annualRevenue - maintenanceCost;
+
+    // 수익/비용 분리 적용
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
-    const totalNet20Won = (annualNetProfit * (1 - Math.pow(R, n))) / (1 - R);
+
+    const totalRevenue20 = (annualRevenue * (1 - Math.pow(R, n))) / (1 - R);
+    const totalCost20 = maintenanceCost * 20;
+    const totalNet20Won = totalRevenue20 - totalCost20;
+
     const roiYears = annualNetProfit > 0 ? investWon / annualNetProfit : 0;
-    const profitRate =
-      (totalNet20Won / (investWon + maintenanceCost * 20)) * 100;
+    const profitRate = (totalNet20Won / (investWon + totalCost20)) * 100;
 
     return {
       title: '한전 장기 계약 (20년)',
@@ -223,57 +224,78 @@ export default function PreviewSummary() {
     const revenue_surplus = isSurplusDiscarded
       ? 0
       : volume_surplus_final * config.unit_price_kepco;
-    const grossRevenue =
+
+    // [수정] O&M 비율 계산용 매출 (합리화 포함)
+    const grossRevenueForOandM =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
       fixedRationalizationSavings;
 
+    // [수정] 태양광 기반 변동 매출 (합리화 제외)
+    const solarBasedRevenue = revenue_saving + revenue_ec + revenue_surplus;
+
     const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
     const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
 
-    // 유지보수 비율 결정 로직
+    // 유지보수 비율 결정 (합리화 포함 매출 기준)
     let scenarioMaintenanceRate = 0;
-
     if (!store.isMaintenanceAuto) {
       scenarioMaintenanceRate = store.maintenanceRate;
     } else {
       let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
       const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
       let revenueBasedCapRate =
-        grossRevenue > 0 ? (maxAvailableForOandM / grossRevenue) * 100 : 0;
+        grossRevenueForOandM > 0
+          ? (maxAvailableForOandM / grossRevenueForOandM) * 100
+          : 0;
       scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
       scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
     }
 
+    // 유지보수 비용
     const maintenanceCost =
-      (grossRevenue * scenarioMaintenanceRate) / 100 + laborCostWon;
-    const annualNetProfitWon = grossRevenue - maintenanceCost;
+      (grossRevenueForOandM * scenarioMaintenanceRate) / 100 + laborCostWon;
 
+    // [수정] 1차년도 연간 순수익 (표시용) -> 합리화 절감액 제외!
+    // Step4의 '연간 실제 순수익'과 맞추기 위해 solarBasedRevenue 사용
+    const annualNetProfitWon = solarBasedRevenue - maintenanceCost;
+
+    // --- 투자비 계산 ---
     const solarCost = (capacity / 100) * currentSolarPrice;
     const ecCost = activeEcCount * config.price_ec_unit;
-
-    // [수정] 운영 플랫폼 비용 자동 계산 (Min 공식 적용)
-    // 용량(kw)/100 * 0.1 과 0.3 중 작은 값 (최대 0.3억 한도)
     const calculatedPlatformCost = Math.min((capacity / 100) * 0.1, 0.3);
 
     let infraCost = 0;
     if (isEcSelfConsumption) {
-      // 자가소비형: 플랫폼 비용만 발생 (수식 적용)
       infraCost = calculatedPlatformCost;
     } else if (store.useEc && activeEcCount > 0) {
-      // 이동형: 트랙터 + 플랫폼 비용 (수식 적용)
       infraCost = config.price_tractor + calculatedPlatformCost;
     }
 
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
+    // --- 20년 수익 상세 계산 ---
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
-    const totalNet20Won = (annualNetProfitWon * (1 - Math.pow(R, n))) / (1 - R);
-    const totalCost20 = investWon + maintenanceCost * 20;
+
+    // 1. 태양광 기반 수익 (매년 감소)
+    const totalSolarRevenue20 =
+      (solarBasedRevenue * (1 - Math.pow(R, n))) / (1 - R);
+
+    // 2. 합리화 절감액 (고정) -> 20년 총액에는 포함!
+    const totalRationalization20 = fixedRationalizationSavings * 20;
+
+    // 3. 유지보수 비용 (고정)
+    const totalMaintenance20 = maintenanceCost * 20;
+
+    // 4. 최종 20년 순수익 (태양광20 + 합리화20 - 비용20)
+    const totalNet20Won =
+      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
+
+    const totalCost20 = investWon + totalMaintenance20;
     const roiYears =
       annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0;
     const profitRate =
@@ -481,7 +503,6 @@ export default function PreviewSummary() {
         </div>
       </div>
 
-      {/* 배터리형 적용 상태 배지 (자가소비 모드일 때만 노출) */}
       {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
         <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
           <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
