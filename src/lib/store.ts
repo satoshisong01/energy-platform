@@ -896,10 +896,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     const calculatedTotalInvestment = solarCost + ecCost + infraCost;
 
-    // [중요] 투자비 에누리 (10만원 단위 절삭) 적용
-    const rawTotalInvestment = calculatedTotalInvestment * 100000000;
-    const totalInvestment = Math.floor(rawTotalInvestment / 100000) * 100000;
-    const totalInvestmentUk = totalInvestment / 100000000;
+    // 엑셀과 동일: 초기투자 억원을 소수 둘째자리로 반올림 후 × 100000000
+    const totalInvestmentUk = Math.round(calculatedTotalInvestment * 100) / 100;
+    const totalInvestment = Math.round(totalInvestmentUk * 100000000);
 
     // 2. 연간 기본 데이터 계산
     const solarRadiation = config.solar_radiation || 3.8;

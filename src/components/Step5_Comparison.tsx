@@ -15,10 +15,12 @@ export default function Step5_Comparison() {
   // 중앙 계산 로직 호출 (store.ts에서 이미 투자비 절삭 완료)
   const results = store.getSimulationResults();
 
-  // [수정] 화면 표시용 연간 수입 (Gross) - 합리화 절감액 제외 (순수 발전 수익만)
-  // Step4, PreviewFinancialTable과 기준 통일
+  // [수정] 화면 표시용 연간 수입 (Gross) - 합리화 제외, 기본료 절감 포함 (Step4/PreviewFinancialTable과 통일)
   const displayedAnnualGross =
-    results.revenue_saving + results.revenue_ec + results.revenue_surplus;
+    results.revenue_saving +
+    results.revenue_ec +
+    results.revenue_surplus +
+    results.revenue_base_bill_savings;
 
   // [수정] 화면 표시용 연간 영업 이익 (Net) - 위 Gross 기준
   const displayedAnnualNet =
@@ -75,14 +77,14 @@ export default function Step5_Comparison() {
   }
 
   const bestProfitModel = models.reduce((prev, current) =>
-    prev.profit > current.profit ? prev : current,
+    prev.profit > current.profit ? prev : current
   );
 
   const noInvestModels = models.filter((m) => m.invest === 0);
   const bestNoInvestModel =
     noInvestModels.length > 0
       ? noInvestModels.reduce((prev, current) =>
-          prev.profit > current.profit ? prev : current,
+          prev.profit > current.profit ? prev : current
         )
       : null;
 

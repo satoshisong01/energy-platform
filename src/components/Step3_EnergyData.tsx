@@ -578,7 +578,7 @@ export default function Step3_EnergyData() {
             </span>
           </div>
           <div className={styles.savingRateBadge}>
-            기존 전기요금 절감율{' '}
+            기존 전기요금 대비 절감율{' '}
             <span style={{ marginLeft: '0.5rem' }}>
               {savingRate.toFixed(1)}%
             </span>

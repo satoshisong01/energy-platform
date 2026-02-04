@@ -29,9 +29,12 @@ export default function PreviewComparisonTable() {
   // 스토어에서 계산된 결과 가져오기 (투자비 절삭됨)
   const results = store.getSimulationResults();
 
-  // [수정] 연간 수입 (Gross) - 합리화 절감액 제외 (순수 발전 수익만)
+  // [수정] 연간 수입 (Gross) - 합리화 제외, 기본료 절감 포함 (Step4/PreviewFinancialTable과 통일)
   const displayedAnnualGross =
-    results.revenue_saving + results.revenue_ec + results.revenue_surplus;
+    results.revenue_saving +
+    results.revenue_ec +
+    results.revenue_surplus +
+    results.revenue_base_bill_savings;
 
   // [수정] 연간 영업 이익 (Net) - 위 Gross 기준 (합리화 제외)
   const displayedAnnualNet =

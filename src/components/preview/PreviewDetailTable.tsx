@@ -188,29 +188,29 @@ export default function PreviewDetailTable({
         </div>
       )}
 
-      {/* 하단 배지 영역 (전체적으로 확대) */}
+      {/* 하단 배지 영역 (크기 축소, 절감율 배지 구분) */}
       <div className={styles.badgeWrapper}>
-        <div style={{ textAlign: 'right', marginRight: '2rem' }}>
+        <div style={{ textAlign: 'right', marginRight: '1.5rem' }}>
           <div
             style={{
-              fontSize: '15px', // [수정] 0.8rem -> 15px
+              fontSize: '12px',
               color: '#64748b',
               fontWeight: 'bold',
-              marginBottom: '4px',
+              marginBottom: '2px',
             }}
           >
             연간 총 경제적 효과 (절감+수익)
           </div>
           <div
             style={{
-              fontSize: '2.25rem', // [수정] 2rem -> 2.25rem
+              fontSize: '1.75rem',
               fontWeight: '900',
               color: '#1e40af',
               lineHeight: '1.1',
             }}
           >
             {Math.round(totalBenefit).toLocaleString()}{' '}
-            <span style={{ fontSize: '1.25rem', color: '#94a3b8' }}>원</span>
+            <span style={{ fontSize: '1rem', color: '#94a3b8' }}>원</span>
           </div>
         </div>
 
@@ -221,76 +221,98 @@ export default function PreviewDetailTable({
             background: 'linear-gradient(to right, #e0f2fe, #bae6fd)',
             color: '#0284c7',
             borderColor: '#7dd3fc',
-            gap: '0.5rem',
+            gap: '0.35rem',
             marginRight: '0.5rem',
-            padding: '0.75rem 1.25rem', // [수정] 패딩 약간 증가
+            padding: '0.5rem 1rem',
           }}
         >
           <span
             className={styles.finalLabel}
-            style={{ color: '#0369a1', fontSize: '14px' }} // [수정] 라벨 크기 증가
+            style={{ color: '#0369a1', fontSize: '11px' }}
           >
             최대부하비율
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline' }}>
             <span
               className={styles.finalValue}
-              style={{ color: '#0284c7', fontSize: '1.5rem' }} // [수정] 값 크기 증가
+              style={{ color: '#0284c7', fontSize: '1.2rem' }}
             >
               {maxLoadRatio.toFixed(1)}
             </span>
             <span
               className={styles.finalUnit}
-              style={{ color: '#38bdf8', fontSize: '1rem' }}
+              style={{ color: '#38bdf8', fontSize: '0.85rem' }}
             >
               %
             </span>
           </div>
         </div>
 
-        {/* 절감율 배지 */}
+        {/* 기존 전기요금 대비 절감율 - 분홍 테두리/배경으로 구분 */}
         <div
           className={styles.badge}
-          style={{ padding: '0.75rem 1.25rem', marginRight: '0.5rem' }} // [수정] 패딩 약간 증가
+          style={{
+            padding: '0.5rem 1rem',
+            marginRight: '0.5rem',
+            background: 'linear-gradient(to right, #fdf2f8, #fce7f3)',
+            border: '1px solid #f9a8d4',
+          }}
         >
-          <LucideZap className="text-pink-500 mr-2" size={24} />
-          <span className={styles.finalLabel} style={{ fontSize: '14px' }}>
-            기존 전기요금 대비 절감율
+          <LucideZap
+            size={18}
+            style={{ color: '#db2777', marginRight: '0.35rem' }}
+          />
+          <span
+            className={styles.finalLabel}
+            style={{ fontSize: '11px', color: '#9d174d' }}
+          >
+            기존 대비 절감율
           </span>
           <span
             className={styles.finalValue}
             style={{
               color: '#db2777',
-              marginLeft: '0.5rem',
-              fontSize: '1.5rem',
-            }} // [수정] 값 크기 증가
+              marginLeft: '0.35rem',
+              fontSize: '1.2rem',
+            }}
           >
             {savingRate.toFixed(1)}
           </span>
-          <span className={styles.finalUnit} style={{ fontSize: '1rem' }}>
+          <span className={styles.finalUnit} style={{ fontSize: '0.85rem' }}>
             %
           </span>
         </div>
+
+        {/* 전기요금 절감율 - 보라/인디고 톤으로 구분 */}
         <div
           className={styles.badge}
-          style={{ padding: '0.75rem 1.25rem' }} // [수정] 패딩 약간 증가
+          style={{
+            padding: '0.5rem 1rem',
+            background: 'linear-gradient(to right, #eef2ff, #e0e7ff)',
+            border: '1px solid #a5b4fc',
+          }}
         >
-          <LucideZap className="text-pink-500 mr-2" size={24} />
-          <span className={styles.finalLabel} style={{ fontSize: '14px' }}>
-            기존 전기요금 절감율
+          <LucideZap
+            size={18}
+            style={{ color: '#6366f1', marginRight: '0.35rem' }}
+          />
+          <span
+            className={styles.finalLabel}
+            style={{ fontSize: '11px', color: '#4338ca' }}
+          >
+            전기요금 절감율
           </span>
           <span
             className={styles.finalValue}
             style={{
-              color: '#db2777',
-              marginLeft: '0.5rem',
-              fontSize: '1.5rem',
-              
-            }} // [수정] 값 크기 증가
+              color: '#6366f1',
+              marginLeft: '0.35rem',
+              fontSize: '1.2rem',
+            }}
           >
             {customSavingRate.toFixed(1)}
           </span>
-          <span className={styles.finalUnit} style={{ fontSize: '1rem' }}>
+          <span className={styles.finalUnit} style={{ fontSize: '0.85rem' }}>
             %
           </span>
         </div>
