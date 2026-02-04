@@ -114,7 +114,7 @@ export default function PreviewSummary() {
   // const savingRate =
   //   totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
-  const savingRate =
+  const customSavingRate =
     totalBillBefore > 0
       ? ((totalBillBefore - totalBillSavings) / totalBillBefore) * 100
       : 0;
@@ -420,7 +420,7 @@ export default function PreviewSummary() {
           </div>
           <div className={styles.connectItem}>
             <span className={styles.connectValueBlue}>
-              {savingRate.toFixed(0)}%
+              {customSavingRate.toFixed(0)}%
             </span>
             <span className={styles.connectLabel}>절감</span>
           </div>
