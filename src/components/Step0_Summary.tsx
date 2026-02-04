@@ -59,48 +59,15 @@ export default function Step0_Summary() {
   const simpleAnnualGen = results.initialAnnualGen;
   const totalBillBefore = monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
-    0,
+    0
   );
   const totalUsage = monthlyData.reduce((acc, cur) => acc + cur.usageKwh, 0);
 
   // RE100 달성률
   const re100Rate = totalUsage > 0 ? (simpleAnnualGen / totalUsage) * 100 : 0;
 
-  const solarRadiation = config.solar_radiation || 3.8;
-
-  // 전기요금 절감률 계산
-  let totalBillSavings = 0;
-  monthlyData.forEach((data) => {
-    const days = new Date(2025, data.month, 0).getDate();
-    const autoGen = capacityKw * solarRadiation * days;
-    const selfConsum = data.selfConsumption;
-    const usageSaving =
-      Math.min(autoGen, selfConsum) *
-      (store.unitPriceSavings || config.unit_price_savings);
-
-    // 기본료 절감 (피크 감소분)
-    const totalUsageYear = monthlyData.reduce(
-      (acc, cur) => acc + cur.usageKwh,
-      0,
-    );
-    const totalSelfYear = monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0,
-    );
-    const dynamicPeakRatio =
-      totalUsageYear > 0 ? totalSelfYear / totalUsageYear : 0;
-
-    let baseBillSaving = 0;
-    if (data.peakKw > 0) {
-      baseBillSaving = Math.max(
-        0,
-        data.baseBill - store.baseRate * data.peakKw,
-      );
-    } else {
-      baseBillSaving = data.baseBill * dynamicPeakRatio;
-    }
-    totalBillSavings += usageSaving + baseBillSaving;
-  });
+  const totalBillSavings =
+    results.revenue_saving + results.revenue_base_bill_savings;
 
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;

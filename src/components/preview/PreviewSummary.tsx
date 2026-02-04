@@ -56,13 +56,13 @@ export default function PreviewSummary() {
 
   const [applyEc, setApplyEc] = useState(
     (store.useEc || store.isEcSelfConsumption) &&
-      store.selectedModel !== 'KEPCO',
+      store.selectedModel !== 'KEPCO'
   );
 
   useEffect(() => {
     setApplyEc(
       (store.useEc || store.isEcSelfConsumption) &&
-        store.selectedModel !== 'KEPCO',
+        store.selectedModel !== 'KEPCO'
     );
   }, [store.useEc, store.isEcSelfConsumption, store.selectedModel]);
 
@@ -73,12 +73,12 @@ export default function PreviewSummary() {
   const capacity = store.capacityKw;
   const totalUsage = store.monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
-    0,
+    0
   );
   const re100Rate = totalUsage > 0 ? (simpleAnnualGen / totalUsage) * 100 : 0;
   const totalBillBefore = store.monthlyData.reduce(
     (acc, cur) => acc + cur.totalBill,
-    0,
+    0
   );
 
   let totalBillSavings = 0;
@@ -91,11 +91,11 @@ export default function PreviewSummary() {
       (store.unitPriceSavings || config.unit_price_savings);
     const totalUsageYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.usageKwh,
-      0,
+      0
     );
     const totalSelfYear = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0,
+      0
     );
     const dynamicPeakRatio =
       totalUsageYear > 0 ? totalSelfYear / totalUsageYear : 0;
@@ -103,7 +103,7 @@ export default function PreviewSummary() {
     if (data.peakKw > 0) {
       baseBillSaving = Math.max(
         0,
-        data.baseBill - store.baseRate * data.peakKw,
+        data.baseBill - store.baseRate * data.peakKw
       );
     } else {
       baseBillSaving = data.baseBill * dynamicPeakRatio;
@@ -194,7 +194,7 @@ export default function PreviewSummary() {
     const annualGen = simpleAnnualGen;
     let annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0,
+      0
     );
     if (isGap) annualSelf = 0;
 
@@ -233,14 +233,15 @@ export default function PreviewSummary() {
       ? 0
       : volume_surplus_final * config.unit_price_kepco;
 
-    // [수정] O&M 비율 계산용 매출 (합리화 포함)
+    // [수정] O&M 비율 계산용 매출 (합리화 + 기본료 절감 포함)
     const grossRevenueForOandM =
       revenue_saving +
       revenue_ec +
       revenue_surplus +
+      results.revenue_base_bill_savings +
       fixedRationalizationSavings;
 
-    // [수정] 태양광 기반 변동 매출 (합리화 제외)
+    // [수정] 태양광 기반 변동 매출 (합리화 제외, 매년 감소 반영용)
     const solarBasedRevenue = revenue_saving + revenue_ec + revenue_surplus;
 
     const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
@@ -265,9 +266,10 @@ export default function PreviewSummary() {
     const maintenanceCost =
       (grossRevenueForOandM * scenarioMaintenanceRate) / 100 + laborCostWon;
 
-    // [수정] 1차년도 연간 순수익 (표시용) -> 합리화 절감액 제외!
-    // Step4의 '연간 실제 순수익'과 맞추기 위해 solarBasedRevenue 사용
-    const annualNetProfitWon = solarBasedRevenue - maintenanceCost;
+    // [수정] 1차년도 연간 순수익 (표시용) -> 합리화 제외, 기본료 절감 포함
+    // Step4의 '연간 실제 순수익'과 맞추기
+    const annualNetProfitWon =
+      solarBasedRevenue + results.revenue_base_bill_savings - maintenanceCost;
 
     // --- 투자비 계산 ---
     const solarCost = (capacity / 100) * currentSolarPrice;
@@ -293,15 +295,21 @@ export default function PreviewSummary() {
     const totalSolarRevenue20 =
       (solarBasedRevenue * (1 - Math.pow(R, n))) / (1 - R);
 
-    // 2. 합리화 절감액 (고정) -> 20년 총액에는 포함!
+    // 2. 기본료 절감 (고정) -> 20년 총액에 포함
+    const totalBaseBillSavings20 = results.totalBaseBillSavings20;
+
+    // 3. 합리화 절감액 (고정) -> 20년 총액에는 포함!
     const totalRationalization20 = fixedRationalizationSavings * 20;
 
-    // 3. 유지보수 비용 (고정)
+    // 4. 유지보수 비용 (고정)
     const totalMaintenance20 = maintenanceCost * 20;
 
-    // 4. 최종 20년 순수익 (태양광20 + 합리화20 - 비용20)
+    // 5. 최종 20년 순수익 (태양광20 + 기본료절감20 + 합리화20 - 비용20)
     const totalNet20Won =
-      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
+      totalSolarRevenue20 +
+      totalBaseBillSavings20 +
+      totalRationalization20 -
+      totalMaintenance20;
 
     const totalCost20 = investWon + totalMaintenance20;
     const roiYears =
@@ -315,8 +323,8 @@ export default function PreviewSummary() {
           ? 'TYPE B. EC 자가소비 Plan'
           : 'TYPE B. REC 5.0 Plan'
         : isEcSelfConsumption
-          ? 'TYPE A. EC 자가소비 Plan'
-          : 'TYPE A. REC 1.5 Plan',
+        ? 'TYPE A. EC 자가소비 Plan'
+        : 'TYPE A. REC 1.5 Plan',
       invest: investUk,
       ecCount: activeEcCount,
       annualProfit: annualNetProfitWon / 100000000,

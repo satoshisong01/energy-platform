@@ -17,6 +17,7 @@ import PreviewComparisonTable from './preview/PreviewComparisonTable';
 import PreviewSummary from './preview/PreviewSummary';
 import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
 import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
+import { computeMonthlyEnergyMetrics } from '../lib/energyCalculations';
 
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -56,104 +57,27 @@ export default function PreviewPanel() {
     window.print();
   };
 
-  const getDaysInMonth = (month: number) => new Date(2025, month, 0).getDate();
-
-  // ----------------------------------------------------------------
-  // [1] 월별 데이터 계산 (일조량 설정 반영)
-  // ----------------------------------------------------------------
-  const computedData = store.monthlyData.map((data) => {
-    const days = getDaysInMonth(data.month);
-
-    // [수정 1] 하드코딩(3.64) 제거 -> 설정값(solar_radiation) 사용 (기본 3.8)
-    const dailyGenHours = config.solar_radiation || 3.8;
-
-    const autoSolarGen = store.capacityKw * dailyGenHours * days;
-    const solarGeneration =
-      data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
-    const surplusPower = Math.max(0, solarGeneration - data.selfConsumption);
-    const unitPriceSavings = store.unitPriceSavings || 136.47;
-    const maxLoadSavings =
-      Math.min(solarGeneration, data.selfConsumption) * unitPriceSavings;
-    const totalUsage = store.monthlyData.reduce(
-      (acc, cur) => acc + cur.usageKwh,
-      0,
-    );
-    const totalSelf = store.monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0,
-    );
-    const dynamicPeakRatio = totalUsage > 0 ? totalSelf / totalUsage : 0;
-
-    let baseBillSavings = 0;
-    if (data.peakKw > 0) {
-      baseBillSavings = Math.max(
-        0,
-        data.baseBill - store.baseRate * data.peakKw,
-      );
-    } else {
-      baseBillSavings = data.baseBill * dynamicPeakRatio;
-    }
-
-    const totalSavings = maxLoadSavings + baseBillSavings;
-    const afterBill = Math.max(0, data.totalBill - totalSavings);
-
-    // [수정 2] 잉여수익 계산 시 설정된 판매단가(SMP+REC) 사용
-    const unitPriceSell = config.unit_price_kepco || 210;
-    const surplusRevenue = surplusPower * unitPriceSell;
-
-    return {
-      ...data,
-      solarGeneration,
-      surplusPower,
-      maxLoadSavings,
-      baseBillSavings,
-      totalSavings,
-      afterBill,
-      surplusRevenue,
-      name: `${data.month}월`,
-      설치전: data.totalBill / 10000,
-      설치후: afterBill / 10000,
-    };
+  const {
+    computedData: baseComputedData,
+    totals,
+    savingRate,
+    customSavingRate,
+    maxLoadRatio,
+    totalBenefit,
+  } = computeMonthlyEnergyMetrics({
+    monthlyData: store.monthlyData,
+    capacityKw: store.capacityKw,
+    baseRate: store.baseRate,
+    unitPriceSavings: store.unitPriceSavings || config.unit_price_savings || 0,
+    config,
   });
 
-  const totals = computedData.reduce(
-    (acc, cur) => ({
-      usageKwh: acc.usageKwh + cur.usageKwh,
-      selfConsumption: acc.selfConsumption + cur.selfConsumption,
-      solarGeneration: acc.solarGeneration + cur.solarGeneration,
-      surplusPower: acc.surplusPower + cur.surplusPower,
-      totalBill: acc.totalBill + cur.totalBill,
-      baseBill: acc.baseBill + cur.baseBill,
-      maxLoadSavings: acc.maxLoadSavings + cur.maxLoadSavings,
-      baseBillSavings: acc.baseBillSavings + cur.baseBillSavings,
-      totalSavings: acc.totalSavings + cur.totalSavings,
-      afterBill: acc.afterBill + cur.afterBill,
-      surplusRevenue: acc.surplusRevenue + cur.surplusRevenue,
-    }),
-    {
-      usageKwh: 0,
-      selfConsumption: 0,
-      solarGeneration: 0,
-      surplusPower: 0,
-      totalBill: 0,
-      baseBill: 0,
-      maxLoadSavings: 0,
-      baseBillSavings: 0,
-      totalSavings: 0,
-      afterBill: 0,
-      surplusRevenue: 0,
-    },
-  );
-
-  const savingRate =
-    totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
-  const customSavingRate =
-    totals.totalBill > 0
-      ? ((totals.totalBill - totals.totalSavings) / totals.totalBill) * 100
-      : 0;
-  const maxLoadRatio =
-    totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
-  const totalBenefit = totals.totalSavings + totals.surplusRevenue;
+  const computedData = baseComputedData.map((row) => ({
+    ...row,
+    name: `${row.month}월`,
+    설치전: row.totalBill / 10000,
+    설치후: row.afterBill / 10000,
+  }));
 
   // [수정 3] 누락되었던 연간 발전량 계산 함수 추가 (헤더 표시용)
   const calculateAnnualGen = () => {
@@ -225,8 +149,8 @@ export default function PreviewPanel() {
               {isEcSelfConsumption
                 ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
                 : store.useEc && truckCount > 0
-                  ? `, 이동형 EC ${truckCount}대`
-                  : ''}
+                ? `, 이동형 EC ${truckCount}대`
+                : ''}
               ) -
             </h2>
             {/* [추가] 일조량 표시 */}

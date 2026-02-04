@@ -124,7 +124,7 @@ export default function Step4_Simulation() {
   const renderRationalizationInput = (
     field: keyof RationalizationData,
     placeholder: string = '0',
-    extraClass: string = '',
+    extraClass: string = ''
   ) => {
     const value = rationalization[field];
     return (
@@ -189,9 +189,12 @@ export default function Step4_Simulation() {
   const revenue_ec = results.revenue_ec;
   const revenue_surplus = results.revenue_surplus;
 
-  // [수정] 화면 표시용 연간 수익 합계 (합리화 절감액 제외)
+  // [수정] 화면 표시용 연간 수익 합계 (합리화 절감액 제외, 기본료 절감 포함)
   const displayedAnnualGrossRevenue =
-    revenue_saving + revenue_ec + revenue_surplus;
+    revenue_saving +
+    revenue_ec +
+    revenue_surplus +
+    results.revenue_base_bill_savings;
 
   const laborCostWon = results.laborCostWon;
   const totalAnnualCost = results.annualMaintenanceCost;
@@ -501,7 +504,7 @@ export default function Step4_Simulation() {
                 onChange={(e) =>
                   store.setSimulationOption(
                     'isRationalizationEnabled',
-                    e.target.checked,
+                    e.target.checked
                   )
                 }
                 className="w-4 h-4 accent-blue-600 disabled:bg-slate-200"
@@ -723,8 +726,8 @@ export default function Step4_Simulation() {
                     {store.isEcSelfConsumption
                       ? store.ecSelfConsumptionCount
                       : store.useEc
-                        ? truckCount
-                        : 0}{' '}
+                      ? truckCount
+                      : 0}{' '}
                     ea
                   </td>
                   <td>{tractorCost > 0 ? 1 : 0} ea</td>
@@ -794,7 +797,7 @@ export default function Step4_Simulation() {
                 onChange={(e) =>
                   store.setSimulationOption(
                     'isSurplusDiscarded',
-                    e.target.checked,
+                    e.target.checked
                   )
                 }
               />
@@ -945,9 +948,15 @@ export default function Step4_Simulation() {
                   {(revenue_ec / 100000000).toFixed(2)} 억원
                 </span>
               </div>
-
-              {/* [수정] 전기요금합리화절감액 행 삭제됨 */}
-
+              <div className={styles.row}>
+                <span className="text-xs text-gray-500 pl-2">
+                  ○ 기본료 절감
+                </span>
+                <span className="text-xs">
+                  {(results.revenue_base_bill_savings / 100000000).toFixed(2)}{' '}
+                  억원
+                </span>
+              </div>
               <div className={styles.row}>
                 <span className="text-xs text-gray-500 pl-2">
                   ○ 잉여 한전판매 수익
@@ -1001,6 +1010,10 @@ export default function Step4_Simulation() {
               <div className="flex justify-between">
                 <span>(+) 태양광발전수익 (20년, 효율감소반영)</span>
                 <span>{toUk(results.totalSolarRevenue20)} 억원</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>(+) 기본료 절감 (20년)</span>
+                <span>+{toUk(results.totalBaseBillSavings20)} 억원</span>
               </div>
               {/* 항상 표시 (0원이라도 표시) */}
               <div className="flex justify-between text-blue-600">

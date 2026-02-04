@@ -73,9 +73,12 @@ export default function PreviewFinancialTable() {
     else if (useEc) ecStatusText = `이동형 (${activeEcCount}대)`;
   }
 
-  // 연간 수익 표 계산 (합리화 제외)
+  // 연간 수익 표 계산 (합리화 제외, 기본료 절감 포함)
   const displayedAnnualGross =
-    results.revenue_saving + results.revenue_ec + results.revenue_surplus;
+    results.revenue_saving +
+    results.revenue_ec +
+    results.revenue_surplus +
+    results.revenue_base_bill_savings;
   const displayedAnnualNet =
     displayedAnnualGross - results.annualMaintenanceCost;
 
@@ -190,7 +193,7 @@ export default function PreviewFinancialTable() {
         </thead>
         <tbody>
           <tr>
-            <td rowSpan={3} className={styles.textBold}>
+            <td rowSpan={4} className={styles.textBold}>
               수익
             </td>
             <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
@@ -232,6 +235,16 @@ export default function PreviewFinancialTable() {
             </td>
             <td className={styles.textRight}>{toUk(results.revenue_ec)}</td>
           </tr>
+          <tr>
+            <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
+              ④ 기본료 절감
+            </td>
+            <td className={styles.bgPinkRow}>-</td>
+            <td className={styles.bgYellowRow}>-</td>
+            <td className={styles.textRight}>
+              {toUk(results.revenue_base_bill_savings)}
+            </td>
+          </tr>
 
           {/* 총계 */}
           <tr className={styles.bgGreenRow} style={{ fontWeight: 'bold' }}>
@@ -270,7 +283,9 @@ export default function PreviewFinancialTable() {
       {/* 최종 결론 */}
       <div className={styles.badgeWrapper} style={{ alignItems: 'flex-start' }}>
         <div className={styles.finalMetricBox} style={{ marginRight: '2rem' }}>
-          <span className={styles.finalLabel} style={{width: '100%'}}>20년 누적 수익</span>
+          <span className={styles.finalLabel} style={{ width: '100%' }}>
+            20년 누적 수익
+          </span>
 
           {/* [수정] 줄바꿈 방지를 위해 flex row 적용 */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
@@ -295,6 +310,16 @@ export default function PreviewFinancialTable() {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>태양광발전수익(20년)</span>
               <span>+{toUk(results.totalSolarRevenue20)}억</span>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: '#475569',
+              }}
+            >
+              <span>기본료 절감(20년)</span>
+              <span>+{toUk(results.totalBaseBillSavings20)}억</span>
             </div>
             {/* 항상 표시 (0원이어도) */}
             <div

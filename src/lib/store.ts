@@ -107,6 +107,7 @@ type SimulationResult = {
   revenue_saving: number;
   revenue_ec: number;
   revenue_surplus: number;
+  revenue_base_bill_savings: number;
   totalRationalizationSavings: number;
   annualGrossRevenue: number;
   annualOperatingProfit: number;
@@ -116,6 +117,7 @@ type SimulationResult = {
 
   // [NEW] 20년 상세 내역
   totalSolarRevenue20: number;
+  totalBaseBillSavings20: number;
   totalRationalization20: number;
   totalMaintenance20: number;
 
@@ -194,19 +196,19 @@ interface ProposalState {
   updateRoofArea: (
     id: string,
     field: 'name' | 'valueM2',
-    value: string | number,
+    value: string | number
   ) => void;
   recalculateCapacity: (areas: RoofArea[]) => void;
   setContractType: (
     name: string,
     baseRate: number,
-    unitPriceSavings: number,
+    unitPriceSavings: number
   ) => void;
   setVoltageType: (type: string) => void;
   updateMonthlyData: (
     month: number,
     field: keyof MonthlyData,
-    value: number,
+    value: number
   ) => void;
   setMonthlyData: (data: MonthlyData[]) => void;
   copyJanToAll: () => void;
@@ -214,7 +216,7 @@ interface ProposalState {
   setEnergyNote: (note: string) => void;
   updateRationalization: (
     field: keyof RationalizationData,
-    value: number,
+    value: number
   ) => void;
   setSimulationOption: (field: any, value: any) => void;
   setTruckCount: (count: number) => void;
@@ -223,7 +225,7 @@ interface ProposalState {
   updateTariffPreset: (
     index: number,
     field: keyof TariffPreset,
-    value: string | number,
+    value: string | number
   ) => void;
   recalculateInvestment: () => void;
   setCapacityKw: (val: number) => void;
@@ -370,7 +372,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
   updateRoofArea: (id, field, value) => {
     const newAreas = get().roofAreas.map((area) =>
-      area.id === id ? { ...area, [field]: value } : area,
+      area.id === id ? { ...area, [field]: value } : area
     );
     set({ roofAreas: newAreas });
     get().recalculateCapacity(newAreas);
@@ -390,7 +392,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   updateMonthlyData: (month, field, value) =>
     set((state) => ({
       monthlyData: state.monthlyData.map((d) =>
-        d.month === month ? { ...d, [field]: value } : d,
+        d.month === month ? { ...d, [field]: value } : d
       ),
     })),
   setMonthlyData: (data) => set({ monthlyData: data }),
@@ -398,7 +400,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => {
       const jan = state.monthlyData[0];
       const newData = state.monthlyData.map((d, i) =>
-        i === 0 ? d : { ...d, ...jan, month: d.month },
+        i === 0 ? d : { ...d, ...jan, month: d.month }
       );
       return { monthlyData: newData };
     }),
@@ -406,7 +408,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set((state) => {
       const firstVal = state.monthlyData[0][field];
       const newData = state.monthlyData.map((d, i) =>
-        i === 0 ? d : { ...d, [field]: firstVal },
+        i === 0 ? d : { ...d, [field]: firstVal }
       );
       return { monthlyData: newData };
     }),
@@ -557,7 +559,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const finalName = customName || state.proposalName || defaultName;
     const isDuplicate = await get().checkDuplicateName(
       finalName,
-      state.proposalId || undefined,
+      state.proposalId || undefined
     );
     if (isDuplicate) {
       alert('❌ 이미 같은 이름의 분석자료가 존재합니다.');
@@ -638,7 +640,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const isDuplicate = await get().checkDuplicateName(customName);
     if (isDuplicate) {
       alert(
-        '❌ 이미 같은 이름의 분석자료가 존재합니다. 다른 이름을 사용해주세요.',
+        '❌ 이미 같은 이름의 분석자료가 존재합니다. 다른 이름을 사용해주세요.'
       );
       return false;
     }
@@ -744,10 +746,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       const savedPresets = data.input_data.tariffPresets || [];
       const newPresets = DEFAULT_TARIFFS.filter(
         (def) =>
-          !savedPresets.find((saved: TariffPreset) => saved.id === def.id),
+          !savedPresets.find((saved: TariffPreset) => saved.id === def.id)
       );
       const mergedPresets = [...savedPresets, ...newPresets].sort(
-        (a, b) => a.id - b.id,
+        (a, b) => a.id - b.id
       );
       const defaultFin = get().financialSettings;
       const savedFin = data.input_data.financialSettings || {};
@@ -762,7 +764,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       if (finalCapacity === undefined || finalCapacity === null) {
         const totalM2 = (data.input_data.roofAreas || []).reduce(
           (sum: number, area: any) => sum + (area.valueM2 || 0),
-          0,
+          0
         );
         const totalPyeong = totalM2 * 0.3025;
         finalCapacity = Math.floor(totalPyeong / 2);
@@ -912,10 +914,37 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     let revenue_saving = 0,
       revenue_ec = 0,
       revenue_surplus = 0,
+      revenue_base_bill_savings = 0,
       totalRationalizationSavings = 0;
     let annualGrossRevenue = 0;
 
     const isGap = contractType.includes('(갑)');
+
+    // [기본료 절감] 절감후 피크산정 소계(합산) - KEPCO 제외, monthlyData 기반
+    if (selectedModel !== 'KEPCO') {
+      const totalUsageYear = monthlyData.reduce(
+        (acc, cur) => acc + cur.usageKwh,
+        0
+      );
+      const totalSelfYear = monthlyData.reduce(
+        (acc, cur) => acc + cur.selfConsumption,
+        0
+      );
+      const dynamicPeakRatio =
+        totalUsageYear > 0 ? totalSelfYear / totalUsageYear : 0;
+      monthlyData.forEach((data) => {
+        let baseBillSaving = 0;
+        if (data.peakKw > 0) {
+          baseBillSaving = Math.max(
+            0,
+            data.baseBill - state.baseRate * data.peakKw
+          );
+        } else {
+          baseBillSaving = data.baseBill * dynamicPeakRatio;
+        }
+        revenue_base_bill_savings += baseBillSaving;
+      });
+    }
 
     if (selectedModel === 'KEPCO') {
       volume_self = 0;
@@ -931,14 +960,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     } else {
       let annualSelfConsumptionCalc = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
-        0,
+        0
       );
       if (isGap) annualSelfConsumptionCalc = 0;
       volume_self = Math.min(initialAnnualGen, annualSelfConsumptionCalc);
 
       const rawSurplus = Math.max(
         0,
-        initialAnnualGen - annualSelfConsumptionCalc,
+        initialAnnualGen - annualSelfConsumptionCalc
       );
 
       let ecCapacityAnnual = 0;
@@ -996,6 +1025,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         revenue_saving +
         revenue_ec +
         revenue_surplus +
+        revenue_base_bill_savings +
         totalRationalizationSavings;
     }
 
@@ -1025,16 +1055,22 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const totalSolarRevenue20 =
       (annualSolarRevenue * (1 - Math.pow(R, n))) / (1 - R);
 
-    // (2) 전기요금 합리화 절감액 (매년 고정, 감소 안 함)
+    // (2) 기본료 절감 (매년 고정, 감소 안 함)
+    const totalBaseBillSavings20 = revenue_base_bill_savings * 20;
+
+    // (3) 전기요금 합리화 절감액 (매년 고정, 감소 안 함)
     const totalRationalization20 = totalRationalizationSavings * 20;
 
-    // (3) 유지보수 비용 (매년 고정, 감소 안 함)
+    // (4) 유지보수 비용 (매년 고정, 감소 안 함)
     const totalMaintenance20 = annualMaintenanceCost * 20;
 
-    // (4) 최종 20년 누적 순수익
-    //     = (태양광20년 + 합리화20년) - 유지보수20년
+    // (5) 최종 20년 누적 순수익
+    //     = (태양광20년 + 기본료절감20년 + 합리화20년) - 유지보수20년
     const self_final_profit =
-      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
+      totalSolarRevenue20 +
+      totalBaseBillSavings20 +
+      totalRationalization20 -
+      totalMaintenance20;
 
     // --- 금융 비용 처리 (절삭된 totalInvestment 사용) ---
     const rps = financialSettings.rps;
@@ -1076,13 +1112,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const price_standard = 210.5;
     const annualSelfConsumptionForSub = monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
-      0,
+      0
     );
     const sub_benefit_savings =
       annualSelfConsumptionForSub * (price_standard - config.sub_price_self);
     const rawSurplusForSub = Math.max(
       0,
-      initialAnnualGen - annualSelfConsumptionForSub,
+      initialAnnualGen - annualSelfConsumptionForSub
     );
     const sub_revenue_surplus = rawSurplusForSub * config.sub_price_surplus;
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
@@ -1117,7 +1153,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           : Math.max(
               0,
               initialAnnualGen -
-                monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0),
+                monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0)
             ),
       volume_self,
       volume_ec,
@@ -1125,6 +1161,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       revenue_saving,
       revenue_ec,
       revenue_surplus,
+      revenue_base_bill_savings,
       totalRationalizationSavings,
       annualGrossRevenue,
       annualOperatingProfit,
@@ -1133,6 +1170,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       self_final_profit,
       // [NEW] 20년 상세 내역 반환
       totalSolarRevenue20,
+      totalBaseBillSavings20,
       totalRationalization20,
       totalMaintenance20,
       rps_final_profit,
