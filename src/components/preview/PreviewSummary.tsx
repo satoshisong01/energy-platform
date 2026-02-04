@@ -111,9 +111,12 @@ export default function PreviewSummary() {
     totalBillSavings += usageSaving + baseBillSaving;
   });
 
-  // const savingRate =
-  //   totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
+  // [기존] 절감율 (참고용으로 남겨둘 수 있음, 하지만 화면 표시는 customSavingRate 사용)
+  const savingRate =
+    totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
+  // [추가] 전기요금 절감 (요청하신 수식 적용)
+  // 식: (전체요금 - 총절감액) / 전체요금 * 100
   const customSavingRate =
     totalBillBefore > 0
       ? ((totalBillBefore - totalBillSavings) / totalBillBefore) * 100
@@ -616,7 +619,6 @@ export default function PreviewSummary() {
               )
             </span>
           </div>
-          {/* [수정] 자가소비 모드면 임대/구독 숨김 */}
           {showRentSub && (
             <>
               <div className={styles.compRow}>
