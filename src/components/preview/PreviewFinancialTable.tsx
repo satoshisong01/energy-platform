@@ -311,16 +311,7 @@ export default function PreviewFinancialTable() {
               <span>태양광발전수익(20년)</span>
               <span>+{toUk(results.totalSolarRevenue20)}억</span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                color: '#475569',
-              }}
-            >
-              <span>기본료 절감(20년)</span>
-              <span>+{toUk(results.totalBaseBillSavings20)}억</span>
-            </div>
+            {/* 엑셀 J16과 동일: 연간 수익총액(기본료 포함)에 등비수열 적용 */}
             {/* 항상 표시 (0원이어도) */}
             <div
               style={{

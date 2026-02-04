@@ -1048,15 +1048,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const R = 1 + degradationRateDecimal;
     const n = 20;
 
-    // (1) 태양광 발전 기반 수익 (매년 감소)
-    //     항목: 자가소비절감 + EC판매 + 잉여판매
-    const annualSolarRevenue = revenue_saving + revenue_ec + revenue_surplus;
-    //     등비수열 합: A * (1 - R^n) / (1 - R)
+    // (1) 연간 수익총액(J16) 기준 20년 수익 (엑셀 동일: J16*(1-(1+K25/100)^20)/(1-(1+K25/100)))
+    //     J16 = 자가소비 + EC + 기본료 절감 + 잉여 (기본료 포함, 별도 기본료 20년 계산 없음)
+    const annualRevenueFor20Yr =
+      revenue_saving + revenue_ec + revenue_surplus + revenue_base_bill_savings;
     const totalSolarRevenue20 =
-      (annualSolarRevenue * (1 - Math.pow(R, n))) / (1 - R);
+      (annualRevenueFor20Yr * (1 - Math.pow(R, n))) / (1 - R);
 
-    // (2) 기본료 절감 (매년 고정, 감소 안 함)
-    const totalBaseBillSavings20 = revenue_base_bill_savings * 20;
+    // (2) 기본료 절감 20년 - 엑셀에는 없음(J16에 포함), 웹 표시용 0
+    const totalBaseBillSavings20 = 0;
 
     // (3) 전기요금 합리화 절감액 (매년 고정, 감소 안 함)
     const totalRationalization20 = totalRationalizationSavings * 20;
@@ -1064,13 +1064,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     // (4) 유지보수 비용 (매년 고정, 감소 안 함)
     const totalMaintenance20 = annualMaintenanceCost * 20;
 
-    // (5) 최종 20년 누적 순수익
-    //     = (태양광20년 + 기본료절감20년 + 합리화20년) - 유지보수20년
+    // (5) 최종 20년 누적 순수익 (엑셀과 동일: 태양광20년 + 합리화20년 - 유지보수20년)
     const self_final_profit =
-      totalSolarRevenue20 +
-      totalBaseBillSavings20 +
-      totalRationalization20 -
-      totalMaintenance20;
+      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
 
     // --- 금융 비용 처리 (절삭된 totalInvestment 사용) ---
     const rps = financialSettings.rps;

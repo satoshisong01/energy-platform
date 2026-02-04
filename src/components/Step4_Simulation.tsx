@@ -1011,10 +1011,7 @@ export default function Step4_Simulation() {
                 <span>(+) 태양광발전수익 (20년, 효율감소반영)</span>
                 <span>{toUk(results.totalSolarRevenue20)} 억원</span>
               </div>
-              <div className="flex justify-between text-slate-600">
-                <span>(+) 기본료 절감 (20년)</span>
-                <span>+{toUk(results.totalBaseBillSavings20)} 억원</span>
-              </div>
+              {/* 엑셀 J16과 동일: 연간 수익총액(기본료 포함)에 등비수열 적용, 기본료 20년 별도 없음 */}
               {/* 항상 표시 (0원이라도 표시) */}
               <div className="flex justify-between text-blue-600">
                 <span>(+) 전기요금합리화절감액 (20년)</span>

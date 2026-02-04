@@ -286,30 +286,26 @@ export default function PreviewSummary() {
     const investUk = solarCost + ecCost + infraCost;
     const investWon = investUk * 100000000;
 
-    // --- 20년 수익 상세 계산 ---
+    // --- 20년 수익 상세 계산 (엑셀 J16과 동일) ---
     const degradationRateDecimal = -(store.degradationRate / 100);
     const R = 1 + degradationRateDecimal;
     const n = 20;
 
-    // 1. 태양광 기반 수익 (매년 감소)
+    // 1. 연간 수익총액(J16) 기준 20년 수익 (기본료 포함, 등비수열 적용)
+    const annualRevenueFor20Yr =
+      solarBasedRevenue + results.revenue_base_bill_savings;
     const totalSolarRevenue20 =
-      (solarBasedRevenue * (1 - Math.pow(R, n))) / (1 - R);
+      (annualRevenueFor20Yr * (1 - Math.pow(R, n))) / (1 - R);
 
-    // 2. 기본료 절감 (고정) -> 20년 총액에 포함
-    const totalBaseBillSavings20 = results.totalBaseBillSavings20;
-
-    // 3. 합리화 절감액 (고정) -> 20년 총액에는 포함!
+    // 2. 합리화 절감액 (고정) -> 20년 총액에는 포함!
     const totalRationalization20 = fixedRationalizationSavings * 20;
 
-    // 4. 유지보수 비용 (고정)
+    // 3. 유지보수 비용 (고정)
     const totalMaintenance20 = maintenanceCost * 20;
 
-    // 5. 최종 20년 순수익 (태양광20 + 기본료절감20 + 합리화20 - 비용20)
+    // 4. 최종 20년 순수익 (엑셀과 동일: 태양광20 + 합리화20 - 비용20)
     const totalNet20Won =
-      totalSolarRevenue20 +
-      totalBaseBillSavings20 +
-      totalRationalization20 -
-      totalMaintenance20;
+      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
 
     const totalCost20 = investWon + totalMaintenance20;
     const roiYears =
