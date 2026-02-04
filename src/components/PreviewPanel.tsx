@@ -147,6 +147,10 @@ export default function PreviewPanel() {
 
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
+  const customSavingRate =
+    totals.totalBill > 0
+      ? ((totals.totalBill - totals.totalSavings) / totals.totalBill) * 100
+      : 0;
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
   const totalBenefit = totals.totalSavings + totals.surplusRevenue;
@@ -259,6 +263,7 @@ export default function PreviewPanel() {
           <PreviewChart
             data={computedData}
             savingRate={savingRate}
+            customSavingRate={customSavingRate}
             contractType={store.contractType}
             baseRate={store.baseRate}
           />
@@ -278,6 +283,7 @@ export default function PreviewPanel() {
             data={computedData}
             totals={totals}
             savingRate={savingRate}
+            customSavingRate={customSavingRate}
             maxLoadRatio={maxLoadRatio}
             totalBenefit={totalBenefit}
           />

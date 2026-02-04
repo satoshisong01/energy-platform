@@ -111,8 +111,13 @@ export default function PreviewSummary() {
     totalBillSavings += usageSaving + baseBillSaving;
   });
 
+  // const savingRate =
+  //   totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
+
   const savingRate =
-    totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
+    totalBillBefore > 0
+      ? ((totalBillBefore - totalBillSavings) / totalBillBefore) * 100
+      : 0;
 
   const MAX_LIMIT = maintenanceCostLimit;
 

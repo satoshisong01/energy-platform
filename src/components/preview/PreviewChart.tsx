@@ -19,11 +19,13 @@ type Props = {
   savingRate: number;
   contractType: string;
   baseRate: number;
+  customSavingRate: number;
 };
 
 export default function PreviewChart({
   data,
   savingRate,
+  customSavingRate,
   contractType,
   baseRate,
 }: Props) {
@@ -40,6 +42,14 @@ export default function PreviewChart({
           </span>
           <span style={{ color: '#22c55e', fontSize: '1rem' }}>
             {savingRate.toFixed(1)}% ▼
+          </span>
+        </div>
+        <div className={styles.contractLabel}>
+          <span style={{ color: '#94a3b8', marginRight: '0.5rem' }}>
+            전기 절감율
+          </span>
+          <span style={{ color: '#22c55e', fontSize: '1rem' }}>
+            {customSavingRate.toFixed(1)}% ▼
           </span>
         </div>
       </div>

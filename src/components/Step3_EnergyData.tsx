@@ -190,7 +190,7 @@ export default function Step3_EnergyData() {
   };
 
   // ----------------------------------------------------------------------
-  // [핵심 수정] 실시간 계산 로직 (엑셀과 값 맞추기)
+  // 실시간 계산 로직
   // ----------------------------------------------------------------------
   const totalUsageInput = monthlyData.reduce(
     (acc, cur) => acc + cur.usageKwh,
@@ -237,8 +237,7 @@ export default function Step3_EnergyData() {
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
 
-    // [중요 수정] 판매 단가 동기화
-    // 기존: store.unitPriceSell (구버전 변수) -> 수정: config.unit_price_kepco (설정값)
+    // 판매 단가 동기화
     const unitPriceSell = config.unit_price_kepco || 210;
 
     // 6. 잉여수익 계산
@@ -289,6 +288,13 @@ export default function Step3_EnergyData() {
 
   const savingRate =
     totals.totalBill > 0 ? (totals.totalSavings / totals.totalBill) * 100 : 0;
+
+  // [NEW] 요청하신 공식: (전체요금 - 설치후요금) / 전체요금
+  // totals.totalBill (B24) - totals.afterBill (F24) = 사실상 totalSavings
+  // 하지만 명시적으로 (Before - After) / Before 계산식을 적용합니다.
+  const customSavingRate =
+        totals.totalBill > 0 ? ((totals.totalBill - totals.totalSavings) / totals.totalBill * 100) : 0;
+
   const maxLoadRatio =
     totals.usageKwh > 0 ? (totals.selfConsumption / totals.usageKwh) * 100 : 0;
   const isGap = store.contractType.includes('(갑)');
@@ -301,7 +307,6 @@ export default function Step3_EnergyData() {
         </h3>
 
         <div className="flex gap-2">
-          {/* [수정] 자동 계산 버튼 제거됨 */}
           <input
             type="file"
             accept=".xlsx, .xls"
@@ -675,6 +680,16 @@ export default function Step3_EnergyData() {
             기존 전기요금 절감율{' '}
             <span style={{ marginLeft: '0.5rem' }}>
               {savingRate.toFixed(1)}%
+            </span>
+          </div>
+          {/* [NEW] 전기요금 절감 배지 추가 */}
+          <div
+            className={styles.savingRateBadge}
+            style={{ backgroundColor: '#f0fdf4', color: '#15803d' }}
+          >
+            전기요금 절감{' '}
+            <span style={{ marginLeft: '0.5rem' }}>
+              {customSavingRate.toFixed(1)}%
             </span>
           </div>
         </div>

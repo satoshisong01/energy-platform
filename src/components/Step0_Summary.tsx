@@ -105,6 +105,11 @@ export default function Step0_Summary() {
   const savingRate =
     totalBillBefore > 0 ? (totalBillSavings / totalBillBefore) * 100 : 0;
 
+  const customSavingRate =
+    totalBillBefore > 0
+      ? ((totalBillBefore - totalBillSavings) / totalBillBefore) * 100
+      : 0;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -185,6 +190,12 @@ export default function Step0_Summary() {
                 <span className={styles.metricLabel}>요금 절감률</span>
                 <span className="text-xl font-bold text-blue-600">
                   {savingRate.toFixed(1)}%
+                </span>
+              </div>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>전기 절감률</span>
+                <span className="text-xl font-bold text-blue-600">
+                  {customSavingRate.toFixed(1)}%
                 </span>
               </div>
             </div>

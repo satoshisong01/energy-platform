@@ -9,6 +9,7 @@ type Props = {
   data: any[];
   totals: any;
   savingRate: number;
+  customSavingRate: number;
   maxLoadRatio: number;
   totalBenefit: number;
 };
@@ -17,6 +18,7 @@ export default function PreviewDetailTable({
   data,
   totals,
   savingRate,
+  customSavingRate,
   maxLoadRatio,
   totalBenefit,
 }: Props) {
@@ -249,7 +251,7 @@ export default function PreviewDetailTable({
         {/* 절감율 배지 */}
         <div
           className={styles.badge}
-          style={{ padding: '0.75rem 1.25rem' }} // [수정] 패딩 약간 증가
+          style={{ padding: '0.75rem 1.25rem', marginRight: '0.5rem' }} // [수정] 패딩 약간 증가
         >
           <LucideZap className="text-pink-500 mr-2" size={24} />
           <span className={styles.finalLabel} style={{ fontSize: '14px' }}>
@@ -264,6 +266,29 @@ export default function PreviewDetailTable({
             }} // [수정] 값 크기 증가
           >
             {savingRate.toFixed(1)}
+          </span>
+          <span className={styles.finalUnit} style={{ fontSize: '1rem' }}>
+            %
+          </span>
+        </div>
+        <div
+          className={styles.badge}
+          style={{ padding: '0.75rem 1.25rem' }} // [수정] 패딩 약간 증가
+        >
+          <LucideZap className="text-pink-500 mr-2" size={24} />
+          <span className={styles.finalLabel} style={{ fontSize: '14px' }}>
+            기존 전기요금 절감율
+          </span>
+          <span
+            className={styles.finalValue}
+            style={{
+              color: '#db2777',
+              marginLeft: '0.5rem',
+              fontSize: '1.5rem',
+              
+            }} // [수정] 값 크기 증가
+          >
+            {customSavingRate.toFixed(1)}
           </span>
           <span className={styles.finalUnit} style={{ fontSize: '1rem' }}>
             %
