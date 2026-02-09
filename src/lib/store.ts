@@ -896,8 +896,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     const calculatedTotalInvestment = solarCost + ecCost + infraCost;
 
-    // 엑셀과 동일: 억 단위에서 반올림하지 않고 원화로 환산 후 1원 단위 반올림 (예: 4.482억 → 448,200,000원)
-    const totalInvestment = Math.round(calculatedTotalInvestment * 100000000);
+    // 원화 환산 후 10만원 단위 절삭(내림) → 448,275,000 → 448,200,000 (엑셀 표기와 동일)
+    const rawTotal = Math.round(calculatedTotalInvestment * 100000000);
+    const totalInvestment = Math.floor(rawTotal / 100000) * 100000;
     const totalInvestmentUk = totalInvestment / 100000000;
 
     // 2. 연간 기본 데이터 계산
