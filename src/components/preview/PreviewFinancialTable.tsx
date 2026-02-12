@@ -304,7 +304,7 @@ export default function PreviewFinancialTable() {
               fontSize: '0.75rem',
               color: '#64748b',
               width: '100%',
-              minWidth: '200px', // 최소 너비 확보
+              minWidth: '250px', // 최소 너비 확보
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -330,7 +330,9 @@ export default function PreviewFinancialTable() {
                 color: '#dc2626',
               }}
             >
-              <span>유지보수 및 운영비(17년, 3년 무상)</span>
+              <span style={{ whiteSpace: 'nowrap' }}>
+                유지보수 및 운영비(17년, 3년 무상)
+              </span>
               <span>-{toUk(results.totalMaintenance20)}억</span>
             </div>
           </div>
