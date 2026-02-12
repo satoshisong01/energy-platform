@@ -2,14 +2,14 @@
 
 import { createClient } from '@/src/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 
 const SESSION_KEY = 'sessionStartedAt';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberId, setRememberId] = useState(false); // [추가] 아이디 저장 체크 상태
+  const [rememberId, setRememberId] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
   const router = useRouter();
@@ -134,5 +134,21 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-100">
+          <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md text-center text-gray-500">
+            로딩 중...
+          </div>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }
