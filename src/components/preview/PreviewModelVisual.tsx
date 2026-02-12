@@ -286,20 +286,51 @@ export function PreviewModelGraph() {
 
 // 버튼 9개: 1~6 이미지, 7~9 영상 (선택 시 해당 미디어 표시, 버튼은 인쇄 시 숨김)
 const MODEL_OPTIONS = [
-  { id: 1, label: '한전판매형', type: 'image' as const, src: '/images/1.jpg' },
-  { id: 2, label: 'ESS 고정형', type: 'image' as const, src: '/images/2.png' },
-  { id: 3, label: 'A,B동 보충형', type: 'image' as const, src: '/images/3.png' },
-  { id: 4, label: '자가소비후 한전판매형', type: 'image' as const, src: '/images/4..jpg' },
-  { id: 5, label: 'ESS 고정(심야)형', type: 'image' as const, src: '/images/5..png' },
-  { id: 6, label: '전량자가 소비형', type: 'image' as const, src: '/images/6.png' },
-  { id: 7, label: '전력구매형(애니메이션)', type: 'video' as const, src: '/videos/7.mp4' },
-  { id: 8, label: '에너지케리어 3대', type: 'video' as const, src: '/videos/8.mp4' },
-  { id: 9, label: '에너지케리어 2대', type: 'video' as const, src: '/videos/9.mp4' },
+  { id: 1, label: '한전판매', type: 'image' as const, src: '/images/1.jpg' },
+  { id: 2, label: 'ESS고정', type: 'image' as const, src: '/images/2.png' },
+  {
+    id: 3,
+    label: 'A,B동 보충',
+    type: 'image' as const,
+    src: '/images/3.png',
+  },
+  {
+    id: 4,
+    label: '자가소비 한전판매',
+    type: 'image' as const,
+    src: '/images/4..jpg',
+  },
+  {
+    id: 5,
+    label: 'ESS 고정(심야)',
+    type: 'image' as const,
+    src: '/images/5..png',
+  },
+  {
+    id: 6,
+    label: '전량자가소비',
+    type: 'image' as const,
+    src: '/images/6.png',
+  },
+  { id: 7, label: '전력구매형', type: 'video' as const, src: '/videos/7.mp4' },
+  {
+    id: 8,
+    label: 'EC 3대',
+    type: 'video' as const,
+    src: '/videos/8.mp4',
+  },
+  {
+    id: 9,
+    label: 'EC 2대',
+    type: 'video' as const,
+    src: '/videos/9.mp4',
+  },
 ];
 
 export function PreviewModelImage() {
   const [selectedId, setSelectedId] = React.useState(1);
-  const selected = MODEL_OPTIONS.find((o) => o.id === selectedId) || MODEL_OPTIONS[0];
+  const selected =
+    MODEL_OPTIONS.find((o) => o.id === selectedId) || MODEL_OPTIONS[0];
 
   return (
     <div className={styles.container}>
@@ -307,7 +338,15 @@ export function PreviewModelImage() {
         <h4 className={styles.videoTitle} style={{ marginBottom: '12px' }}>
           모델 시각 자료
         </h4>
-        <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+        <div
+          className="no-print"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            marginBottom: '16px',
+          }}
+        >
           {MODEL_OPTIONS.map((opt) => (
             <button
               key={opt.id}
@@ -319,7 +358,10 @@ export function PreviewModelImage() {
                 fontWeight: selectedId === opt.id ? 700 : 500,
                 color: selectedId === opt.id ? '#1e40af' : '#475569',
                 background: selectedId === opt.id ? '#dbeafe' : '#f1f5f9',
-                border: selectedId === opt.id ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                border:
+                  selectedId === opt.id
+                    ? '2px solid #3b82f6'
+                    : '1px solid #e2e8f0',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
