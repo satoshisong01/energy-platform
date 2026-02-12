@@ -52,6 +52,7 @@ export default function PreviewPanel() {
     isEcSelfConsumption,
     ecSelfConsumptionCount,
   } = store;
+  const isGap = store.contractType.includes('(갑)');
 
   const handlePrint = () => {
     window.print();
@@ -70,6 +71,7 @@ export default function PreviewPanel() {
     baseRate: store.baseRate,
     unitPriceSavings: store.unitPriceSavings || config.unit_price_savings || 0,
     config,
+    isGap,
   });
 
   const computedData = baseComputedData.map((row) => ({

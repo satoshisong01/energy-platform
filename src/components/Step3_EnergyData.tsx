@@ -188,6 +188,7 @@ export default function Step3_EnergyData() {
     reader.readAsBinaryString(file);
   };
 
+  const isGap = store.contractType.includes('(갑)');
   const { computedData, totals, savingRate, customSavingRate, maxLoadRatio } =
     computeMonthlyEnergyMetrics({
       monthlyData,
@@ -197,8 +198,8 @@ export default function Step3_EnergyData() {
         store.unitPriceSavings || config.unit_price_savings || 0,
       config,
       roundAutoGeneration: true,
+      isGap,
     });
-  const isGap = store.contractType.includes('(갑)');
 
   return (
     <div>
