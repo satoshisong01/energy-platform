@@ -250,13 +250,16 @@ export default function Step4_Simulation() {
       ? 1 * calculatedPlatformCost // 1식이므로 그대로 사용
       : 0;
 
+  // 유지보수: 3년 무상, 17년만 유상 반영
+  const maintenanceYearsPaid = 17;
   let totalInvestment20Years = 0;
   if (isKepco) {
     const annualInvestSplit = totalInitialInvestment / 20;
-    totalInvestment20Years = (annualInvestSplit + maintenanceTableValue) * 20;
+    totalInvestment20Years =
+      annualInvestSplit * 20 + maintenanceTableValue * maintenanceYearsPaid;
   } else {
     totalInvestment20Years =
-      totalInitialInvestment + maintenanceTableValue * 20;
+      totalInitialInvestment + maintenanceTableValue * maintenanceYearsPaid;
   }
 
   const solarSplit = round2(solarCost / 20);
@@ -1018,7 +1021,7 @@ export default function Step4_Simulation() {
                 <span>+{toUk(results.totalRationalization20)} 억원</span>
               </div>
               <div className="flex justify-between text-red-500">
-                <span>(-) 유지보수 및 운영비 (20년, 고정)</span>
+                <span>(-) 유지보수 및 운영비 (17년, 3년 무상)</span>
                 <span>-{toUk(results.totalMaintenance20)} 억원</span>
               </div>
             </div>

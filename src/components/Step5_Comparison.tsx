@@ -211,9 +211,11 @@ export default function Step5_Comparison() {
               )}
             </tr>
 
-            {/* O&M */}
+            {/* O&M (3년 무상, 17년 유상) */}
             <tr>
-              <td className={styles.rowLabel}>O&M (유지보수비)</td>
+              <td className={styles.rowLabel}>
+                O&M (유지보수비, 17년 유상)
+              </td>
               <td className={styles.valRed}>
                 -{toWon(results.annualMaintenanceCost)} 원
               </td>

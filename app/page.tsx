@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; // [수정] useEffect 추가
+import React, { useState, useEffect, useRef } from 'react'; // [수정] useEffect 추가
 import { useProposalStore } from '../src/lib/store';
 import styles from './page.module.css';
 import {
@@ -12,7 +12,7 @@ import {
   LucideCopy,
   LucideChevronLeft,
   LucideChevronRight,
-  LucideLogOut, // [수정] 로그아웃 아이콘 추가
+  LucideLogOut,
 } from 'lucide-react';
 
 import Step1_BasicInfo from '../src/components/Step1_BasicInfo';
@@ -29,10 +29,72 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/client';
 import Step0_Summary from '@/src/components/Step0_Summary';
 
+const SESSION_KEY = 'sessionStartedAt';
+const SESSION_MAX_MS = 30 * 60 * 1000; // 30분
+const SESSION_WARNING_MS = 20 * 60 * 1000; // 20분 경과 시 알림 (10분 전)
+
 export default function Home() {
   const router = useRouter();
   const supabase = createClient();
   const store = useProposalStore();
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
+  const [sessionRemainingSec, setSessionRemainingSec] = useState<number | null>(
+    null
+  );
+  const warningShownRef = useRef(false);
+
+  // 상단 타이머 표시용: 남은 시간(초) 1초마다 갱신
+  useEffect(() => {
+    const updateRemaining = () => {
+      const started = sessionStorage.getItem(SESSION_KEY);
+      if (!started) {
+        setSessionRemainingSec(null);
+        return;
+      }
+      const elapsed = Date.now() - Number(started);
+      const remainingMs = Math.max(0, SESSION_MAX_MS - elapsed);
+      setSessionRemainingSec(Math.ceil(remainingMs / 1000));
+    };
+    updateRemaining();
+    const interval = setInterval(updateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [showSessionWarning]); // 연장 시 모달 닫히면서 리셋 반영
+
+  // 30분 고정 타이머 + 10분 전 알림
+  useEffect(() => {
+    const checkSession = () => {
+      const started = sessionStorage.getItem(SESSION_KEY);
+      if (!started) return;
+      const elapsed = Date.now() - Number(started);
+
+      if (elapsed >= SESSION_MAX_MS) {
+        sessionStorage.removeItem(SESSION_KEY);
+        warningShownRef.current = false;
+        supabase.auth.signOut();
+        router.push('/login?timeout=1');
+        router.refresh();
+        return;
+      }
+      if (elapsed >= SESSION_WARNING_MS && !warningShownRef.current) {
+        warningShownRef.current = true;
+        setShowSessionWarning(true);
+      }
+    };
+    checkSession();
+    const interval = setInterval(checkSession, 60 * 1000); // 1분마다 확인
+    return () => clearInterval(interval);
+  }, [router, supabase.auth]);
+
+  const handleSessionExtend = () => {
+    sessionStorage.setItem(SESSION_KEY, String(Date.now()));
+    warningShownRef.current = false;
+    setShowSessionWarning(false);
+    setSessionRemainingSec(Math.floor(SESSION_MAX_MS / 1000)); // 즉시 30분으로 표시
+  };
+
+  const handleSessionCancel = () => {
+    setShowSessionWarning(false);
+  };
 
   // [수정] PDF 인쇄 시 제목 깔끔하게 나오게 하는 로직 추가
   useEffect(() => {
@@ -51,6 +113,7 @@ export default function Home() {
     // 로그아웃 확인
     if (!confirm('로그아웃 하시겠습니까?')) return;
 
+    sessionStorage.removeItem(SESSION_KEY);
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
@@ -119,6 +182,44 @@ export default function Home() {
         onClose={() => setIsLoadModalOpen(false)}
       />
 
+      {/* 세션 만료 10분 전 알림 모달 */}
+      {showSessionWarning && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="session-warning-title"
+        >
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4 text-center">
+            <h3
+              id="session-warning-title"
+              className="text-lg font-bold text-slate-800 mb-2"
+            >
+              세션 만료 예정
+            </h3>
+            <p className="text-slate-600 mb-6">
+              10분 뒤 로그아웃 됩니다. 계속 사용하시려면 연장을 눌러 주세요.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                type="button"
+                onClick={handleSessionExtend}
+                className="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                연장
+              </button>
+              <button
+                type="button"
+                onClick={handleSessionCancel}
+                className="px-5 py-2.5 bg-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-300 transition"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 왼쪽: 입력 패널 (인쇄 시 숨김) */}
       <section
         className={`
@@ -147,8 +248,28 @@ export default function Home() {
                   <LucideSun className="text-orange-500 fill-orange-500" />
                   정보 입력 패널
                 </h1>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {/* [수정] 로그아웃 버튼 추가 */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {/* 세션 타이머 + 연장 (로그아웃 아이콘 옆) */}
+                  {sessionRemainingSec !== null && (
+                    <>
+                      <span
+                        className="text-sm font-medium text-slate-600 tabular-nums"
+                        title="세션 만료까지 남은 시간"
+                      >
+                        {Math.floor(sessionRemainingSec / 60)}:
+                        {String(sessionRemainingSec % 60).padStart(2, '0')} 남음
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSessionExtend}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1.5 rounded transition"
+                        title="세션 30분 연장"
+                      >
+                        연장
+                      </button>
+                      <div className="w-px h-5 bg-slate-300 self-center" />
+                    </>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition"
@@ -156,9 +277,7 @@ export default function Home() {
                   >
                     <LucideLogOut size={20} />
                   </button>
-
-                  <div className="w-px h-6 bg-slate-300 mx-1 self-center"></div>
-
+                  <div className="w-px h-6 bg-slate-300 mx-1 self-center" />
                   <button
                     onClick={handleReset}
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"

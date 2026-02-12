@@ -84,8 +84,8 @@ export default function PreviewFinancialTable() {
 
   // --- [수정] ROI 및 투자총액 계산 오류 수정 ---
 
-  // 1. 20년 총 비용 (원 단위 합산)
-  // results.totalMaintenance20은 이미 store에서 (연간비용 * 20) 원 단위로 계산되어 옴
+  // 1. 20년 총 비용 (원 단위): 초기투자 + 유지보수 17년(3년 무상)
+  // results.totalMaintenance20 = 연간유지보수 * 17
   const totalCost20Won = results.totalInvestment + results.totalMaintenance20;
 
   // 2. ROI 계산
@@ -330,7 +330,7 @@ export default function PreviewFinancialTable() {
                 color: '#dc2626',
               }}
             >
-              <span>유지보수 및 운영비(20년)</span>
+              <span>유지보수 및 운영비(17년, 3년 무상)</span>
               <span>-{toUk(results.totalMaintenance20)}억</span>
             </div>
           </div>

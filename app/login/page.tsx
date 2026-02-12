@@ -1,16 +1,31 @@
 'use client';
 
 import { createClient } from '@/src/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
+
+const SESSION_KEY = 'sessionStartedAt';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberId, setRememberId] = useState(false); // [추가] 아이디 저장 체크 상태
   const [loading, setLoading] = useState(false);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // 세션 만료로 리다이렉트된 경우 signOut 후 메시지 표시
+  useEffect(() => {
+    if (searchParams.get('timeout') === '1') {
+      supabase.auth.signOut();
+      sessionStorage.removeItem(SESSION_KEY);
+      setSessionExpiredMessage(true);
+      // URL에서 timeout 제거 (새로고침 시 메시지 반복 방지)
+      router.replace('/login', { scroll: false });
+    }
+  }, [searchParams, router, supabase.auth]);
 
   // [추가] 컴포넌트 마운트 시 로컬 스토리지에서 아이디 불러오기
   useEffect(() => {
@@ -40,6 +55,8 @@ export default function LoginPage() {
       } else {
         localStorage.removeItem('savedEmail');
       }
+      // 3시간 자동 로그아웃용 세션 시작 시각 저장
+      sessionStorage.setItem(SESSION_KEY, String(Date.now()));
 
       router.push('/'); // 메인으로 이동
       router.refresh();
@@ -54,6 +71,11 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-gray-600">
             서비스 이용을 위해 로그인이 필요합니다.
           </p>
+          {sessionExpiredMessage && (
+            <p className="mt-3 text-sm text-amber-600 bg-amber-50 py-2 px-3 rounded">
+              세션이 만료되었습니다. 다시 로그인해 주세요.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

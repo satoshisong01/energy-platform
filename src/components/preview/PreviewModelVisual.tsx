@@ -142,8 +142,8 @@ export function PreviewModelGraph() {
       </h3>
       <div className={styles.chartBox}>
         <h4 className={styles.chartTitle}>시간대별 전력 수급 패턴</h4>
-        <div style={{ height: 400 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div style={{ height: 400, minHeight: 400, minWidth: 1 }}>
+          <ResponsiveContainer width="100%" height={400} minHeight={400}>
             <ComposedChart
               data={hourlyData}
               margin={{ top: 20, right: 20, bottom: 0, left: 0 }}

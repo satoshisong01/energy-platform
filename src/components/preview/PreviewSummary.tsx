@@ -157,7 +157,7 @@ export default function PreviewSummary() {
     const n = 20;
 
     const totalRevenue20 = (annualRevenue * (1 - Math.pow(R, n))) / (1 - R);
-    const totalCost20 = maintenanceCost * 20;
+    const totalCost20 = maintenanceCost * 17; // 3년 무상, 17년 유상
     const totalNet20Won = totalRevenue20 - totalCost20;
 
     const roiYears = annualNetProfit > 0 ? investWon / annualNetProfit : 0;
@@ -300,10 +300,10 @@ export default function PreviewSummary() {
     // 2. 합리화 절감액 (고정) -> 20년 총액에는 포함!
     const totalRationalization20 = fixedRationalizationSavings * 20;
 
-    // 3. 유지보수 비용 (고정)
-    const totalMaintenance20 = maintenanceCost * 20;
+    // 3. 유지보수 비용: 3년 무상, 17년 유상만
+    const totalMaintenance20 = maintenanceCost * 17;
 
-    // 4. 최종 20년 순수익 (엑셀과 동일: 태양광20 + 합리화20 - 비용20)
+    // 4. 최종 20년 순수익 (태양광20년 + 합리화20년 - 유지보수17년)
     const totalNet20Won =
       totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
 

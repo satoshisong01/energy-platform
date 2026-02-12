@@ -155,7 +155,9 @@
 }
 .chartWrapper {
   height: 220px;
+  min-height: 220px;
   width: 100%;
+  min-width: 1px; /* ResponsiveContainer -1 방지 */
 }
 .chartFooter {
   text-align: center;

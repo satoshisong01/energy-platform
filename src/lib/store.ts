@@ -1061,10 +1061,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     // (3) 전기요금 합리화 절감액 (매년 고정, 감소 안 함)
     const totalRationalization20 = totalRationalizationSavings * 20;
 
-    // (4) 유지보수 비용 (매년 고정, 감소 안 함)
-    const totalMaintenance20 = annualMaintenanceCost * 20;
+    // (4) 유지보수 비용: 3년 무상, 17년 유상만 계산
+    const totalMaintenance20 = annualMaintenanceCost * 17;
 
-    // (5) 최종 20년 누적 순수익 (엑셀과 동일: 태양광20년 + 합리화20년 - 유지보수20년)
+    // (5) 최종 20년 누적 순수익 (태양광20년 + 합리화20년 - 유지보수17년)
     const self_final_profit =
       totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
 

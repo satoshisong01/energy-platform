@@ -183,10 +183,10 @@ export default function PreviewComparisonTable() {
               )}
             </tr>
 
-            {/* O&M */}
+            {/* O&M (3년 무상, 17년 유상) */}
             <tr>
               <td className={`${styles.rowLabel} text-[14px]`}>
-                O&M (유지보수비)
+                O&M (유지보수비, 17년 유상)
               </td>
               <td className={`${styles.valRed} text-[15px]`}>
                 -{toWon(results.annualMaintenanceCost)} 원
