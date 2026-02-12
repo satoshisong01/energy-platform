@@ -92,6 +92,7 @@ export type ProposalMeta = {
   client_name: string;
   created_at: string;
   updated_at: string;
+  last_used_at?: string | null;
 };
 
 // [수정] 상세 내역 필드 3개 추가 (totalSolarRevenue20, totalRationalization20, totalMaintenance20)
@@ -605,6 +606,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
             address: state.address,
             input_data: saveData,
             updated_at: new Date().toISOString(),
+            last_used_at: new Date().toISOString(),
           })
           .eq('id', state.proposalId);
         if (error) throw error;
@@ -613,15 +615,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       } else {
         const { data, error } = await supabase
           .from('proposals')
-          .insert({
-            client_name: state.clientName,
-            proposal_name: finalName,
-            address: state.address,
-            input_data: saveData,
-            status: 'completed',
-          })
-          .select()
-          .single();
+        .insert({
+          client_name: state.clientName,
+          proposal_name: finalName,
+          address: state.address,
+          input_data: saveData,
+          status: 'completed',
+          last_used_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
         if (error) throw error;
         if (data) {
           set({ proposalId: data.id, proposalName: finalName });
@@ -682,6 +685,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           address: state.address,
           input_data: saveData,
           status: 'completed',
+          last_used_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -710,6 +714,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         .update({
           proposal_name: newName,
           updated_at: new Date().toISOString(),
+          last_used_at: new Date().toISOString(),
         })
         .eq('id', id);
       if (error) throw error;
@@ -725,8 +730,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('proposals')
-        .select('id, proposal_name, client_name, created_at, updated_at')
-        .order('created_at', { ascending: false });
+        .select('id, proposal_name, client_name, created_at, updated_at, last_used_at')
+        .order('last_used_at', { ascending: false });
       if (error) throw error;
       return data || [];
     } catch (error: any) {
@@ -788,6 +793,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         config: { ...get().config, ...(data.input_data.config || {}) },
       });
       get().recalculateInvestment();
+      await supabase
+        .from('proposals')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', id);
       alert(`✅ '${data.proposal_name}' 불러오기 완료`);
     } catch (error: any) {
       alert(`불러오기 실패: ${error.message}`);

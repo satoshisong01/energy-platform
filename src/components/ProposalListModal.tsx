@@ -19,13 +19,14 @@ interface Props {
   onClose: () => void;
 }
 
-// 트리 노드 타입 정의
+// 트리 노드 타입 정의 (폴더 정렬용: 해당 폴더 내 최근 사용일)
 type TreeNode = {
   name: string;
   fullPath: string;
   isFolder: boolean;
   children: { [key: string]: TreeNode };
   data?: ProposalMeta;
+  maxLastUsedAt?: string | null;
 };
 
 export default function ProposalListModal({ isOpen, onClose }: Props) {
@@ -70,7 +71,7 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
     setExpandedFolders(newSet);
   };
 
-  // 데이터 -> 트리 변환 (useMemo)
+  // 데이터 -> 트리 변환 + 폴더별 최근 사용일 계산 (useMemo)
   const tree = useMemo(() => {
     const root: TreeNode = {
       name: 'root',
@@ -96,6 +97,20 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
         current = current.children[part];
       });
     });
+
+    const setMaxLastUsedAt = (node: TreeNode): string | null => {
+      if (!node.isFolder && node.data) {
+        return node.data.last_used_at || node.data.updated_at || null;
+      }
+      let max: string | null = null;
+      for (const c of Object.values(node.children)) {
+        const t = setMaxLastUsedAt(c);
+        if (t && (!max || t > max)) max = t;
+      }
+      if (node.isFolder) node.maxLastUsedAt = max;
+      return max;
+    };
+    setMaxLastUsedAt(root);
     return root;
   }, [list]);
 
@@ -148,6 +163,17 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
     const nodes = Object.values(node.children).sort((a, b) => {
       if (a.isFolder && !b.isFolder) return -1;
       if (!a.isFolder && b.isFolder) return 1;
+      if (a.isFolder && b.isFolder) {
+        const at = a.maxLastUsedAt || '';
+        const bt = b.maxLastUsedAt || '';
+        if (bt !== at) return bt.localeCompare(at);
+        return a.name.localeCompare(b.name);
+      }
+      if (!a.isFolder && !b.isFolder && a.data && b.data) {
+        const aUsed = a.data.last_used_at || a.data.updated_at || '';
+        const bUsed = b.data.last_used_at || b.data.updated_at || '';
+        return bUsed.localeCompare(aUsed);
+      }
       return a.name.localeCompare(b.name);
     });
 
@@ -247,7 +273,8 @@ export default function ProposalListModal({ isOpen, onClose }: Props) {
                   </div>
                   <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                     고객명: {item.client_name} <br />
-                    수정일: {formatDate(item.updated_at || item.created_at)}
+                    사용일: {formatDate(item.last_used_at || item.updated_at || item.created_at)}{' '}
+                    / 수정일: {formatDate(item.updated_at || item.created_at)}
                   </div>
                 </div>
 
