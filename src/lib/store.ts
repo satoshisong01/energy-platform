@@ -953,6 +953,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         }
         revenue_base_bill_savings += baseBillSaving;
       });
+      // (갑) 요금제에서는 자가소비 대신 전량 판매 전략을 사용하므로,
+      // 공장 피크를 낮춰 기본요금을 줄였다고 보지 않고 기본료 절감 효과는 0으로 처리
+      if (isGap) {
+        revenue_base_bill_savings = 0;
+      }
     }
 
     if (selectedModel === 'KEPCO') {

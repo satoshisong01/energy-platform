@@ -97,6 +97,11 @@ export function computeMonthlyEnergyMetrics({
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
     }
+    // (갑) 요금제에서는 자가소비 대신 전량 판매 전략이므로,
+    // 공장 피크를 낮춰서 기본료를 줄였다고 보지 않고 기본료 절감 효과는 0으로 처리
+    if (isGap) {
+      baseBillSavings = 0;
+    }
 
     const totalSavings = maxLoadSavings + baseBillSavings;
     const afterBill = Math.max(0, data.totalBill - totalSavings);
