@@ -927,8 +927,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalRationalizationSavings = 0;
     let annualGrossRevenue = 0;
 
-    const isGap = contractType.includes('(갑)');
-
     // [기본료 절감] 절감후 피크산정 소계(합산) - KEPCO 제외, monthlyData 기반
     if (selectedModel !== 'KEPCO') {
       const totalUsageYear = monthlyData.reduce(
@@ -953,11 +951,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         }
         revenue_base_bill_savings += baseBillSaving;
       });
-      // (갑) 요금제에서는 자가소비 대신 전량 판매 전략을 사용하므로,
-      // 공장 피크를 낮춰 기본요금을 줄였다고 보지 않고 기본료 절감 효과는 0으로 처리
-      if (isGap) {
-        revenue_base_bill_savings = 0;
-      }
     }
 
     if (selectedModel === 'KEPCO') {
@@ -972,11 +965,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       }
       annualGrossRevenue = revenue_surplus;
     } else {
-      let annualSelfConsumptionCalc = monthlyData.reduce(
+      const annualSelfConsumptionCalc = monthlyData.reduce(
         (acc, cur) => acc + cur.selfConsumption,
         0
       );
-      if (isGap) annualSelfConsumptionCalc = 0;
       volume_self = Math.min(initialAnnualGen, annualSelfConsumptionCalc);
 
       const rawSurplus = Math.max(
@@ -1154,11 +1146,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestmentUk, // 절삭된 억 단위
       initialAnnualGen,
       annualSelfConsumption:
-        selectedModel === 'KEPCO' || isGap
+        selectedModel === 'KEPCO'
           ? 0
           : monthlyData.reduce((acc, cur) => acc + cur.selfConsumption, 0),
       annualSurplus:
-        selectedModel === 'KEPCO' || isGap
+        selectedModel === 'KEPCO'
           ? initialAnnualGen
           : Math.max(
               0,

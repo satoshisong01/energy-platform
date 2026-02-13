@@ -42,8 +42,6 @@ type MonthlyMetricsParams = {
   unitPriceSavings?: number;
   config: SystemConfig;
   roundAutoGeneration?: boolean;
-  // (갑) 계약 종별 여부 - true이면 자가소비 대신 전량 판매 가정 (경제성 계산용)
-  isGap?: boolean;
 };
 
 const getDaysInMonth = (month: number, year?: number) =>
@@ -56,7 +54,6 @@ export function computeMonthlyEnergyMetrics({
   unitPriceSavings,
   config,
   roundAutoGeneration = false,
-  isGap = false,
 }: MonthlyMetricsParams): MonthlyMetrics {
   const solarRadiation = config.solar_radiation || 3.8;
   const totalUsageYear = monthlyData.reduce(
@@ -84,9 +81,7 @@ export function computeMonthlyEnergyMetrics({
     const solarGeneration =
       data.solarGeneration > 0 ? data.solarGeneration : autoSolarGen;
 
-    // (갑)일 때는 자가소비분을 경제성 계산에서는 0으로 보고, 전량을 잉여(판매)로 처리
-    const selfForCalc = isGap ? 0 : data.selfConsumption;
-
+    const selfForCalc = data.selfConsumption;
     const surplusPower = Math.max(0, solarGeneration - selfForCalc);
     const maxLoadSavings =
       Math.min(solarGeneration, selfForCalc) * appliedUnitPriceSavings;
@@ -96,11 +91,6 @@ export function computeMonthlyEnergyMetrics({
       baseBillSavings = Math.max(0, data.baseBill - baseRate * data.peakKw);
     } else {
       baseBillSavings = data.baseBill * dynamicPeakRatio;
-    }
-    // (갑) 요금제에서는 자가소비 대신 전량 판매 전략이므로,
-    // 공장 피크를 낮춰서 기본료를 줄였다고 보지 않고 기본료 절감 효과는 0으로 처리
-    if (isGap) {
-      baseBillSavings = 0;
     }
 
     const totalSavings = maxLoadSavings + baseBillSavings;

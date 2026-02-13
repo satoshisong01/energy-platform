@@ -179,8 +179,6 @@ export default function PreviewSummary() {
 
   // [2] 시나리오 데이터
   const getScenarioData = (isPremium: boolean) => {
-    const isGap = contractType.includes('(갑)');
-
     let activeEcCount = 0;
     if (isEcSelfConsumption) {
       activeEcCount = ecSelfConsumptionCount || 1;
@@ -192,11 +190,10 @@ export default function PreviewSummary() {
     const ecCapacityAnnual = activeEcCount * 100 * cycles * 365;
 
     const annualGen = simpleAnnualGen;
-    let annualSelf = store.monthlyData.reduce(
+    const annualSelf = store.monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
     );
-    if (isGap) annualSelf = 0;
 
     const rawSurplus = Math.max(0, annualGen - annualSelf);
     const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);

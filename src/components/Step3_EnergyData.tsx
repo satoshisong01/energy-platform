@@ -188,7 +188,6 @@ export default function Step3_EnergyData() {
     reader.readAsBinaryString(file);
   };
 
-  const isGap = store.contractType.includes('(갑)');
   const { computedData, totals, savingRate, customSavingRate, maxLoadRatio } =
     computeMonthlyEnergyMetrics({
       monthlyData,
@@ -198,7 +197,6 @@ export default function Step3_EnergyData() {
         store.unitPriceSavings || config.unit_price_savings || 0,
       config,
       roundAutoGeneration: true,
-      isGap,
     });
 
   return (
@@ -253,12 +251,12 @@ export default function Step3_EnergyData() {
               <div
                 className={styles.inputReadOnly}
                 style={{
-                  backgroundColor: isGap ? '#f3f4f6' : '#f0fdf4',
-                  color: isGap ? '#9ca3af' : '#16a34a',
-                  borderColor: isGap ? '#e5e7eb' : '#bbf7d0',
+                  backgroundColor: '#f0fdf4',
+                  color: '#16a34a',
+                  borderColor: '#bbf7d0',
                 }}
               >
-                {isGap ? '0' : store.unitPriceSavings.toLocaleString()} 원
+                {store.unitPriceSavings.toLocaleString()} 원
               </div>
             </div>
           </div>
