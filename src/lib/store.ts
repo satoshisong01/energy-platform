@@ -255,6 +255,7 @@ const DEFAULT_TARIFFS: TariffPreset[] = [
   { id: 3, name: '산업용(갑)I 저압', baseRate: 5550, savings: 108.4 },
   { id: 4, name: '일반용(갑)I 저압', baseRate: 6160, savings: 114.4 },
   { id: 5, name: '산업용(을) 고압A - 선택I', baseRate: 7220, savings: 216 },
+  { id: 6, name: '일반용(갑)2 고압A-선택2', baseRate: 8230, savings: 132.87 },
 ];
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
