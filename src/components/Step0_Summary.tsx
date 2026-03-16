@@ -16,7 +16,10 @@ import styles from './Step0_Summary.module.css';
 
 // 원 단위 포맷터
 const toWon = (val: number) => Math.round(val).toLocaleString();
-const toUk = (val: number) => (val / 100000000).toFixed(2);
+const toUk = (val: number) =>
+  (val / 100000000).toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
 
 export default function Step0_Summary() {
   const store = useProposalStore();

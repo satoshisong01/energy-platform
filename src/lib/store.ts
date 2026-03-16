@@ -461,8 +461,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
   setFinancialSettings: (settings) =>
-    set((state) => ({
-      financialSettings: {
+    set((state) => {
+      const mergedFinancial: FinancialSettings = {
         ...state.financialSettings,
         ...settings,
         rps: { ...state.financialSettings.rps, ...(settings.rps || {}) },
@@ -470,8 +470,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           ...state.financialSettings.factoring,
           ...(settings.factoring || {}),
         },
-      },
-    })),
+      };
+
+      return {
+        financialSettings: mergedFinancial,
+        // 금융 설정 변경 시, 기존 config 내 대출 이자율 필드도 함께 동기화
+        config: {
+          ...state.config,
+          loan_rate_rps: mergedFinancial.rps.interestRate,
+          loan_rate_factoring: mergedFinancial.factoring.interestRate,
+        },
+      };
+    }),
   updateTariffPreset: (index, field, value) => {
     set((state) => {
       const newPresets = [...state.tariffPresets];
