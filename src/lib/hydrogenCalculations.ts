@@ -32,18 +32,21 @@ export interface HydrogenComparisonInput {
 export interface HydrogenComparisonResult {
   annualNeededKwh: number; // 연간 필요 발전량 (kWh)
   dailyNeededKwh: number; // 일일 필요 발전량 (kWh)
-  requiredCapacityKw: number; // 필요 평균 출력 (kW)
+  rawCapacityKw: number; // 원시 평균 출력 (kW, 올림 전)
+  requiredCapacityKw: number; // 필요 평균 출력 (kW, 100kW 단위 올림 후)
   requiredCapacityMw: number; // 필요 평균 출력 (MW)
   investmentWon: number; // 투자비 (원)
   investmentUk: number; // 투자비 (억원)
   roiYears: number; // 회수 기간 (년)
   basedOnActualUsage: boolean; // true: 실측 사용량 / false: 단순 역산
   simpleEstimateKwh: number; // 참고용: 단순 역산치 (annualBillWon / kepcoUnitPrice)
+  isUnderscaled: boolean; // true: 원시 필요 출력이 상용 수소연료전지 최소 단위(100kW) 미만
   isValid: boolean;
 }
 
 const HOURS_PER_YEAR = 24 * 365;
 const WON_PER_UK = 100_000_000;
+const HYDROGEN_MIN_COMMERCIAL_KW = 100; // 상용 수소연료전지 최소 단위 (100 kW)
 
 export function computeHydrogenComparison(
   input: HydrogenComparisonInput
@@ -71,6 +74,7 @@ export function computeHydrogenComparison(
     return {
       annualNeededKwh: 0,
       dailyNeededKwh: 0,
+      rawCapacityKw: 0,
       requiredCapacityKw: 0,
       requiredCapacityMw: 0,
       investmentWon: 0,
@@ -78,6 +82,7 @@ export function computeHydrogenComparison(
       roiYears: 0,
       basedOnActualUsage: false,
       simpleEstimateKwh,
+      isUnderscaled: false,
       isValid: false,
     };
   }
@@ -102,9 +107,14 @@ export function computeHydrogenComparison(
   const annualBillUk = annualBillWon / WON_PER_UK;
   const roiYears = annualBillUk > 0 ? investmentUk / annualBillUk : 0;
 
+  // 소형 사업장 판정: 원시 평균 출력이 상용 최소 단위(100 kW) 미만
+  // → 영업적으로 태양광 PV가 더 적합한 규모 (수소연료전지 단위 부정합)
+  const isUnderscaled = rawCapacityKw < HYDROGEN_MIN_COMMERCIAL_KW;
+
   return {
     annualNeededKwh,
     dailyNeededKwh,
+    rawCapacityKw,
     requiredCapacityKw,
     requiredCapacityMw,
     investmentWon,
@@ -112,6 +122,7 @@ export function computeHydrogenComparison(
     roiYears,
     basedOnActualUsage: hasActualUsage,
     simpleEstimateKwh,
+    isUnderscaled,
     isValid: true,
   };
 }

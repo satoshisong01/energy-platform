@@ -236,7 +236,7 @@ export default function Step0_Summary() {
             <LucideFlame size={16} />
             수소발전 역산 비교 (24·365 베이스로드 기준)
           </div>
-          <div className="text-[11px] text-cyan-700 flex items-center gap-2">
+          <div className="text-[11px] text-cyan-700 flex items-center gap-2 flex-wrap">
             <span
               className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                 hydrogen.basedOnActualUsage
@@ -248,6 +248,14 @@ export default function Step0_Summary() {
                 ? '실측 사용량 기준'
                 : '단순 역산 (사용량 미입력)'}
             </span>
+            {hydrogen.isUnderscaled && (
+              <span
+                className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-300"
+                title="원시 평균 출력이 상용 수소연료전지 최소 단위(100kW) 미만 — 태양광 PV 권장"
+              >
+                ⚠️ 권장 규모 미만 · 태양광 PV 적합
+              </span>
+            )}
             <span>
               한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
               <strong>{config.price_hydrogen_per_mw}</strong>억원
@@ -338,6 +346,13 @@ export default function Step0_Summary() {
             <span className="ml-1 text-slate-400">
               · 용량은 100kW 단위 올림 적용 (최소 0.1 MW)
             </span>
+            {hydrogen.isUnderscaled && (
+              <span className="ml-1 text-orange-600 font-bold">
+                · 본 사업장 평균 필요 출력은{' '}
+                {hydrogen.rawCapacityKw.toFixed(1)} kW로 상용 수소연료전지
+                최소 단위(100 kW) 미만입니다. 태양광 PV가 더 적합합니다.
+              </span>
+            )}
           </div>
         )}
       </div>

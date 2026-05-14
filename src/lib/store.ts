@@ -808,6 +808,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
         config: { ...get().config, ...(data.input_data.config || {}) },
+        showHydrogen: false, // UI 토글은 항상 OFF로 시작 (영속화하지 않음)
       });
       get().recalculateInvestment();
       await supabase
@@ -876,6 +877,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isSurplusDiscarded: false,
       isEcSelfConsumption: false,
       ecSelfConsumptionCount: 1,
+      showHydrogen: false,
     });
   },
   getSimulationResults: () => {

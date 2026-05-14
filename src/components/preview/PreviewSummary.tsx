@@ -679,6 +679,22 @@ export default function PreviewSummary() {
                   ? '실측 사용량 기준'
                   : '단순 역산'}
               </span>
+              {hydrogen.isUnderscaled && (
+                <span
+                  style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 8,
+                    backgroundColor: '#ffedd5',
+                    color: '#c2410c',
+                    border: '1px solid #fdba74',
+                  }}
+                  title="원시 평균 출력이 상용 수소연료전지 최소 단위(100kW) 미만"
+                >
+                  ⚠ 권장 규모 미만 · 태양광 PV 적합
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '0.65rem', color: '#0e7490' }}>
               한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
@@ -791,6 +807,20 @@ export default function PreviewSummary() {
               : '연간 전기료를 한전 단가로 나눈 필요 발전량을 24h·365d 균등 가동 기준으로 환산 (사용량 미입력 폴백).'}{' '}
             1MW당 단가·한전 단가는 [설정 → 장비 투자비 단가] 및 [수익 분석
             단가]에서 변경 가능합니다.
+            {hydrogen.isUnderscaled && (
+              <span
+                style={{
+                  display: 'block',
+                  marginTop: 2,
+                  color: '#c2410c',
+                  fontWeight: 700,
+                }}
+              >
+                ※ 본 사업장 평균 필요 출력은{' '}
+                {hydrogen.rawCapacityKw.toFixed(1)} kW로 상용 수소연료전지
+                최소 단위(100 kW) 미만 — 태양광 PV가 더 적합한 규모입니다.
+              </span>
+            )}
           </div>
         </div>
       )}
