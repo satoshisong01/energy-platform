@@ -61,6 +61,9 @@ export default function PreviewSummary() {
       store.selectedModel !== 'KEPCO'
   );
 
+  // [수소발전 역산 비교] 기본 OFF, 사용자가 체크하면 1페이지에 박스 표시
+  const [showHydrogen, setShowHydrogen] = useState(false);
+
   useEffect(() => {
     setApplyEc(
       (store.useEc || store.isEcSelfConsumption) &&
@@ -513,6 +516,28 @@ export default function PreviewSummary() {
               />
               <span className="font-bold text-slate-700">EC 적용</span>
             </label>
+            <label
+              className={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded border text-xs transition-colors ${
+                showHydrogen
+                  ? 'bg-cyan-50 border-cyan-300 hover:bg-cyan-100'
+                  : 'bg-white border-slate-200 hover:bg-slate-50'
+              }`}
+              title="연간 사용량 기반 수소발전 역산 비교 표시"
+            >
+              <input
+                type="checkbox"
+                className="w-3 h-3 accent-cyan-600"
+                checked={showHydrogen}
+                onChange={(e) => setShowHydrogen(e.target.checked)}
+              />
+              <span
+                className={`font-bold ${
+                  showHydrogen ? 'text-cyan-700' : 'text-slate-700'
+                }`}
+              >
+                수소 비교
+              </span>
+            </label>
             <button
               className={`${styles.expandBtn} ${
                 showExpansion ? styles.active : ''
@@ -590,8 +615,8 @@ export default function PreviewSummary() {
         </div>
       )}
 
-      {/* [NEW] 수소발전 역산 비교 섹션 */}
-      {hydrogen.isValid && (
+      {/* [NEW] 수소발전 역산 비교 섹션 — '수소 비교' 체크박스로 토글 (기본 OFF) */}
+      {showHydrogen && hydrogen.isValid && (
         <div
           style={{
             backgroundColor: '#ecfeff',
