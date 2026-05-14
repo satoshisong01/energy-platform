@@ -307,6 +307,12 @@ export default function Step0_Summary() {
               <div className="text-[10px] text-slate-400">
                 ≈ {Math.round(hydrogen.requiredCapacityKw).toLocaleString()} kW
               </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {hydrogen.rawCapacityKw.toFixed(1)} kW
+                <span className="text-[9px] text-slate-400 ml-1">
+                  (시간당 실측용량)
+                </span>
+              </div>
             </div>
             <div className="bg-white rounded-lg border border-cyan-100 p-2">
               <div className="text-[11px] text-slate-500 mb-1">

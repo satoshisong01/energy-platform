@@ -755,6 +755,16 @@ export default function PreviewSummary() {
               <span className={styles.kSub}>
                 ≈ {Math.round(hydrogen.requiredCapacityKw).toLocaleString()} kW
               </span>
+              <span
+                style={{
+                  fontSize: '0.55rem',
+                  color: '#64748b',
+                  marginTop: 1,
+                }}
+              >
+                {hydrogen.rawCapacityKw.toFixed(1)} kW{' '}
+                <span style={{ color: '#94a3b8' }}>(시간당 실측용량)</span>
+              </span>
             </div>
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
