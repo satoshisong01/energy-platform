@@ -61,8 +61,10 @@ export default function PreviewSummary() {
       store.selectedModel !== 'KEPCO'
   );
 
-  // [수소발전 역산 비교] 기본 OFF, 사용자가 체크하면 1페이지에 박스 표시
-  const [showHydrogen, setShowHydrogen] = useState(false);
+  // [수소발전 역산 비교] Zustand store에서 토글 상태 공유 (Step0_Summary와 동기화)
+  // 기본 OFF, 한 곳에서 체크하면 양쪽 화면 모두에 박스 표시
+  const showHydrogen = store.showHydrogen;
+  const setShowHydrogen = store.setShowHydrogen;
 
   useEffect(() => {
     setApplyEc(

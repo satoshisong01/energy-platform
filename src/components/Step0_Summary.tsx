@@ -223,7 +223,10 @@ export default function Step0_Summary() {
         </div>
       </div>
 
-      {/* [NEW] 수소발전 역산 비교 카드 (풀폭) */}
+      {/* [수소발전 역산 비교 카드 - 풀폭]
+          PreviewSummary 헤더의 '수소 비교' 체크박스와 store.showHydrogen으로 동기화.
+          기본 OFF, 체크 시 양쪽(Step0 + Preview 1페이지)에 동시 노출. */}
+      {store.showHydrogen && (
       <div
         className="mt-4 rounded-xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-sky-50 overflow-hidden"
         style={{ gridColumn: '1 / -1' }}
@@ -332,9 +335,13 @@ export default function Step0_Summary() {
               ? '실측 가정: 입력된 12개월 사용량(kWh) 합계를, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다.'
               : '역산 가정: 연간 전기료를 한전 단가로 나눈 필요 발전량을, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다. (실측 사용량을 입력하면 자동으로 정밀 모드로 전환됩니다)'}{' '}
             실제 설계용량·이용률·연료비는 별도 검토가 필요합니다.
+            <span className="ml-1 text-slate-400">
+              · 용량은 100kW 단위 올림 적용 (최소 0.1 MW)
+            </span>
           </div>
         )}
       </div>
+      )}
 
       {/* 하단 계약 정보 바 */}
       <div className={styles.footerInfo}>

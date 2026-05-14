@@ -8,9 +8,16 @@
  *       2순위. 연간 전기료 ÷ 한전 단가 (단순 역산)              ← 폴백
  *   - 사용량 데이터가 없거나 0이면 자동으로 단순 역산 폴백을 사용한다.
  *
+ * 용량 단위 규칙 (영업/제안 자료 정합성):
+ *   - 기본 단위: 1 MW
+ *   - 최소 단위: 100 kW (= 0.1 MW)
+ *   - 소수점 둘째 자리(1.12 MW 등)는 표현 불가 → 0.1 MW 단위로 **올림(ceil)**
+ *     이유: "필요량을 충당하려면 최소 X MW 필요"를 보수적으로 표기
+ *
  * 계산 흐름:
- *   annualNeededKwh ─÷ (24 * 365) → requiredCapacityKw
- *   requiredCapacityKw ÷ 1000     → requiredCapacityMw
+ *   annualNeededKwh ─÷ (24 * 365) → rawCapacityKw
+ *   rawCapacityKw ÷ 1000          → rawCapacityMw
+ *   ceil(rawCapacityMw, 0.1)      → requiredCapacityMw (100kW 단위)
  *   requiredCapacityMw × pricePerMwUk → investmentUk
  *   investmentUk(원환산) ÷ annualBillWon → roiYears (전기료 회수)
  */
@@ -76,9 +83,17 @@ export function computeHydrogenComparison(
   }
 
   const dailyNeededKwh = annualNeededKwh / 365;
-  const requiredCapacityKw = annualNeededKwh / HOURS_PER_YEAR;
-  const requiredCapacityMw = requiredCapacityKw / 1000;
 
+  // 원시 평균 출력
+  const rawCapacityKw = annualNeededKwh / HOURS_PER_YEAR;
+  const rawCapacityMw = rawCapacityKw / 1000;
+
+  // 100kW(0.1 MW) 단위 올림 → 1.12 MW 같은 표현 방지, 영업적 보수성
+  const requiredCapacityMw = Math.ceil(rawCapacityMw * 10) / 10;
+  const requiredCapacityKw = requiredCapacityMw * 1000;
+
+  // 투자비는 100kW 단위로 떨어진 용량 × 1MW 단가
+  // (예: 1.1 MW × 60억 = 66억, 0.5 MW × 60억 = 30억 → 100kW당 6억으로 비례)
   const investmentUk = requiredCapacityMw * pricePerMwUk;
   const investmentWon = investmentUk * WON_PER_UK;
 

@@ -187,6 +187,7 @@ interface ProposalState {
   degradationRate: number;
   totalInvestment: number;
   recAveragePrice: number;
+  showHydrogen: boolean; // 수소발전 비교 카드/박스 표시 토글 (Step0 + Preview 동기화, 기본 OFF)
 
   setSiteImage: (img: string | null) => void;
   setClientName: (name: string) => void;
@@ -232,6 +233,7 @@ interface ProposalState {
   recalculateInvestment: () => void;
   setCapacityKw: (val: number) => void;
   setRecAveragePrice: (price: number) => void;
+  setShowHydrogen: (val: boolean) => void;
   getProposalFileName: () => string;
   checkDuplicateName: (name: string, excludeId?: number) => Promise<boolean>;
   saveProposal: (customName?: string) => Promise<boolean>;
@@ -323,7 +325,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     subscription_price_per_kw: 40000,
     sub_price_self: 150,
     sub_price_surplus: 50,
-    price_hydrogen_per_mw: 75,
+    price_hydrogen_per_mw: 60,
   },
   financialSettings: {
     rps: {
@@ -355,6 +357,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   degradationRate: 0.5,
   totalInvestment: 0,
   recAveragePrice: 80,
+  showHydrogen: false,
 
   setSiteImage: (img) => set({ siteImage: img }),
   setClientName: (name) => set({ clientName: name }),
@@ -539,6 +542,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     get().recalculateInvestment();
   },
   setRecAveragePrice: (price) => set({ recAveragePrice: price }),
+  setShowHydrogen: (val) => set({ showHydrogen: val }),
   getProposalFileName: () => {
     const state = get();
     const date = new Date();
