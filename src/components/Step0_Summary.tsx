@@ -11,8 +11,10 @@ import {
   LucideTrendingUp,
   LucidePiggyBank,
   LucidePercent,
+  LucideFlame,
 } from 'lucide-react';
 import styles from './Step0_Summary.module.css';
+import { computeHydrogenComparison } from '../lib/hydrogenCalculations';
 
 // 원 단위 포맷터
 const toWon = (val: number) => Math.round(val).toLocaleString();
@@ -79,6 +81,17 @@ export default function Step0_Summary() {
     totalBillBefore > 0
       ? ((totalBillBefore - totalBillSavings) / totalBillBefore) * 100
       : 0;
+
+  // [수소발전 역산 비교]
+  // - 1순위: 실측 연간 사용량 (totalUsage = monthlyData.usageKwh 합계)
+  // - 폴백: 연간 전기료 ÷ 한전단가 (config.unit_price_kepco)
+  // 한전 판매가는 ConfigModal에서 수정 시 자동 반영됨.
+  const hydrogen = computeHydrogenComparison({
+    annualBillWon: totalBillBefore,
+    kepcoUnitPrice: config.unit_price_kepco,
+    pricePerMwUk: config.price_hydrogen_per_mw,
+    annualUsageKwh: totalUsage,
+  });
 
   return (
     <div className={styles.container}>
@@ -208,6 +221,119 @@ export default function Step0_Summary() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* [NEW] 수소발전 역산 비교 카드 (풀폭) */}
+      <div
+        className="mt-4 rounded-xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-sky-50 overflow-hidden"
+        style={{ gridColumn: '1 / -1' }}
+      >
+        <div className="flex items-center justify-between px-4 py-2 bg-cyan-100/70 border-b border-cyan-200">
+          <div className="flex items-center gap-2 text-cyan-800 font-extrabold text-sm">
+            <LucideFlame size={16} />
+            수소발전 역산 비교 (24·365 베이스로드 기준)
+          </div>
+          <div className="text-[11px] text-cyan-700 flex items-center gap-2">
+            <span
+              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                hydrogen.basedOnActualUsage
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-amber-100 text-amber-700 border border-amber-200'
+              }`}
+            >
+              {hydrogen.basedOnActualUsage
+                ? '실측 사용량 기준'
+                : '단순 역산 (사용량 미입력)'}
+            </span>
+            <span>
+              한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
+              <strong>{config.price_hydrogen_per_mw}</strong>억원
+            </span>
+          </div>
+        </div>
+
+        {!hydrogen.isValid ? (
+          <div className="px-4 py-3 text-xs text-cyan-700">
+            연간 전기료가 입력되어야 수소발전 비교가 계산됩니다.
+          </div>
+        ) : (
+          <div className="grid grid-cols-5 gap-2 px-4 py-3 text-center">
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">연간 전기료</div>
+              <div className="text-sm font-extrabold text-slate-800">
+                {(totalBillBefore / 100000000).toFixed(2)}{' '}
+                <span className="text-xs font-bold text-slate-500">억원</span>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">
+                필요 발전량 (연/일)
+              </div>
+              <div className="text-sm font-extrabold text-slate-800">
+                {Math.round(hydrogen.annualNeededKwh).toLocaleString()}
+                <span className="text-[10px] text-slate-500"> kWh/년</span>
+              </div>
+              <div className="text-[10px] text-slate-400">
+                ≈ {Math.round(hydrogen.dailyNeededKwh).toLocaleString()} kWh/일
+              </div>
+              {hydrogen.basedOnActualUsage &&
+                hydrogen.simpleEstimateKwh > 0 && (
+                  <div className="text-[9px] text-slate-400 mt-0.5">
+                    단순역산:{' '}
+                    {Math.round(hydrogen.simpleEstimateKwh).toLocaleString()}{' '}
+                    kWh
+                  </div>
+                )}
+            </div>
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">
+                필요 발전 용량
+              </div>
+              <div className="text-sm font-extrabold text-cyan-700">
+                {hydrogen.requiredCapacityMw.toFixed(2)}{' '}
+                <span className="text-xs font-bold text-cyan-600">MW</span>
+              </div>
+              <div className="text-[10px] text-slate-400">
+                ≈ {Math.round(hydrogen.requiredCapacityKw).toLocaleString()} kW
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">
+                예상 투자비 (수소)
+              </div>
+              <div className="text-sm font-extrabold text-amber-600">
+                {hydrogen.investmentUk.toFixed(2)}{' '}
+                <span className="text-xs font-bold text-slate-500">억원</span>
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {hydrogen.requiredCapacityMw.toFixed(2)}MW ×{' '}
+                {config.price_hydrogen_per_mw}억
+              </div>
+            </div>
+            <div className="bg-cyan-600 rounded-lg p-2 text-white">
+              <div className="text-[11px] text-cyan-100 mb-1">
+                ROI (전기료 회수)
+              </div>
+              <div className="text-lg font-extrabold">
+                {hydrogen.roiYears.toFixed(2)}{' '}
+                <span className="text-xs font-bold">년</span>
+              </div>
+              <div className="text-[10px] text-cyan-100">
+                투자비 ÷ 연간 전기료
+              </div>
+            </div>
+          </div>
+        )}
+
+        {hydrogen.isValid && (
+          <div className="px-4 pb-3 -mt-1 text-[10px] text-slate-500 leading-tight">
+            *{' '}
+            {hydrogen.basedOnActualUsage
+              ? '실측 가정: 입력된 12개월 사용량(kWh) 합계를, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다.'
+              : '역산 가정: 연간 전기료를 한전 단가로 나눈 필요 발전량을, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다. (실측 사용량을 입력하면 자동으로 정밀 모드로 전환됩니다)'}{' '}
+            실제 설계용량·이용률·연료비는 별도 검토가 필요합니다.
+          </div>
+        )}
       </div>
 
       {/* 하단 계약 정보 바 */}

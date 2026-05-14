@@ -8,7 +8,9 @@ import {
   LucideWallet,
   LucideChevronsDown,
   LucideBattery,
+  LucideFlame,
 } from 'lucide-react';
+import { computeHydrogenComparison } from '../../lib/hydrogenCalculations';
 
 export default function PreviewSummary() {
   const store = useProposalStore();
@@ -332,6 +334,17 @@ export default function PreviewSummary() {
   const stdData = getScenarioData(false);
   const expData = getScenarioData(true);
 
+  // [수소발전 역산 비교]
+  // - 1순위: 실측 연간 사용량 (totalUsage = monthlyData.usageKwh 합계)
+  // - 폴백: 연간 전기료 ÷ 한전단가 (config.unit_price_kepco)
+  // 한전 판매가는 ConfigModal에서 수정 시 자동 반영됨.
+  const hydrogen = computeHydrogenComparison({
+    annualBillWon: totalBillBefore,
+    kepcoUnitPrice: config.unit_price_kepco,
+    pricePerMwUk: config.price_hydrogen_per_mw,
+    annualUsageKwh: totalUsage,
+  });
+
   // 하단 비교 섹션
   const simpleRentalRevenueUk = (capacity * 0.4) / 1000;
   const simpleRentalSavingRate =
@@ -573,6 +586,184 @@ export default function PreviewSummary() {
                 ROI {kepcoData.roiYears.toFixed(2)}년
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* [NEW] 수소발전 역산 비교 섹션 */}
+      {hydrogen.isValid && (
+        <div
+          style={{
+            backgroundColor: '#ecfeff',
+            border: '1px solid #67e8f9',
+            borderRadius: 8,
+            padding: '8px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 2,
+            }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#0891b2',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <LucideFlame size={12} /> 수소발전 역산 비교 (24·365 베이스로드)
+              </div>
+              <span
+                style={{
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  padding: '1px 6px',
+                  borderRadius: 8,
+                  backgroundColor: hydrogen.basedOnActualUsage
+                    ? '#0891b2'
+                    : '#fef3c7',
+                  color: hydrogen.basedOnActualUsage ? 'white' : '#92400e',
+                  border: hydrogen.basedOnActualUsage
+                    ? 'none'
+                    : '1px solid #fcd34d',
+                }}
+              >
+                {hydrogen.basedOnActualUsage
+                  ? '실측 사용량 기준'
+                  : '단순 역산'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.65rem', color: '#0e7490' }}>
+              한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
+              <strong>{config.price_hydrogen_per_mw}</strong>억
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>연간 전기료</span>
+              <span className={styles.kValue}>
+                {(totalBillBefore / 100000000).toFixed(2)} 억
+              </span>
+              <span className={styles.kSub}>÷ 한전단가</span>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>연간 필요 발전량</span>
+              <span className={styles.kValueSm}>
+                {Math.round(hydrogen.annualNeededKwh).toLocaleString()} kWh
+              </span>
+              <span className={styles.kSub}>
+                ≈ {Math.round(hydrogen.dailyNeededKwh).toLocaleString()} kWh/일
+              </span>
+              {hydrogen.basedOnActualUsage &&
+                hydrogen.simpleEstimateKwh > 0 && (
+                  <span
+                    style={{
+                      fontSize: '0.55rem',
+                      color: '#94a3b8',
+                      marginTop: 1,
+                    }}
+                  >
+                    단순역산{' '}
+                    {Math.round(hydrogen.simpleEstimateKwh).toLocaleString()}
+                  </span>
+                )}
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>필요 용량 (베이스로드)</span>
+              <span
+                className={styles.kValue}
+                style={{ color: '#0891b2' }}
+              >
+                {hydrogen.requiredCapacityMw.toFixed(2)} MW
+              </span>
+              <span className={styles.kSub}>
+                ≈ {Math.round(hydrogen.requiredCapacityKw).toLocaleString()} kW
+              </span>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>예상 투자비</span>
+              <span
+                className={styles.kValue}
+                style={{ color: '#d97706' }}
+              >
+                {hydrogen.investmentUk.toFixed(2)} 억
+              </span>
+              <span className={styles.kSub}>
+                {hydrogen.requiredCapacityMw.toFixed(2)}MW ×{' '}
+                {config.price_hydrogen_per_mw}억
+              </span>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+            <div className={styles.kepcoItem}>
+              <span className={styles.kLabel}>ROI (전기료 회수)</span>
+              <div
+                style={{
+                  marginTop: 1,
+                  padding: '2px 8px',
+                  backgroundColor: '#0891b2',
+                  color: 'white',
+                  borderRadius: 4,
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                }}
+              >
+                {hydrogen.roiYears.toFixed(2)}년
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              fontSize: '0.6rem',
+              color: '#0e7490',
+              marginTop: 2,
+              lineHeight: 1.2,
+            }}
+          >
+            *{' '}
+            {hydrogen.basedOnActualUsage
+              ? '입력된 12개월 실측 사용량(kWh) 합계를 24h·365d 균등 가동 기준으로 환산.'
+              : '연간 전기료를 한전 단가로 나눈 필요 발전량을 24h·365d 균등 가동 기준으로 환산 (사용량 미입력 폴백).'}{' '}
+            1MW당 단가·한전 단가는 [설정 → 장비 투자비 단가] 및 [수익 분석
+            단가]에서 변경 가능합니다.
           </div>
         </div>
       )}

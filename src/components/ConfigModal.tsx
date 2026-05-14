@@ -232,6 +232,34 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           field="price_labor_ec"
                           store={store}
                         />
+
+                        {/* [NEW] 수소발전 1MW당 투자비 */}
+                        <div className="col-span-2 p-3 border border-cyan-200 rounded-lg bg-cyan-50">
+                          <label className="block text-xs font-bold text-cyan-700 mb-1">
+                            수소발전 단가 (1MW당 / 24·365 베이스로드 가정)
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="1"
+                              className="w-full p-2 border border-cyan-300 rounded text-right pr-16 focus:ring-2 focus:ring-cyan-500 outline-none font-mono text-cyan-800 font-bold bg-white"
+                              value={store.config.price_hydrogen_per_mw}
+                              onChange={(e) =>
+                                store.updateConfig(
+                                  'price_hydrogen_per_mw',
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                            <span className="absolute right-3 top-2 text-cyan-600 text-xs font-bold">
+                              억원/MW
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-cyan-600 mt-1 leading-tight">
+                            * 연간 전기료 기준으로 필요 발전량을 역산하여
+                            수소발전(연료전지) 투자비·ROI를 비교 산출합니다.
+                          </p>
+                        </div>
                       </div>
                     </div>
 

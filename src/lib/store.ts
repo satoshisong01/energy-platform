@@ -61,6 +61,7 @@ export type SystemConfig = {
   subscription_price_per_kw: number;
   sub_price_self: number;
   sub_price_surplus: number;
+  price_hydrogen_per_mw: number; // 수소발전 1MW당 투자비 (단위: 억원)
 };
 
 export type TariffPreset = {
@@ -322,6 +323,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     subscription_price_per_kw: 40000,
     sub_price_self: 150,
     sub_price_surplus: 50,
+    price_hydrogen_per_mw: 75,
   },
   financialSettings: {
     rps: {
