@@ -99,24 +99,13 @@ export default function PreviewPanel() {
         className="print-page-center"
         style={{ position: 'relative', marginTop: '10px' }}
       >
-        <div
-          className={styles.header}
-          style={
-            showHydrogen
-              ? { width: '100%', justifyContent: 'flex-end', border: 'none' }
-              : { width: '100%' }
-          }
-        >
-          {!showHydrogen && (
-            <>
-              <div className={styles.logoBox}>FIRST C&D</div>
-              <div className={styles.companyInfo}>
-                <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
-                <p className={styles.companySub}>FIRST C&D Inc.</p>
-              </div>
-            </>
-          )}
-          {/* PDF 저장/인쇄 버튼은 청정수소 발전 모드에서도 항상 노출 */}
+        <div className={styles.header} style={{ width: '100%' }}>
+          <div className={styles.logoBox}>FIRST C&D</div>
+          <div className={styles.companyInfo}>
+            <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
+            <p className={styles.companySub}>FIRST C&D Inc.</p>
+          </div>
+          {/* 상단 컨트롤바가 따로 없으므로 여기 버튼 유지 */}
           <button
             onClick={handlePrint}
             className={`${styles.printButton} no-print`}
