@@ -114,7 +114,6 @@ export default function PreviewPanel() {
           </button>
         </div>
 
-        {!showHydrogen && (
         <div className={styles.titleSection} style={{ width: '100%' }}>
           <div>
             <h1
@@ -122,50 +121,63 @@ export default function PreviewPanel() {
               style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
             >
               <span>
-                <span className={styles.highlight}>RE100</span> 에너지
-                발전시스템 분석자료
+                <span className={styles.highlight}>RE100</span>{' '}
+                {showHydrogen
+                  ? '청정수소 발전 분석자료'
+                  : '에너지 발전시스템 분석자료'}
               </span>
 
-              {/* 한전 판매 가능/불가능 상태 표시 배지 */}
-              <span
-                style={{
-                  fontSize: '0.5em',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  border: isSurplusDiscarded
-                    ? '1px solid #ef4444'
-                    : '1px solid #3b82f6',
-                  backgroundColor: isSurplusDiscarded ? '#fef2f2' : '#eff6ff',
-                  color: isSurplusDiscarded ? '#dc2626' : '#2563eb',
-                  verticalAlign: 'middle',
-                  fontWeight: 'bold',
-                }}
-              >
-                {isSurplusDiscarded ? '한전 판매 불가능' : '한전 판매 가능'}
-              </span>
+              {/* 한전 판매 가능/불가능 상태 표시 배지 — 태양광 잉여 한전 판매 관련이므로 청정수소 발전 모드에서는 숨김 */}
+              {!showHydrogen && (
+                <span
+                  style={{
+                    fontSize: '0.5em',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: isSurplusDiscarded
+                      ? '1px solid #ef4444'
+                      : '1px solid #3b82f6',
+                    backgroundColor: isSurplusDiscarded
+                      ? '#fef2f2'
+                      : '#eff6ff',
+                    color: isSurplusDiscarded ? '#dc2626' : '#2563eb',
+                    verticalAlign: 'middle',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {isSurplusDiscarded ? '한전 판매 불가능' : '한전 판매 가능'}
+                </span>
+              )}
             </h1>
             <h2 className={styles.subTitle}>
-              - {store.clientName} (태양광발전{' '}
-              {store.capacityKw.toLocaleString()}kW
-              {/* EC 상태 표시 로직 */}
-              {isEcSelfConsumption
-                ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
-                : store.useEc && truckCount > 0
-                ? `, 이동형 EC ${truckCount}대`
-                : ''}
+              - {store.clientName} (
+              {showHydrogen ? (
+                '청정수소 발전'
+              ) : (
+                <>
+                  태양광발전 {store.capacityKw.toLocaleString()}kW
+                  {/* EC 상태 표시 로직 */}
+                  {isEcSelfConsumption
+                    ? `, 자가소비 EC ${ecSelfConsumptionCount}대`
+                    : store.useEc && truckCount > 0
+                    ? `, 이동형 EC ${truckCount}대`
+                    : ''}
+                </>
+              )}
               ) -
             </h2>
-            {/* [추가] 일조량 표시 */}
-            <div className="text-xs text-slate-500 mt-1">
-              * 적용 일조량: {config.solar_radiation || 3.8} 시간/일
-            </div>
+            {/* 일조량 표시 — 태양광 관련이므로 청정수소 발전 모드에서는 숨김 */}
+            {!showHydrogen && (
+              <div className="text-xs text-slate-500 mt-1">
+                * 적용 일조량: {config.solar_radiation || 3.8} 시간/일
+              </div>
+            )}
           </div>
           <div className={styles.contractCard}>
             <div className={styles.contractLabel}>적용 계약 종별</div>
             <div className={styles.contractValue}>{store.contractType}</div>
           </div>
         </div>
-        )}
 
         <div style={{ width: '100%', marginTop: '10px' }}>
           <PreviewSummary />
