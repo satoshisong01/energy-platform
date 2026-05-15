@@ -491,11 +491,16 @@ export default function PreviewSummary() {
   return (
     <div className={styles.container}>
       <div className={styles.headerWrapper}>
-        <div className={styles.headerTitle}>
-          01. RE100 에너지 발전 수익 분석 (종합)
-        </div>
-        <div className="flex items-center gap-2">
-          {contractType.includes('(을)') && (
+        {!showHydrogen && (
+          <div className={styles.headerTitle}>
+            01. RE100 에너지 발전 수익 분석 (종합)
+          </div>
+        )}
+        <div
+          className="flex items-center gap-2"
+          style={showHydrogen ? { marginLeft: 'auto' } : {}}
+        >
+          {!showHydrogen && contractType.includes('(을)') && (
             <div
               className={`text-xs font-bold px-2 py-1 rounded border ${
                 isRationalizationEnabled
@@ -509,22 +514,24 @@ export default function PreviewSummary() {
             </div>
           )}
           <div className="flex items-center gap-2 no-print">
-            <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
-              <input
-                type="checkbox"
-                className="w-3 h-3"
-                checked={applyEc}
-                onChange={(e) => handleEcToggle(e.target.checked)}
-              />
-              <span className="font-bold text-slate-700">EC 적용</span>
-            </label>
+            {!showHydrogen && (
+              <label className="flex items-center gap-1 cursor-pointer bg-white px-2 py-1 rounded border hover:bg-slate-50 text-xs">
+                <input
+                  type="checkbox"
+                  className="w-3 h-3"
+                  checked={applyEc}
+                  onChange={(e) => handleEcToggle(e.target.checked)}
+                />
+                <span className="font-bold text-slate-700">EC 적용</span>
+              </label>
+            )}
             <label
               className={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded border text-xs transition-colors ${
                 showHydrogen
                   ? 'bg-cyan-50 border-cyan-300 hover:bg-cyan-100'
                   : 'bg-white border-slate-200 hover:bg-slate-50'
               }`}
-              title="연간 사용량 기반 수소발전 역산 비교 표시"
+              title="청정수소 발전 모드: 우측 프리뷰를 수소발전 비교 화면만 표시"
             >
               <input
                 type="checkbox"
@@ -537,9 +544,10 @@ export default function PreviewSummary() {
                   showHydrogen ? 'text-cyan-700' : 'text-slate-700'
                 }`}
               >
-                수소 비교
+                청정수소 발전
               </span>
             </label>
+            {!showHydrogen && (
             <button
               className={`${styles.expandBtn} ${
                 showExpansion ? styles.active : ''
@@ -548,21 +556,25 @@ export default function PreviewSummary() {
             >
               {showExpansion ? '닫기' : 'REC 5.0 비교'}
             </button>
+            )}
           </div>
         </div>
       </div>
 
-      {!applyEc && isEcSelfConsumption && store.selectedModel !== 'KEPCO' && (
-        <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
-          <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
-            <LucideBattery size={14} /> EC 자가소비 (배터리형) 적용중 (
-            {ecSelfConsumptionCount}대)
-          </span>
-        </div>
-      )}
+      {!showHydrogen &&
+        !applyEc &&
+        isEcSelfConsumption &&
+        store.selectedModel !== 'KEPCO' && (
+          <div className="flex justify-end pr-4 -mt-2 mb-2 animate-pulse">
+            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
+              <LucideBattery size={14} /> EC 자가소비 (배터리형) 적용중 (
+              {ecSelfConsumptionCount}대)
+            </span>
+          </div>
+        )}
 
-      {/* 한전 장기 계약 섹션 */}
-      {!isSurplusDiscarded && (
+      {/* 한전 장기 계약 섹션 — 청정수소 발전 모드일 때는 숨김 */}
+      {!showHydrogen && !isSurplusDiscarded && (
         <div className={styles.kepcoSection}>
           <div className={styles.kepcoBadge}>한전 장기 계약 (20년)</div>
           <div className={styles.kepcoContent}>
@@ -835,12 +847,14 @@ export default function PreviewSummary() {
         </div>
       )}
 
-      <div className={styles.planSection}>
-        <div className={styles.sectionTitle}>{stdData.title}</div>
-        {renderRow(stdData)}
-      </div>
+      {!showHydrogen && (
+        <div className={styles.planSection}>
+          <div className={styles.sectionTitle}>{stdData.title}</div>
+          {renderRow(stdData)}
+        </div>
+      )}
 
-      {showExpansion && (
+      {!showHydrogen && showExpansion && (
         <div className={`${styles.planSection} ${styles.fadeIn}`}>
           <div className={styles.connector}>
             <div className={styles.connectorLine}></div>
@@ -856,7 +870,8 @@ export default function PreviewSummary() {
         </div>
       )}
 
-      {/* 하단 비교 섹션 */}
+      {/* 하단 비교 섹션 — 청정수소 발전 모드일 때는 숨김 */}
+      {!showHydrogen && (
       <div className={styles.comparisonSection}>
         <div className={styles.compHeader}>
           <LucideWallet size={14} /> 초기 투자가 없는 모델 (연간 수익 / 절감율)
@@ -916,6 +931,7 @@ export default function PreviewSummary() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

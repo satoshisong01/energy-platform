@@ -51,6 +51,7 @@ export default function PreviewPanel() {
     isSurplusDiscarded,
     isEcSelfConsumption,
     ecSelfConsumptionCount,
+    showHydrogen, // 청정수소 발전 모드: 수소 박스 + PDF 버튼만 표시
   } = store;
 
   const handlePrint = () => {
@@ -98,13 +99,24 @@ export default function PreviewPanel() {
         className="print-page-center"
         style={{ position: 'relative', marginTop: '10px' }}
       >
-        <div className={styles.header} style={{ width: '100%' }}>
-          <div className={styles.logoBox}>FIRST C&D</div>
-          <div className={styles.companyInfo}>
-            <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
-            <p className={styles.companySub}>FIRST C&D Inc.</p>
-          </div>
-          {/* 상단 컨트롤바가 따로 없으므로 여기 버튼 유지 */}
+        <div
+          className={styles.header}
+          style={
+            showHydrogen
+              ? { width: '100%', justifyContent: 'flex-end', border: 'none' }
+              : { width: '100%' }
+          }
+        >
+          {!showHydrogen && (
+            <>
+              <div className={styles.logoBox}>FIRST C&D</div>
+              <div className={styles.companyInfo}>
+                <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
+                <p className={styles.companySub}>FIRST C&D Inc.</p>
+              </div>
+            </>
+          )}
+          {/* PDF 저장/인쇄 버튼은 청정수소 발전 모드에서도 항상 노출 */}
           <button
             onClick={handlePrint}
             className={`${styles.printButton} no-print`}
@@ -113,6 +125,7 @@ export default function PreviewPanel() {
           </button>
         </div>
 
+        {!showHydrogen && (
         <div className={styles.titleSection} style={{ width: '100%' }}>
           <div>
             <h1
@@ -163,13 +176,17 @@ export default function PreviewPanel() {
             <div className={styles.contractValue}>{store.contractType}</div>
           </div>
         </div>
+        )}
 
         <div style={{ width: '100%', marginTop: '10px' }}>
           <PreviewSummary />
         </div>
-        <PageFooter page={1} />
+        {!showHydrogen && <PageFooter page={1} />}
       </div>
 
+      {/* 페이지 2~9 — 청정수소 발전 모드에서는 모두 숨김 */}
+      {!showHydrogen && (
+      <>
       {/* [페이지 2] 설치 공간 분석 */}
       <div
         className="print-page-center"
@@ -269,6 +286,8 @@ export default function PreviewPanel() {
         </div>
         <PageFooter page={9} />
       </div>
+      </>
+      )}
     </div>
   );
 }
