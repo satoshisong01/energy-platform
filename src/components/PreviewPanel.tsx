@@ -185,9 +185,12 @@ export default function PreviewPanel() {
         {!showHydrogen && <PageFooter page={1} />}
       </div>
 
-      {/* 페이지 2~9 — 청정수소 발전 모드에서는 모두 숨김 */}
-      {!showHydrogen && (
-      <>
+      {/* 페이지 2~9 — 청정수소 발전 모드에서는 CSS로만 숨김 (unmount 안 함)
+          이유: 페이지 7의 video 3개·페이지 3/6의 recharts·이미지 등이
+          매번 remount되며 토글 시 메인 스레드 freeze가 발생하기 때문.
+          DOM에 유지하고 display:none 처리하면 비디오/차트는 한 번만 로드되고
+          토글은 단순 보이기/숨기기만 수행되어 즉시 반응함. */}
+      <div style={showHydrogen ? { display: 'none' } : { display: 'contents' }}>
       {/* [페이지 2] 설치 공간 분석 */}
       <div
         className="print-page-center"
@@ -287,8 +290,7 @@ export default function PreviewPanel() {
         </div>
         <PageFooter page={9} />
       </div>
-      </>
-      )}
+      </div>
     </div>
   );
 }
