@@ -173,10 +173,12 @@ export default function PreviewPanel() {
               </div>
             )}
           </div>
-          <div className={styles.contractCard}>
-            <div className={styles.contractLabel}>적용 계약 종별</div>
-            <div className={styles.contractValue}>{store.contractType}</div>
-          </div>
+          {!showHydrogen && (
+            <div className={styles.contractCard}>
+              <div className={styles.contractLabel}>적용 계약 종별</div>
+              <div className={styles.contractValue}>{store.contractType}</div>
+            </div>
+          )}
         </div>
 
         <div style={{ width: '100%', marginTop: '10px' }}>
