@@ -1166,20 +1166,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
-    // 수익배분형: 초기 투자비 없이 전기 발생 수익을 회사:파트너 = 5:5 배분
-    // - 회사 측 연간 수익: 전체 전기 매출(자가소비+잉여+EC+기본료절감) × share_company_ratio
-    // - 파트너 측 연간 수익: 동일 매출 × share_partner_ratio (지붕임대인 몫)
+    // 수익배분형 (지붕 임대 + 발전사업자 운영 모델)
+    // - 사업 구조: 고객사는 자가소비 없이 지붕만 임대, 설치된 태양광 패널의
+    //   발전 전력을 100% 외부 판매 (한전)하고 매출을 회사:파트너 배분
+    // - 베이스: 연간 발전량(initialAnnualGen) × 한전 판매 단가(unit_price_kepco)
+    //   → 자가소비 절감·EC·기본료 절감은 적용하지 않음 (사업 구조가 다름)
     // - share_ownership_transfer_years 후 발전 설비 소유권을 파트너에게 이전
     const shareCompanyRatio = config.share_company_ratio ?? 0.5;
     const sharePartnerRatio = config.share_partner_ratio ?? 0.5;
     const shareTransferYears = config.share_ownership_transfer_years ?? 15;
-    const annualElectricRevenue =
-      revenue_saving +
-      revenue_ec +
-      revenue_surplus +
-      revenue_base_bill_savings;
-    const share_revenue_company_yr = annualElectricRevenue * shareCompanyRatio;
-    const share_revenue_partner_yr = annualElectricRevenue * sharePartnerRatio;
+    const shareSalesRevenue = initialAnnualGen * config.unit_price_kepco;
+    const share_revenue_company_yr = shareSalesRevenue * shareCompanyRatio;
+    const share_revenue_partner_yr = shareSalesRevenue * sharePartnerRatio;
 
     // 20년 누적 산정 (소유권 이전 시점 N년 기준):
     //  - 회사 측: 1~N년차만 수익, 이후 0 (설비 무상 이전)
@@ -1190,7 +1188,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       share_revenue_company_yr * yearsBeforeTransfer;
     const share_final_profit_partner =
       share_revenue_partner_yr * yearsBeforeTransfer +
-      annualElectricRevenue * yearsAfterTransfer;
+      shareSalesRevenue * yearsAfterTransfer;
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
