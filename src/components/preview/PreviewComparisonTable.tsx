@@ -25,6 +25,9 @@ export default function PreviewComparisonTable() {
     financialSettings,
     isEcSelfConsumption,
   } = store;
+  // 수익배분형 비율 (헤더 배지·수익셀에서 사용)
+  const shareCompanyPct = Math.round((config.share_company_ratio ?? 0.5) * 100);
+  const sharePartnerPct = Math.round((config.share_partner_ratio ?? 0.5) * 100);
 
   // 스토어에서 계산된 결과 가져오기 (투자비 절삭됨)
   const results = store.getSimulationResults();
@@ -120,6 +123,14 @@ export default function PreviewComparisonTable() {
                     <br />
                     <span className={styles.subText}>서비스</span>
                   </th>
+                  <th className={styles.colShare}>
+                    수익배분형
+                    <br />
+                    <span className={styles.subText}>
+                      {shareCompanyPct}:{sharePartnerPct} /{' '}
+                      {results.share_transfer_years}년 이전
+                    </span>
+                  </th>
                 </>
               )}
             </tr>
@@ -153,6 +164,13 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <td className={`${styles.valBold} text-[15px]`}>
+                    0 원
+                    <br />
+                    <span className="text-[11px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -179,6 +197,13 @@ export default function PreviewComparisonTable() {
                   <td className={`${styles.val} text-[15px]`}>
                     {toWon(results.sub_revenue_yr)} 원
                   </td>
+                  <td className={`${styles.val} text-[15px]`}>
+                    {toWon(results.share_revenue_company_yr)} 원
+                    <br />
+                    <span className="text-[10px] text-emerald-600">
+                      회사 측 {shareCompanyPct}%
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -199,6 +224,7 @@ export default function PreviewComparisonTable() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -248,6 +274,7 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -263,6 +290,7 @@ export default function PreviewComparisonTable() {
               <EmptyCell />
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -282,6 +310,7 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -297,6 +326,7 @@ export default function PreviewComparisonTable() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -317,6 +347,7 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -332,6 +363,7 @@ export default function PreviewComparisonTable() {
               <EmptyCell />
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -351,6 +383,7 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -366,6 +399,7 @@ export default function PreviewComparisonTable() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -409,6 +443,7 @@ export default function PreviewComparisonTable() {
                   >
                     {results.rec_1000_sub.toFixed(1)}
                   </td>
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -435,6 +470,7 @@ export default function PreviewComparisonTable() {
                   <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                     {toWon(results.rec_annual_sub)} 원
                   </td>
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -453,6 +489,14 @@ export default function PreviewComparisonTable() {
                   <td>
                     {(results.sub_final_profit / 100000000).toFixed(2)} 억원
                   </td>
+                  <td>
+                    {(results.share_final_profit_company / 100000000).toFixed(2)}{' '}
+                    억원
+                    <br />
+                    <span className="text-[10px] text-emerald-200">
+                      ({results.share_transfer_years}년)
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -465,6 +509,7 @@ export default function PreviewComparisonTable() {
               <td className={styles.val}>{toWon(fac_avg)} 원</td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -487,12 +532,34 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
           </tbody>
         </table>
       </div>
+
+      {showRentSub && (
+        <div
+          style={{
+            marginTop: '0.6rem',
+            padding: '0.5rem 0.8rem',
+            backgroundColor: '#ecfdf5',
+            border: '1px solid #6ee7b7',
+            borderLeft: '4px solid #047857',
+            borderRadius: 4,
+            fontSize: '0.7rem',
+            color: '#065f46',
+            lineHeight: 1.5,
+          }}
+        >
+          🤝 <strong>수익배분형:</strong> 초기 투자비 0원, 전기 발생 수익을
+          회사:파트너 = <strong>{shareCompanyPct}:{sharePartnerPct}</strong>로
+          배분. <strong>{results.share_transfer_years}년 후</strong> 발전설비
+          소유권을 파트너(지붕임대인)에게 무상 이전합니다.
+        </div>
+      )}
     </div>
   );
 }

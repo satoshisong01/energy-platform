@@ -547,6 +547,110 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           × 잉여 단가
                         </p>
                       </div>
+
+                      {/* [NEW] 수익배분형 설정 */}
+                      <div className="mt-3 p-4 border border-emerald-200 rounded-lg bg-emerald-50">
+                        <h4 className="text-xs font-bold text-emerald-700 mb-3 flex items-center gap-1">
+                          🤝 수익배분형 (초기 투자 0 / 소유권 이전) 설정
+                        </h4>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              회사 측 배분 비율
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                className="w-full p-2 border border-emerald-300 rounded text-right pr-8 focus:ring-2 focus:ring-emerald-500 outline-none font-mono bg-white"
+                                value={Math.round(
+                                  (store.config.share_company_ratio ?? 0.5) *
+                                    100,
+                                )}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'share_company_ratio',
+                                    Number(e.target.value) / 100,
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold">
+                                %
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-emerald-600 mt-1">
+                              (주)퍼스트씨앤디 몫
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              파트너 측 배분 비율
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                className="w-full p-2 border border-emerald-300 rounded text-right pr-8 focus:ring-2 focus:ring-emerald-500 outline-none font-mono bg-white"
+                                value={Math.round(
+                                  (store.config.share_partner_ratio ?? 0.5) *
+                                    100,
+                                )}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'share_partner_ratio',
+                                    Number(e.target.value) / 100,
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold">
+                                %
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-emerald-600 mt-1">
+                              지붕임대인 몫
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              소유권 이전 시점
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="1"
+                                max="30"
+                                className="w-full p-2 border border-emerald-300 rounded text-right pr-8 focus:ring-2 focus:ring-emerald-500 outline-none font-mono bg-white"
+                                value={
+                                  store.config.share_ownership_transfer_years ??
+                                  15
+                                }
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'share_ownership_transfer_years',
+                                    Number(e.target.value),
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-emerald-600 text-xs font-bold">
+                                년
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-emerald-600 mt-1">
+                              N년 뒤 파트너에게 이전
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-emerald-500 mt-2 leading-tight">
+                          * 초기 투자비 0원, 전기 발생 수익(자가소비+잉여+EC+기본료절감)을
+                          회사:파트너로 배분. N년 후 발전 설비 소유권은
+                          파트너(지붕임대인)에게 이전.
+                        </p>
+                      </div>
                     </div>
 
                     {/* 3. 시뮬레이션 비율 - 기존 디자인 유지 */}

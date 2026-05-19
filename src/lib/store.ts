@@ -65,6 +65,9 @@ export type SystemConfig = {
   re100_kepco_ratio: number; // RE100연계 한전 판매 적용 비율 (0~1, 기본 0.2)
   re100_rental_ratio: number; // RE100연계 임대료 적용 비율 (0~1, 기본 0.8)
   sub_price_standard: number; // 구독 서비스 절감 기준 단가 (원/kWh, 기본 210.5)
+  share_company_ratio: number; // 수익배분형 회사 측 비율 (0~1, 기본 0.5)
+  share_partner_ratio: number; // 수익배분형 파트너(지붕임대인) 측 비율 (0~1, 기본 0.5)
+  share_ownership_transfer_years: number; // 수익배분형 소유권 이전 시점(년, 기본 15)
 };
 
 export type TariffPreset = {
@@ -150,6 +153,11 @@ type SimulationResult = {
   fac_roi_years: number;
   rental_revenue_yr: number;
   sub_revenue_yr: number;
+  share_revenue_company_yr: number; // 수익배분형 회사 측 연간 수익
+  share_revenue_partner_yr: number; // 수익배분형 파트너 측 연간 수익
+  share_final_profit_company: number; // 회사 측 누적 (소유권 이전 시점까지)
+  share_final_profit_partner: number; // 파트너 측 누적
+  share_transfer_years: number; // 소유권 이전 시점(년)
 };
 
 interface ProposalState {
@@ -332,6 +340,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     re100_kepco_ratio: 0.2,
     re100_rental_ratio: 0.8,
     sub_price_standard: 210.5,
+    share_company_ratio: 0.5,
+    share_partner_ratio: 0.5,
+    share_ownership_transfer_years: 15,
   },
   financialSettings: {
     rps: {
@@ -1155,6 +1166,25 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
     const sub_final_profit = sub_revenue_yr * 20;
 
+    // 수익배분형: 초기 투자비 없이 전기 발생 수익을 회사:파트너 = 5:5 배분
+    // - 회사 측 연간 수익: 전체 전기 매출(자가소비+잉여+EC+기본료절감) × share_company_ratio
+    // - 파트너 측 연간 수익: 동일 매출 × share_partner_ratio (지붕임대인 몫)
+    // - share_ownership_transfer_years 후 발전 설비 소유권을 파트너에게 이전
+    const shareCompanyRatio = config.share_company_ratio ?? 0.5;
+    const sharePartnerRatio = config.share_partner_ratio ?? 0.5;
+    const shareTransferYears = config.share_ownership_transfer_years ?? 15;
+    const annualElectricRevenue =
+      revenue_saving +
+      revenue_ec +
+      revenue_surplus +
+      revenue_base_bill_savings;
+    const share_revenue_company_yr = annualElectricRevenue * shareCompanyRatio;
+    const share_revenue_partner_yr = annualElectricRevenue * sharePartnerRatio;
+    const share_final_profit_company =
+      share_revenue_company_yr * shareTransferYears;
+    const share_final_profit_partner =
+      share_revenue_partner_yr * shareTransferYears;
+
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * re100KepcoRatio * solarRadiation * 365) / 1000;
@@ -1228,6 +1258,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       fac_roi_years,
       rental_revenue_yr,
       sub_revenue_yr,
+      share_revenue_company_yr,
+      share_revenue_partner_yr,
+      share_final_profit_company,
+      share_final_profit_partner,
+      share_transfer_years: shareTransferYears,
     };
   },
 }));
