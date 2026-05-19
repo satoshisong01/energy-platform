@@ -386,6 +386,167 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           store={store}
                         />
                       </div>
+
+                      {/* [NEW] RE100연계형 단가 설정 */}
+                      <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                        <h4 className="text-xs font-bold text-blue-700 mb-3 flex items-center gap-1">
+                          🔗 RE100연계형 (임대 모델) 비율 설정
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              한전 판매 적용 비율
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                className="w-full p-2 border border-blue-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none font-mono bg-white"
+                                value={Math.round(
+                                  (store.config.re100_kepco_ratio ?? 0.2) * 100,
+                                )}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    're100_kepco_ratio',
+                                    Number(e.target.value) / 100,
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-blue-600 text-xs font-bold">
+                                %
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-blue-600 mt-1">
+                              용량 × 비율 × 한전단가 × 일조량 × 365
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              임대료 적용 비율
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                max="100"
+                                className="w-full p-2 border border-blue-300 rounded text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none font-mono bg-white"
+                                value={Math.round(
+                                  (store.config.re100_rental_ratio ?? 0.8) *
+                                    100,
+                                )}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    're100_rental_ratio',
+                                    Number(e.target.value) / 100,
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-blue-600 text-xs font-bold">
+                                %
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-blue-600 mt-1">
+                              용량 × 비율 × 임대형 단가(연간/kW)
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-blue-500 mt-2 leading-tight">
+                          * 두 비율의 합이 100%가 되도록 일반적으로 설정합니다
+                          (예: 20% + 80%). 임대형 단가(연간/kW)는 위 입력란
+                          참조.
+                        </p>
+                      </div>
+
+                      {/* [NEW] 구독형 단가 설정 */}
+                      <div className="mt-3 p-4 border border-purple-200 rounded-lg bg-purple-50">
+                        <h4 className="text-xs font-bold text-purple-700 mb-3 flex items-center gap-1">
+                          📦 구독형 (Subscription) 단가 설정
+                        </h4>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              절감 기준 단가
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full p-2 border border-purple-300 rounded text-right pr-8 focus:ring-2 focus:ring-purple-500 outline-none font-mono bg-white"
+                                value={store.config.sub_price_standard ?? 210.5}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'sub_price_standard',
+                                    Number(e.target.value),
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-purple-600 text-xs">
+                                원
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-purple-600 mt-1">
+                              일반 산업용 절감 베이스
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              가입자 자가소비 단가
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full p-2 border border-purple-300 rounded text-right pr-8 focus:ring-2 focus:ring-purple-500 outline-none font-mono bg-white"
+                                value={store.config.sub_price_self}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'sub_price_self',
+                                    Number(e.target.value),
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-purple-600 text-xs">
+                                원
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-purple-600 mt-1">
+                              절감액 = (기준−가입자) × 자가소비
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                              잉여 판매 단가
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full p-2 border border-purple-300 rounded text-right pr-8 focus:ring-2 focus:ring-purple-500 outline-none font-mono bg-white"
+                                value={store.config.sub_price_surplus}
+                                onChange={(e) =>
+                                  store.updateConfig(
+                                    'sub_price_surplus',
+                                    Number(e.target.value),
+                                  )
+                                }
+                              />
+                              <span className="absolute right-3 top-2 text-purple-600 text-xs">
+                                원
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-purple-600 mt-1">
+                              잉여 발전량에 적용
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-purple-500 mt-2 leading-tight">
+                          * 연간 수익 = (기준 − 가입자) × 자가소비량 + 잉여량
+                          × 잉여 단가
+                        </p>
+                      </div>
                     </div>
 
                     {/* 3. 시뮬레이션 비율 - 기존 디자인 유지 */}

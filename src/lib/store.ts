@@ -62,6 +62,9 @@ export type SystemConfig = {
   sub_price_self: number;
   sub_price_surplus: number;
   price_hydrogen_per_mw: number; // 수소발전 1MW당 투자비 (단위: 억원)
+  re100_kepco_ratio: number; // RE100연계 한전 판매 적용 비율 (0~1, 기본 0.2)
+  re100_rental_ratio: number; // RE100연계 임대료 적용 비율 (0~1, 기본 0.8)
+  sub_price_standard: number; // 구독 서비스 절감 기준 단가 (원/kWh, 기본 210.5)
 };
 
 export type TariffPreset = {
@@ -326,6 +329,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     sub_price_self: 150,
     sub_price_surplus: 50,
     price_hydrogen_per_mw: 60,
+    re100_kepco_ratio: 0.2,
+    re100_rental_ratio: 0.8,
+    sub_price_standard: 210.5,
   },
   financialSettings: {
     rps: {
@@ -1125,12 +1131,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const fac_net_2_10 = annualOperatingProfit + fac_pmt;
 
     // 임대/구독 등 기타 계산
+    // RE100연계: 용량의 일부(re100_kepco_ratio)는 한전 판매, 나머지(re100_rental_ratio)는 임대료
+    const re100KepcoRatio = config.re100_kepco_ratio ?? 0.2;
+    const re100RentalRatio = config.re100_rental_ratio ?? 0.8;
     const rental_revenue_yr =
-      capacityKw * 0.2 * config.unit_price_kepco * solarRadiation * 365 +
-      capacityKw * 0.8 * config.rental_price_per_kw;
+      capacityKw * re100KepcoRatio * config.unit_price_kepco * solarRadiation * 365 +
+      capacityKw * re100RentalRatio * config.rental_price_per_kw;
     const rental_final_profit = rental_revenue_yr * 20;
 
-    const price_standard = 210.5;
+    // 구독 서비스: 절감 베이스 단가(sub_price_standard) - 가입자 자가소비 단가(sub_price_self)
+    const price_standard = config.sub_price_standard ?? 210.5;
     const annualSelfConsumptionForSub = monthlyData.reduce(
       (acc, cur) => acc + cur.selfConsumption,
       0
@@ -1147,7 +1157,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
-    const rec_1000_rent = (capacityKw * 0.2 * solarRadiation * 365) / 1000;
+    const rec_1000_rent = (capacityKw * re100KepcoRatio * solarRadiation * 365) / 1000;
     const rec_1000_sub = sub_revenue_yr / recPrice / 1000;
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;
