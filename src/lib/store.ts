@@ -1180,10 +1180,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       revenue_base_bill_savings;
     const share_revenue_company_yr = annualElectricRevenue * shareCompanyRatio;
     const share_revenue_partner_yr = annualElectricRevenue * sharePartnerRatio;
-    const share_final_profit_company =
-      share_revenue_company_yr * shareTransferYears;
-    const share_final_profit_partner =
-      share_revenue_partner_yr * shareTransferYears;
+    // 20년 기준으로 다른 모델들과 통일 (소유권 이전 시점은 안내 박스에만 표기)
+    const share_final_profit_company = share_revenue_company_yr * 20;
+    const share_final_profit_partner = share_revenue_partner_yr * 20;
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;

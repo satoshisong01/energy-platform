@@ -127,8 +127,8 @@ export default function PreviewComparisonTable() {
                     수익배분형
                     <br />
                     <span className={styles.subText}>
-                      {shareCompanyPct}:{sharePartnerPct} /{' '}
-                      {results.share_transfer_years}년 이전
+                      고객 {sharePartnerPct}% /{' '}
+                      {results.share_transfer_years}년 후 이전
                     </span>
                   </th>
                 </>
@@ -198,10 +198,10 @@ export default function PreviewComparisonTable() {
                     {toWon(results.sub_revenue_yr)} 원
                   </td>
                   <td className={`${styles.val} text-[15px]`}>
-                    {toWon(results.share_revenue_company_yr)} 원
+                    {toWon(results.share_revenue_partner_yr)} 원
                     <br />
                     <span className="text-[10px] text-emerald-600">
-                      회사 측 {shareCompanyPct}%
+                      고객(지붕임대인) {sharePartnerPct}%
                     </span>
                   </td>
                 </>
@@ -490,12 +490,8 @@ export default function PreviewComparisonTable() {
                     {(results.sub_final_profit / 100000000).toFixed(2)} 억원
                   </td>
                   <td>
-                    {(results.share_final_profit_company / 100000000).toFixed(2)}{' '}
+                    {(results.share_final_profit_partner / 100000000).toFixed(2)}{' '}
                     억원
-                    <br />
-                    <span className="text-[10px] text-emerald-200">
-                      ({results.share_transfer_years}년)
-                    </span>
                   </td>
                 </>
               )}
@@ -554,10 +550,10 @@ export default function PreviewComparisonTable() {
             lineHeight: 1.5,
           }}
         >
-          🤝 <strong>수익배분형:</strong> 초기 투자비 0원, 전기 발생 수익을
-          회사:파트너 = <strong>{shareCompanyPct}:{sharePartnerPct}</strong>로
-          배분. <strong>{results.share_transfer_years}년 후</strong> 발전설비
-          소유권을 파트너(지붕임대인)에게 무상 이전합니다.
+          🤝 <strong>수익배분형:</strong> 초기 투자비 부담 없이 전기 발생
+          수익의 <strong>{sharePartnerPct}%를 지붕임대인</strong>이 수령하며,{' '}
+          <strong>{results.share_transfer_years}년 후</strong> 발전설비
+          소유권을 무상으로 이전받습니다.
         </div>
       )}
     </div>
