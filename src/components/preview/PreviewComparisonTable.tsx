@@ -201,7 +201,8 @@ export default function PreviewComparisonTable() {
                     {toWon(results.share_revenue_partner_yr)} 원
                     <br />
                     <span className="text-[10px] text-emerald-600">
-                      고객(지붕임대인) {sharePartnerPct}%
+                      1~{results.share_transfer_years}년차 (
+                      {sharePartnerPct}%)
                     </span>
                   </td>
                 </>
@@ -550,10 +551,16 @@ export default function PreviewComparisonTable() {
             lineHeight: 1.5,
           }}
         >
-          🤝 <strong>수익배분형:</strong> 초기 투자비 부담 없이 전기 발생
-          수익의 <strong>{sharePartnerPct}%를 지붕임대인</strong>이 수령하며,{' '}
+          🤝 <strong>수익배분형:</strong> 초기 투자비 부담 없이 1~
+          {results.share_transfer_years}년차 전기 발생 수익의{' '}
+          <strong>{sharePartnerPct}%를 지붕임대인</strong>이 수령합니다.{' '}
           <strong>{results.share_transfer_years}년 후</strong> 발전설비
-          소유권을 무상으로 이전받습니다.
+          소유권을 무상으로 이전받아{' '}
+          <strong>
+            {results.share_transfer_years + 1}~20년차는 발전 매출 전액(100%)이
+            귀속
+          </strong>
+          됩니다.
         </div>
       )}
     </div>

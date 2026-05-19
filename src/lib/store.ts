@@ -1180,9 +1180,17 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       revenue_base_bill_savings;
     const share_revenue_company_yr = annualElectricRevenue * shareCompanyRatio;
     const share_revenue_partner_yr = annualElectricRevenue * sharePartnerRatio;
-    // 20년 기준으로 다른 모델들과 통일 (소유권 이전 시점은 안내 박스에만 표기)
-    const share_final_profit_company = share_revenue_company_yr * 20;
-    const share_final_profit_partner = share_revenue_partner_yr * 20;
+
+    // 20년 누적 산정 (소유권 이전 시점 N년 기준):
+    //  - 회사 측: 1~N년차만 수익, 이후 0 (설비 무상 이전)
+    //  - 고객 측: 1~N년차는 배분 비율 적용, N+1~20년차는 발전 매출 100% 귀속
+    const yearsBeforeTransfer = Math.min(20, Math.max(0, shareTransferYears));
+    const yearsAfterTransfer = Math.max(0, 20 - yearsBeforeTransfer);
+    const share_final_profit_company =
+      share_revenue_company_yr * yearsBeforeTransfer;
+    const share_final_profit_partner =
+      share_revenue_partner_yr * yearsBeforeTransfer +
+      annualElectricRevenue * yearsAfterTransfer;
 
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
