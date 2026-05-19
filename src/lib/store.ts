@@ -153,8 +153,9 @@ type SimulationResult = {
   fac_roi_years: number;
   rental_revenue_yr: number;
   sub_revenue_yr: number;
-  share_revenue_company_yr: number; // 수익배분형 회사 측 연간 수익
-  share_revenue_partner_yr: number; // 수익배분형 파트너 측 연간 수익
+  share_revenue_company_yr: number; // 수익배분형 회사 측 연간 수익 (1~N년차)
+  share_revenue_partner_yr: number; // 수익배분형 파트너 측 연간 수익 (1~N년차)
+  share_revenue_partner_after_yr: number; // 파트너 측 연간 수익 (N+1~20년차, 100%)
   share_final_profit_company: number; // 회사 측 누적 (소유권 이전 시점까지)
   share_final_profit_partner: number; // 파트너 측 누적
   share_transfer_years: number; // 소유권 이전 시점(년)
@@ -1265,6 +1266,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       sub_revenue_yr,
       share_revenue_company_yr,
       share_revenue_partner_yr,
+      share_revenue_partner_after_yr: shareSalesRevenue, // 16~20년차 = 매출 100%
       share_final_profit_company,
       share_final_profit_partner,
       share_transfer_years: shareTransferYears,

@@ -197,14 +197,26 @@ export default function PreviewComparisonTable() {
                   <td className={`${styles.val} text-[15px]`}>
                     {toWon(results.sub_revenue_yr)} 원
                   </td>
-                  <td className={`${styles.val} text-[15px]`}>
-                    {toWon(results.share_revenue_partner_yr)} 원
-                    <br />
-                    <span className="text-[10px] text-emerald-600">
-                      1~{results.share_transfer_years}년차 ({sharePartnerPct}%)
+                  <td className={`${styles.val} text-[13px]`}>
+                    <div className="leading-tight">
+                      <span className="text-[10px] text-emerald-700 font-bold">
+                        1~{results.share_transfer_years}년차 ({sharePartnerPct}
+                        %)
+                      </span>
                       <br />
-                      전량 한전 판매 매출
-                    </span>
+                      <span className="text-[14px] font-bold">
+                        {toWon(results.share_revenue_partner_yr)} 원
+                      </span>
+                    </div>
+                    <div className="leading-tight mt-1 pt-1 border-t border-emerald-100">
+                      <span className="text-[10px] text-emerald-700 font-bold">
+                        {results.share_transfer_years + 1}~20년차 (100%)
+                      </span>
+                      <br />
+                      <span className="text-[14px] font-bold">
+                        {toWon(results.share_revenue_partner_after_yr)} 원
+                      </span>
+                    </div>
                   </td>
                 </>
               )}
