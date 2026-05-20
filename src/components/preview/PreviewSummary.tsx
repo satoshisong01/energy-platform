@@ -800,63 +800,95 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-            {/* [NEW] 단가별 연간 매출 셀 */}
+            {/* [NEW] 단가별 연간 매출 + 재료비/O&M 차감 안내 셀 */}
             <div
               className={styles.kepcoItem}
-              style={{ alignItems: 'stretch', minWidth: 110 }}
+              style={{ alignItems: 'stretch', minWidth: 140 }}
             >
-              <span className={styles.kLabel}>연간 매출</span>
+              <span className={styles.kLabel}>매출 / 비용</span>
               {/* 일반수소 */}
               <div
                 style={{
                   marginTop: 1,
-                  padding: '2px 6px',
+                  padding: '3px 6px',
                   border: '1px solid #67e8f9',
                   backgroundColor: '#ecfeff',
                   borderRadius: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
                 }}
               >
-                <span style={{ fontSize: '0.55rem', color: '#0e7490' }}>
+                <div
+                  style={{
+                    fontSize: '0.55rem',
+                    color: '#0e7490',
+                    textAlign: 'center',
+                  }}
+                >
                   일반수소 {config.hydrogen_price_normal}원
-                </span>
-                <span
+                </div>
+                <div
                   style={{
                     fontSize: '0.8rem',
                     fontWeight: 800,
                     color: '#0e7490',
+                    textAlign: 'center',
                   }}
                 >
                   {(hydrogen.annualRevenueNormal / 100000000).toFixed(2)} 억
-                </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.5rem',
+                    color: '#92400e',
+                    textAlign: 'right',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  − 재료비 {(hydrogen.annualMaterialCost / 100000000).toFixed(2)}
+                  억<br />− O&M {config.hydrogen_om_rate}% (
+                  {(hydrogen.annualOmCostNormal / 100000000).toFixed(2)}억)
+                </div>
               </div>
               {/* 청정수소 */}
               <div
                 style={{
                   marginTop: 3,
-                  padding: '2px 6px',
+                  padding: '3px 6px',
                   border: '1px solid #6ee7b7',
                   backgroundColor: '#ecfdf5',
                   borderRadius: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
                 }}
               >
-                <span style={{ fontSize: '0.55rem', color: '#047857' }}>
+                <div
+                  style={{
+                    fontSize: '0.55rem',
+                    color: '#047857',
+                    textAlign: 'center',
+                  }}
+                >
                   청정수소 {config.hydrogen_price_clean}원
-                </span>
-                <span
+                </div>
+                <div
                   style={{
                     fontSize: '0.8rem',
                     fontWeight: 800,
                     color: '#047857',
+                    textAlign: 'center',
                   }}
                 >
                   {(hydrogen.annualRevenueClean / 100000000).toFixed(2)} 억
-                </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.5rem',
+                    color: '#92400e',
+                    textAlign: 'right',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  − 재료비 {(hydrogen.annualMaterialCost / 100000000).toFixed(2)}
+                  억<br />− O&M {config.hydrogen_om_rate}% (
+                  {(hydrogen.annualOmCostClean / 100000000).toFixed(2)}억)
+                </div>
               </div>
             </div>
             <div className={styles.kArrow}>

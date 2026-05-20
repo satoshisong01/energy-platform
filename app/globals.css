@@ -101,6 +101,12 @@ body {
     page-break-before: auto !important;
   }
 
+  /* 페이지 1이 끝나면 다음 페이지가 무조건 새 페이지에서 시작 */
+  .print-page-first {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
   /* 표나 차트 내부에서 잘림 방지 */
   .print-avoid-break {
     break-inside: avoid;

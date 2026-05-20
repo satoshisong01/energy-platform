@@ -94,9 +94,9 @@ export default function PreviewPanel() {
   // ----------------------------------------------------------------
   return (
     <div className={styles.a4Page} id="print-area">
-      {/* [페이지 1] 표지 + 요약 */}
+      {/* [페이지 1] 표지 + 요약 — 02번이 페이지 1 끝에 흘러오지 않도록 print-page-first 강제 */}
       <div
-        className="print-page-center"
+        className="print-page-center print-page-first"
         style={{ position: 'relative', marginTop: '10px' }}
       >
         <div className={styles.header} style={{ width: '100%' }}>

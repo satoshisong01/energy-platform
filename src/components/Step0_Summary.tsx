@@ -330,25 +330,35 @@ export default function Step0_Summary() {
                 {config.price_hydrogen_per_mw}억
               </div>
             </div>
-            {/* [NEW] 연간 매출 카드 (단가별) */}
+            {/* [NEW] 매출 / 비용 카드 (단가별 + 재료비/O&M 차감 안내) */}
             <div className="bg-white rounded-lg border border-cyan-100 p-2">
-              <div className="text-[11px] text-slate-500 mb-1">연간 매출</div>
+              <div className="text-[11px] text-slate-500 mb-1">매출 / 비용</div>
               <div className="bg-cyan-50 border border-cyan-200 rounded px-1 py-0.5 mb-1">
-                <div className="text-[9px] text-cyan-700 leading-tight">
+                <div className="text-[9px] text-cyan-700 leading-tight text-center">
                   일반수소 {config.hydrogen_price_normal}원
                 </div>
-                <div className="text-sm font-extrabold text-cyan-700 leading-tight">
+                <div className="text-sm font-extrabold text-cyan-700 leading-tight text-center">
                   {(hydrogen.annualRevenueNormal / 100000000).toFixed(2)}
                   <span className="text-[10px] font-bold"> 억</span>
                 </div>
+                <div className="text-[8px] text-amber-700 leading-tight text-right">
+                  − 재료비 {(hydrogen.annualMaterialCost / 100000000).toFixed(2)}
+                  억<br />− O&M {config.hydrogen_om_rate}% (
+                  {(hydrogen.annualOmCostNormal / 100000000).toFixed(2)}억)
+                </div>
               </div>
               <div className="bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5">
-                <div className="text-[9px] text-emerald-700 leading-tight">
+                <div className="text-[9px] text-emerald-700 leading-tight text-center">
                   청정수소 {config.hydrogen_price_clean}원
                 </div>
-                <div className="text-sm font-extrabold text-emerald-700 leading-tight">
+                <div className="text-sm font-extrabold text-emerald-700 leading-tight text-center">
                   {(hydrogen.annualRevenueClean / 100000000).toFixed(2)}
                   <span className="text-[10px] font-bold"> 억</span>
+                </div>
+                <div className="text-[8px] text-amber-700 leading-tight text-right">
+                  − 재료비 {(hydrogen.annualMaterialCost / 100000000).toFixed(2)}
+                  억<br />− O&M {config.hydrogen_om_rate}% (
+                  {(hydrogen.annualOmCostClean / 100000000).toFixed(2)}억)
                 </div>
               </div>
             </div>

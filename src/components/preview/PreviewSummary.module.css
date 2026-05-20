@@ -367,48 +367,49 @@
   gap: 4px;
 }
 
-/* Comparison Section (Bottom) */
+/* Comparison Section (Bottom) — 수익배분형 추가로 인한 페이지 1 오버플로우 방지 위해 컴팩트화 */
 .comparisonSection {
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 5px 10px;
 }
 .compHeader {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #64748b;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .compGrid {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
 .compRow {
   flex: 1;
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 6px;
+  padding: 4px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 0;
 }
 .compLabel {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #64748b;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .compValue {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: #334155;
 }
 .compSub {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: #94a3b8;
 }
