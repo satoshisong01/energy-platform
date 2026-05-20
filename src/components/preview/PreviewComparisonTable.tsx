@@ -162,8 +162,20 @@ export default function PreviewComparisonTable() {
               </td>
               {showRentSub && (
                 <>
-                  <EmptyCell />
-                  <EmptyCell />
+                  <td className={`${styles.valBold} text-[15px]`}>
+                    0 원
+                    <br />
+                    <span className="text-[11px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
+                  <td className={`${styles.valBold} text-[15px]`}>
+                    0 원
+                    <br />
+                    <span className="text-[11px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
                   <td className={`${styles.valBold} text-[15px]`}>
                     0 원
                     <br />
@@ -533,8 +545,12 @@ export default function PreviewComparisonTable() {
               <td className={styles.val}>{toWon(fac_avg)} 원</td>
               {showRentSub && (
                 <>
-                  <EmptyCell />
-                  <EmptyCell />
+                  <td className={styles.val}>
+                    {toWon(results.rental_final_profit / 20)} 원
+                  </td>
+                  <td className={styles.val}>
+                    {toWon(results.sub_final_profit / 20)} 원
+                  </td>
                   <td className={styles.val}>
                     {toWon(results.share_revenue_avg_yr)} 원
                   </td>

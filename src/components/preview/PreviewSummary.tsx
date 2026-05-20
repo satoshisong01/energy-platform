@@ -798,16 +798,79 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
+            {/* [NEW] 단가별 연간 매출 셀 */}
             <div
               className={styles.kepcoItem}
-              style={{ alignItems: 'stretch', minWidth: 130 }}
+              style={{ alignItems: 'stretch', minWidth: 110 }}
             >
-              <span className={styles.kLabel}>수소 판매 ROI</span>
+              <span className={styles.kLabel}>연간 매출</span>
               {/* 일반수소 */}
               <div
                 style={{
                   marginTop: 1,
                   padding: '2px 6px',
+                  border: '1px solid #67e8f9',
+                  backgroundColor: '#ecfeff',
+                  borderRadius: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: '0.55rem', color: '#0e7490' }}>
+                  일반수소 {config.hydrogen_price_normal}원
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    color: '#0e7490',
+                  }}
+                >
+                  {(hydrogen.annualRevenueNormal / 100000000).toFixed(2)} 억
+                </span>
+              </div>
+              {/* 청정수소 */}
+              <div
+                style={{
+                  marginTop: 3,
+                  padding: '2px 6px',
+                  border: '1px solid #6ee7b7',
+                  backgroundColor: '#ecfdf5',
+                  borderRadius: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: '0.55rem', color: '#047857' }}>
+                  청정수소 {config.hydrogen_price_clean}원
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    color: '#047857',
+                  }}
+                >
+                  {(hydrogen.annualRevenueClean / 100000000).toFixed(2)} 억
+                </span>
+              </div>
+            </div>
+            <div className={styles.kArrow}>
+              <LucideArrowRight size={14} />
+            </div>
+            {/* ROI 셀 — 단가별 ROI 년수만 */}
+            <div
+              className={styles.kepcoItem}
+              style={{ alignItems: 'stretch', minWidth: 90 }}
+            >
+              <span className={styles.kLabel}>ROI</span>
+              {/* 일반수소 ROI */}
+              <div
+                style={{
+                  marginTop: 1,
+                  padding: '4px 6px',
                   backgroundColor: '#0891b2',
                   color: 'white',
                   borderRadius: 4,
@@ -817,17 +880,17 @@ export default function PreviewSummary() {
                 }}
               >
                 <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
-                  일반수소 {config.hydrogen_price_normal}원
+                  일반수소
                 </span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
                   {hydrogen.roiYearsNormal.toFixed(2)}년
                 </span>
               </div>
-              {/* 청정수소 */}
+              {/* 청정수소 ROI */}
               <div
                 style={{
                   marginTop: 3,
-                  padding: '2px 6px',
+                  padding: '4px 6px',
                   backgroundColor: '#047857',
                   color: 'white',
                   borderRadius: 4,
@@ -837,7 +900,7 @@ export default function PreviewSummary() {
                 }}
               >
                 <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
-                  청정수소 {config.hydrogen_price_clean}원
+                  청정수소
                 </span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
                   {hydrogen.roiYearsClean.toFixed(2)}년

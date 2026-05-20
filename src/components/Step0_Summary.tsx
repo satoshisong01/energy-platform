@@ -269,7 +269,7 @@ export default function Step0_Summary() {
             연간 전기료가 입력되어야 수소발전 비교가 계산됩니다.
           </div>
         ) : (
-          <div className="grid grid-cols-5 gap-2 px-4 py-3 text-center">
+          <div className="grid grid-cols-6 gap-2 px-4 py-3 text-center">
             <div className="bg-white rounded-lg border border-cyan-100 p-2">
               <div className="text-[11px] text-slate-500 mb-1">연간 전기료</div>
               <div className="text-sm font-extrabold text-slate-800">
@@ -328,24 +328,43 @@ export default function Step0_Summary() {
                 {config.price_hydrogen_per_mw}억
               </div>
             </div>
-            <div className="rounded-lg p-2 text-white bg-gradient-to-b from-cyan-600 to-emerald-700">
-              <div className="text-[11px] text-cyan-100 mb-1">
-                수소 판매 ROI
+            {/* [NEW] 연간 매출 카드 (단가별) */}
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">연간 매출</div>
+              <div className="bg-cyan-50 border border-cyan-200 rounded px-1 py-0.5 mb-1">
+                <div className="text-[9px] text-cyan-700 leading-tight">
+                  일반수소 {config.hydrogen_price_normal}원
+                </div>
+                <div className="text-sm font-extrabold text-cyan-700 leading-tight">
+                  {(hydrogen.annualRevenueNormal / 100000000).toFixed(2)}
+                  <span className="text-[10px] font-bold"> 억</span>
+                </div>
               </div>
-              {/* 일반수소 */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5">
+                <div className="text-[9px] text-emerald-700 leading-tight">
+                  청정수소 {config.hydrogen_price_clean}원
+                </div>
+                <div className="text-sm font-extrabold text-emerald-700 leading-tight">
+                  {(hydrogen.annualRevenueClean / 100000000).toFixed(2)}
+                  <span className="text-[10px] font-bold"> 억</span>
+                </div>
+              </div>
+            </div>
+            {/* ROI 카드 — 단가별 년수만 */}
+            <div className="rounded-lg p-2 text-white bg-gradient-to-b from-cyan-600 to-emerald-700">
+              <div className="text-[11px] text-cyan-100 mb-1">ROI</div>
               <div className="bg-cyan-700/40 rounded px-1 py-0.5 mb-1">
                 <div className="text-[9px] text-cyan-100 leading-tight">
-                  일반수소 {config.hydrogen_price_normal}원
+                  일반수소
                 </div>
                 <div className="text-sm font-extrabold leading-tight">
                   {hydrogen.roiYearsNormal.toFixed(2)}{' '}
                   <span className="text-[10px] font-bold">년</span>
                 </div>
               </div>
-              {/* 청정수소 */}
               <div className="bg-emerald-700/40 rounded px-1 py-0.5">
                 <div className="text-[9px] text-emerald-100 leading-tight">
-                  청정수소 {config.hydrogen_price_clean}원
+                  청정수소
                 </div>
                 <div className="text-sm font-extrabold leading-tight">
                   {hydrogen.roiYearsClean.toFixed(2)}{' '}

@@ -39,11 +39,11 @@ export default function PreviewRequirementsTable() {
 
   // [NEW] 컬럼 너비 동적 계산
   // 숨겨질 때는 4개 컬럼(구분+3개)이므로 각각 25%
-  // 보여질 때는 기존 비율 유지
-  const widthLabel = showRentSub ? '14%' : '25%';
-  const widthSelf = showRentSub ? '14%' : '25%';
-  const widthRps = showRentSub ? '19%' : '25%';
-  const widthFac = showRentSub ? '19%' : '25%';
+  // 보여질 때는 6개 임대/구독/수익배분형 포함 균형 배분
+  const widthLabel = showRentSub ? '11%' : '25%';
+  const widthSelf = showRentSub ? '11%' : '25%';
+  const widthRps = showRentSub ? '15%' : '25%';
+  const widthFac = showRentSub ? '15%' : '25%';
   // 팩토링이 마지막일 경우 우측 테두리 제거
   const borderRightFac = showRentSub ? '1px solid #e2e8f0' : 'none';
 
@@ -94,16 +94,23 @@ export default function PreviewRequirementsTable() {
                     <br />
                     <span className={styles.subText}>임대형</span>
                   </th>
+                  <th style={{ ...headerStyle, width: '14%' }}>
+                    구독
+                    <br />
+                    <span className={styles.subText}>서비스</span>
+                  </th>
                   <th
                     style={{
                       ...headerStyle,
                       width: '20%',
                       borderRight: 'none',
+                      backgroundColor: '#ecfdf5',
+                      color: '#047857',
                     }}
                   >
-                    구독
+                    수익배분형
                     <br />
-                    <span className={styles.subText}>서비스</span>
+                    <span className={styles.subText}>50:50 / 15년 이전</span>
                   </th>
                 </>
               )}
@@ -114,15 +121,18 @@ export default function PreviewRequirementsTable() {
             {[
               {
                 label: '초기투자(자기자본)',
-                vals: ['O(100%)', 'O(20%)', 'X', 'X', 'X'],
+                vals: ['O(100%)', 'O(20%)', 'X', 'X', 'X', 'X'],
                 highlight: true,
               },
-              { label: '보증보험', vals: ['X', 'O(11%)', 'O(11%)', 'X', 'X'] },
+              {
+                label: '보증보험',
+                vals: ['X', 'O(11%)', 'O(11%)', 'X', 'X', 'X'],
+              },
               {
                 label: '은행잔고증명',
-                vals: ['X', 'O(15%)', 'O(15%)', 'X', 'X'],
+                vals: ['X', 'O(15%)', 'O(15%)', 'X', 'X', 'X'],
               },
-              { label: 'RE100(REC)', vals: ['O', 'O', 'O', 'O', 'O'] },
+              { label: 'RE100(REC)', vals: ['O', 'O', 'O', 'O', 'O', 'O'] },
             ].map((row, idx) => {
               // 숨김 모드일 때는 앞의 3개 데이터만 사용
               const displayVals = showRentSub ? row.vals : row.vals.slice(0, 3);
@@ -235,7 +245,7 @@ export default function PreviewRequirementsTable() {
                 </ul>
               </td>
 
-              {/* 임대형 & 구독형 (조건부) */}
+              {/* 임대형 & 구독형 & 수익배분형 (조건부) */}
               {showRentSub && (
                 <>
                   <td style={docCellStyle}>
@@ -257,7 +267,7 @@ export default function PreviewRequirementsTable() {
                     </ul>
                   </td>
 
-                  <td style={{ ...docCellStyle, borderRight: 'none' }}>
+                  <td style={docCellStyle}>
                     <ul
                       style={{
                         listStyleType: 'disc',
@@ -270,6 +280,37 @@ export default function PreviewRequirementsTable() {
                       <li>산업단지내 기업</li>
                       <li>사용요금 : 150원/kWh</li>
                       <li>발전용량 : 250kW이상</li>
+                    </ul>
+                  </td>
+
+                  <td
+                    style={{
+                      ...docCellStyle,
+                      borderRight: 'none',
+                      backgroundColor: '#f0fdf4',
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: '#047857',
+                        fontWeight: 700,
+                        marginBottom: '8px',
+                      }}
+                    >
+                      ㅇ 지붕 임대 + 발전매출 50:50 배분
+                    </div>
+                    <ul
+                      style={{
+                        listStyleType: 'disc',
+                        paddingLeft: '1.2rem',
+                        margin: 0,
+                      }}
+                    >
+                      <li>초기 투자비 회사 부담</li>
+                      <li>유지보수(O&amp;M) 회사 부담</li>
+                      <li>15년 후 발전설비 무상 이전</li>
+                      <li>이전 후 16~20년 매출 100% 고객</li>
+                      <li>발전용량 : 250kW 이상 권장</li>
                     </ul>
                   </td>
                 </>
