@@ -158,6 +158,9 @@ type SimulationResult = {
   share_revenue_company_yr: number; // 수익배분형 회사 측 연간 수익 (1~N년차)
   share_revenue_partner_yr: number; // 수익배분형 파트너 측 연간 수익 (1~N년차)
   share_revenue_partner_after_yr: number; // 파트너 측 연간 수익 (N+1~20년차, 100%)
+  share_revenue_avg_yr: number; // 파트너 측 20년 가중평균 연간 수익
+  share_rec_count: number; // 수익배분형 1 REC(1,000kW) 환산 표기값
+  share_rec_annual: number; // 수익배분형 REC 수익/연간
   share_final_profit_company: number; // 회사 측 누적 (소유권 이전 시점까지)
   share_final_profit_partner: number; // 파트너 측 누적
   share_transfer_years: number; // 소유권 이전 시점(년)
@@ -1195,6 +1198,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       share_revenue_partner_yr * yearsBeforeTransfer +
       shareSalesRevenue * yearsAfterTransfer;
 
+    // 20년 가중평균 연간수익 (1~N년 절반 + N+1~20년 전액)
+    // = J13 in 엑셀 = (1~15년 연간수입 × 15 + 16~20년 연간수입 × 5) / 20
+    const share_revenue_avg_yr = share_final_profit_partner / 20;
+
     const recPrice = state.recAveragePrice || 80;
     const rec_1000_common = annualOperatingProfit / recPrice / 1000;
     const rec_1000_rent = (capacityKw * re100KepcoRatio * solarRadiation * 365) / 1000;
@@ -1202,6 +1209,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const rec_annual_common = rec_1000_common * recPrice * 1000;
     const rec_annual_rent = rec_1000_rent * recPrice * 1000;
     const rec_annual_sub = rec_1000_sub * recPrice * 1000;
+
+    // 수익배분형 REC (엑셀 산식 동일):
+    //   1 REC = 20년 가중평균 연수익 / REC 단가 / 1000
+    //   REC 수익/연간 = 1 REC × REC 단가 × 1000 (= 가중평균 연수익)
+    const share_rec_count = share_revenue_avg_yr / recPrice / 1000;
+    const share_rec_annual = share_rec_count * recPrice * 1000;
 
     const self_roi_years =
       annualOperatingProfit > 0 ? totalInvestment / annualOperatingProfit : 0;
@@ -1271,6 +1284,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       share_revenue_company_yr,
       share_revenue_partner_yr,
       share_revenue_partner_after_yr: shareSalesRevenue, // 16~20년차 = 매출 100%
+      share_revenue_avg_yr,
+      share_rec_count,
+      share_rec_annual,
       share_final_profit_company,
       share_final_profit_partner,
       share_transfer_years: shareTransferYears,

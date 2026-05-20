@@ -270,6 +270,13 @@ export default function PreviewComparisonTable() {
                   <td className={`${styles.val} text-[15px]`}>
                     {toWon(results.sub_revenue_yr)} 원
                   </td>
+                  <td className={`${styles.valBlue} text-[14px]`}>
+                    {toWon(results.share_revenue_avg_yr)} 원
+                    <br />
+                    <span className="text-[9px] text-emerald-700">
+                      20년 가중평균
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -457,7 +464,12 @@ export default function PreviewComparisonTable() {
                   >
                     {results.rec_1000_sub.toFixed(1)}
                   </td>
-                  <EmptyCell />
+                  <td
+                    className={`${styles.val} text-[15px]`}
+                    style={{ color: '#2563eb' }}
+                  >
+                    {results.share_rec_count.toFixed(1)}
+                  </td>
                 </>
               )}
             </tr>
@@ -484,7 +496,9 @@ export default function PreviewComparisonTable() {
                   <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                     {toWon(results.rec_annual_sub)} 원
                   </td>
-                  <EmptyCell />
+                  <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                    {toWon(results.share_rec_annual)} 원
+                  </td>
                 </>
               )}
             </tr>
@@ -521,7 +535,9 @@ export default function PreviewComparisonTable() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
-                  <EmptyCell />
+                  <td className={styles.val}>
+                    {toWon(results.share_revenue_avg_yr)} 원
+                  </td>
                 </>
               )}
             </tr>

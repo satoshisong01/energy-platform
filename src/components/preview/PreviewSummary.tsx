@@ -959,6 +959,40 @@ export default function PreviewSummary() {
                   )
                 </span>
               </div>
+              {/* [NEW] 수익배분형 (20년 가중평균 연수익 + REC) */}
+              <div
+                className={styles.compRow}
+                style={{
+                  borderColor: '#a7f3d0',
+                  backgroundColor: '#ecfdf5',
+                }}
+              >
+                <span
+                  className={styles.compLabel}
+                  style={{ color: '#047857', fontWeight: 700 }}
+                >
+                  수익배분형
+                </span>
+                <span className={styles.compValue}>
+                  {(results.share_revenue_avg_yr / 100000000).toFixed(2)} 억
+                </span>
+                <span className="text-xs font-bold text-emerald-700 mx-2">
+                  REC {results.share_rec_count.toFixed(1)}
+                </span>
+                <span className={styles.compSub}>
+                  (절감{' '}
+                  <span className="text-emerald-700">
+                    {totalBillBefore > 0
+                      ? (
+                          (results.share_revenue_avg_yr / totalBillBefore) *
+                          100
+                        ).toFixed(2)
+                      : '0.00'}
+                    %
+                  </span>
+                  )
+                </span>
+              </div>
             </>
           )}
         </div>

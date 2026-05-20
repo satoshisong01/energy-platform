@@ -57,31 +57,31 @@
 /* --- 컬럼 스타일 (좌측 화면과 동일한 색상) --- */
 .colLabel {
   background-color: #334155; /* Dark Slate */
-  width: 12%;
+  width: 11%;
 }
 .colSelf {
   background-color: #1e3a8a; /* Blue 900 */
-  width: 16%;
+  width: 15%;
 }
 .colRps {
   background-color: #475569; /* Slate 600 */
-  width: 16%;
+  width: 15%;
 }
 .colFac {
   background-color: #475569; /* Slate 600 */
-  width: 16%;
+  width: 15%;
 }
 .colRental {
   background-color: #0f766e; /* Teal 700 */
-  width: 14%;
+  width: 12%;
 }
 .colSub {
   background-color: #059669; /* Emerald 600 */
-  width: 14%;
+  width: 12%;
 }
 .colShare {
   background-color: #047857; /* Emerald 700 (수익배분형) */
-  width: 12%;
+  width: 20%;
 }
 
 /* --- 셀 스타일 --- */
