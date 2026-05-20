@@ -350,23 +350,23 @@ export default function Step0_Summary() {
                 </div>
               </div>
             </div>
-            {/* ROI 카드 — 단가별 년수만 (진한 단색 슬레이트 톤으로 박스 배경과 대비) */}
-            <div className="rounded-lg p-2 text-white bg-slate-800">
-              <div className="text-[11px] text-slate-300 mb-1">ROI</div>
-              <div className="bg-cyan-600 rounded px-1 py-0.5 mb-1">
-                <div className="text-[9px] text-cyan-50 leading-tight">
+            {/* ROI 카드 — 다른 카드와 동일한 흰 배경 톤 */}
+            <div className="bg-white rounded-lg border border-cyan-100 p-2">
+              <div className="text-[11px] text-slate-500 mb-1">ROI</div>
+              <div className="bg-cyan-50 border border-cyan-200 rounded px-1 py-0.5 mb-1">
+                <div className="text-[9px] text-cyan-700 leading-tight">
                   일반수소
                 </div>
-                <div className="text-sm font-extrabold leading-tight">
+                <div className="text-sm font-extrabold text-cyan-700 leading-tight">
                   {hydrogen.roiYearsNormal.toFixed(2)}{' '}
                   <span className="text-[10px] font-bold">년</span>
                 </div>
               </div>
-              <div className="bg-emerald-600 rounded px-1 py-0.5">
-                <div className="text-[9px] text-emerald-50 leading-tight">
+              <div className="bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5">
+                <div className="text-[9px] text-emerald-700 leading-tight">
                   청정수소
                 </div>
-                <div className="text-sm font-extrabold leading-tight">
+                <div className="text-sm font-extrabold text-emerald-700 leading-tight">
                   {hydrogen.roiYearsClean.toFixed(2)}{' '}
                   <span className="text-[10px] font-bold">년</span>
                 </div>
