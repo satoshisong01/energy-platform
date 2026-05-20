@@ -309,10 +309,68 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               </div>
                             </div>
                           </div>
+                          {/* [NEW] 재료비 + 유지보수율 — 둘째 줄 */}
+                          <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-cyan-200">
+                            <div>
+                              <label className="block text-[10px] text-amber-700 mb-1 font-semibold">
+                                재료비 단가
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  className="w-full p-2 border border-amber-300 rounded text-right pr-12 focus:ring-2 focus:ring-amber-500 outline-none font-mono text-amber-800 font-bold bg-white"
+                                  value={store.config.hydrogen_material_cost}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'hydrogen_material_cost',
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <span className="absolute right-3 top-2 text-amber-600 text-[10px] font-bold">
+                                  원/kWh
+                                </span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-amber-700 mb-1 font-semibold">
+                                유지보수율
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="w-full p-2 border border-amber-300 rounded text-right pr-8 focus:ring-2 focus:ring-amber-500 outline-none font-mono text-amber-800 font-bold bg-white"
+                                  value={store.config.hydrogen_om_rate}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'hydrogen_om_rate',
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <span className="absolute right-3 top-2 text-amber-600 text-[10px] font-bold">
+                                  %
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-500 self-end leading-tight">
+                              매출 대비 비율
+                              <br />
+                              (수소생산 O&amp;M 일반치)
+                            </div>
+                          </div>
                           <p className="text-[10px] text-cyan-600 mt-2 leading-tight">
-                            * 연간 필요 발전량 × 발전단가 = 연간 매출,
-                            투자비 ÷ 연간 매출 = ROI. 일반/청정수소 단가를
-                            각각 적용해 두 가지 ROI가 동시 산출됩니다.
+                            * 연간 매출 = 필요발전량 × 발전단가 ·
+                            재료비 = 필요발전량 × 재료비단가 ·
+                            O&amp;M = 매출 × 유지보수율
+                            <br />
+                            <strong>
+                              순수익 = 매출 − 재료비 − O&amp;M,
+                              ROI = 투자비 ÷ 순수익
+                            </strong>{' '}
+                            (음수면 적자, 회수 불가)
                           </p>
                         </div>
                       </div>

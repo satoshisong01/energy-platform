@@ -350,6 +350,8 @@ export default function PreviewSummary() {
     annualUsageKwh: totalUsage,
     hydrogenPriceNormal: config.hydrogen_price_normal,
     hydrogenPriceClean: config.hydrogen_price_clean,
+    hydrogenMaterialCost: config.hydrogen_material_cost,
+    hydrogenOmRate: config.hydrogen_om_rate,
   });
 
   // 하단 비교 섹션
@@ -860,18 +862,20 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-            {/* ROI 셀 — 단가별 ROI 년수만 */}
+            {/* ROI 셀 — 순수익 (재료비·O&M 차감 후) + ROI */}
             <div
               className={styles.kepcoItem}
-              style={{ alignItems: 'stretch', minWidth: 90 }}
+              style={{ alignItems: 'stretch', minWidth: 110 }}
             >
-              <span className={styles.kLabel}>ROI</span>
-              {/* 일반수소 ROI */}
+              <span className={styles.kLabel}>순수익 / ROI</span>
+              {/* 일반수소 */}
               <div
                 style={{
                   marginTop: 1,
-                  padding: '4px 6px',
-                  backgroundColor: '#0891b2',
+                  padding: '3px 6px',
+                  backgroundColor: hydrogen.isProfitableNormal
+                    ? '#0891b2'
+                    : '#dc2626',
                   color: 'white',
                   borderRadius: 4,
                   display: 'flex',
@@ -880,18 +884,23 @@ export default function PreviewSummary() {
                 }}
               >
                 <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
-                  일반수소
+                  일반수소{' '}
+                  {(hydrogen.annualNetNormal / 100000000).toFixed(2)}억
                 </span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
-                  {hydrogen.roiYearsNormal.toFixed(2)}년
+                <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>
+                  {hydrogen.isProfitableNormal
+                    ? `${hydrogen.roiYearsNormal.toFixed(2)}년`
+                    : '적자'}
                 </span>
               </div>
-              {/* 청정수소 ROI */}
+              {/* 청정수소 */}
               <div
                 style={{
                   marginTop: 3,
-                  padding: '4px 6px',
-                  backgroundColor: '#047857',
+                  padding: '3px 6px',
+                  backgroundColor: hydrogen.isProfitableClean
+                    ? '#047857'
+                    : '#dc2626',
                   color: 'white',
                   borderRadius: 4,
                   display: 'flex',
@@ -900,10 +909,13 @@ export default function PreviewSummary() {
                 }}
               >
                 <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
-                  청정수소
+                  청정수소{' '}
+                  {(hydrogen.annualNetClean / 100000000).toFixed(2)}억
                 </span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
-                  {hydrogen.roiYearsClean.toFixed(2)}년
+                <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>
+                  {hydrogen.isProfitableClean
+                    ? `${hydrogen.roiYearsClean.toFixed(2)}년`
+                    : '적자'}
                 </span>
               </div>
             </div>
@@ -921,9 +933,9 @@ export default function PreviewSummary() {
             {hydrogen.basedOnActualUsage
               ? '입력된 12개월 실측 사용량(kWh) 합계를 24h·365d 균등 가동 기준으로 환산.'
               : '연간 전기료를 한전 단가로 나눈 필요 발전량을 24h·365d 균등 가동 기준으로 환산 (사용량 미입력 폴백).'}{' '}
-            ROI = 투자비 ÷ (연간 필요 발전량 × 수소 판매단가). 1MW당 단가 및
-            일반/청정수소 판매단가는 [설정 → 장비 투자비 단가]에서 변경
-            가능합니다.
+            ROI = 투자비 ÷ 순수익 (순수익 = 매출 − 재료비 − 유지보수). 1MW당
+            단가, 일반/청정수소 판매단가, 재료비 단가, 유지보수율 모두
+            [설정 → 장비 투자비 단가]에서 변경 가능합니다.
             {hydrogen.isUnderscaled && (
               <span
                 style={{

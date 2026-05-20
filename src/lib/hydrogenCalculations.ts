@@ -29,6 +29,8 @@ export interface HydrogenComparisonInput {
   annualUsageKwh?: number; // 실측 연간 사용량 (kWh) — 있으면 우선 사용
   hydrogenPriceNormal?: number; // 일반수소 발전 판매단가 (원/kWh, 기본 250)
   hydrogenPriceClean?: number; // 청정수소 발전 판매단가 (원/kWh, 기본 450)
+  hydrogenMaterialCost?: number; // 재료비 단가 (원/kWh, 기본 250)
+  hydrogenOmRate?: number; // 유지보수율 (%, 기본 13.3)
 }
 
 export interface HydrogenComparisonResult {
@@ -39,11 +41,18 @@ export interface HydrogenComparisonResult {
   requiredCapacityMw: number; // 필요 평균 출력 (MW)
   investmentWon: number; // 투자비 (원)
   investmentUk: number; // 투자비 (억원)
-  // [단가별 연간 매출 + ROI] 일반수소 / 청정수소
+  // [단가별 연간 매출 + 순수익 + ROI] 일반수소 / 청정수소
   annualRevenueNormal: number; // 일반수소 연간 매출 (원) = 필요발전량 × 일반수소단가
   annualRevenueClean: number; // 청정수소 연간 매출 (원) = 필요발전량 × 청정수소단가
-  roiYearsNormal: number; // 일반수소 ROI (년) = 투자비 / 일반수소 연간 매출
-  roiYearsClean: number; // 청정수소 ROI (년) = 투자비 / 청정수소 연간 매출
+  annualMaterialCost: number; // 재료비 (원) = 필요발전량 × 재료비 단가
+  annualOmCostNormal: number; // 일반수소 유지보수비 (원) = 일반수소 매출 × 유지보수율
+  annualOmCostClean: number; // 청정수소 유지보수비 (원) = 청정수소 매출 × 유지보수율
+  annualNetNormal: number; // 일반수소 순수익 = 매출 - 재료비 - 유지보수
+  annualNetClean: number; // 청정수소 순수익 = 매출 - 재료비 - 유지보수
+  roiYearsNormal: number; // 일반수소 ROI (년) = 투자비 / 순수익 (음수면 -1)
+  roiYearsClean: number; // 청정수소 ROI (년) = 투자비 / 순수익 (음수면 -1)
+  isProfitableNormal: boolean; // 일반수소 순수익 > 0 여부
+  isProfitableClean: boolean; // 청정수소 순수익 > 0 여부
   basedOnActualUsage: boolean; // true: 실측 사용량 / false: 단순 역산
   simpleEstimateKwh: number; // 참고용: 단순 역산치 (annualBillWon / kepcoUnitPrice)
   isUnderscaled: boolean; // true: 원시 필요 출력이 상용 수소연료전지 최소 단위(100kW) 미만
@@ -64,6 +73,8 @@ export function computeHydrogenComparison(
     annualUsageKwh = 0,
     hydrogenPriceNormal = 250,
     hydrogenPriceClean = 450,
+    hydrogenMaterialCost = 250,
+    hydrogenOmRate = 13.3,
   } = input;
 
   // 단순 역산치는 항상 계산해두어 참고/폴백 양쪽 모두에 활용
@@ -89,8 +100,15 @@ export function computeHydrogenComparison(
       investmentUk: 0,
       annualRevenueNormal: 0,
       annualRevenueClean: 0,
+      annualMaterialCost: 0,
+      annualOmCostNormal: 0,
+      annualOmCostClean: 0,
+      annualNetNormal: 0,
+      annualNetClean: 0,
       roiYearsNormal: 0,
       roiYearsClean: 0,
+      isProfitableNormal: false,
+      isProfitableClean: false,
       basedOnActualUsage: false,
       simpleEstimateKwh,
       isUnderscaled: false,
@@ -113,15 +131,30 @@ export function computeHydrogenComparison(
   const investmentUk = requiredCapacityMw * pricePerMwUk;
   const investmentWon = investmentUk * WON_PER_UK;
 
-  // 단가별 연간 매출 + ROI
-  //   매출(원) = 필요 발전량(kWh) × 판매단가(원/kWh)
-  //   ROI(년) = 투자비(원) ÷ 연간 매출(원)
+  // 단가별 연간 매출 → 재료비/유지보수 차감 → 순수익 → ROI
+  //   매출(원)   = 필요 발전량(kWh) × 판매단가(원/kWh)
+  //   재료비(원) = 필요 발전량(kWh) × 재료비 단가(원/kWh)  ← 일반·청정 공통
+  //   O&M(원)    = 매출 × 유지보수율(%)
+  //   순수익(원) = 매출 - 재료비 - O&M
+  //   ROI(년)    = 투자비 ÷ 순수익 (순수익 > 0 일 때만; 음수면 0으로 두고 UI에서 '적자' 표시)
   const annualRevenueNormal = annualNeededKwh * hydrogenPriceNormal;
   const annualRevenueClean = annualNeededKwh * hydrogenPriceClean;
-  const roiYearsNormal =
-    annualRevenueNormal > 0 ? investmentWon / annualRevenueNormal : 0;
-  const roiYearsClean =
-    annualRevenueClean > 0 ? investmentWon / annualRevenueClean : 0;
+  const annualMaterialCost = annualNeededKwh * hydrogenMaterialCost;
+  const omRate = hydrogenOmRate / 100;
+  const annualOmCostNormal = annualRevenueNormal * omRate;
+  const annualOmCostClean = annualRevenueClean * omRate;
+  const annualNetNormal =
+    annualRevenueNormal - annualMaterialCost - annualOmCostNormal;
+  const annualNetClean =
+    annualRevenueClean - annualMaterialCost - annualOmCostClean;
+  const isProfitableNormal = annualNetNormal > 0;
+  const isProfitableClean = annualNetClean > 0;
+  const roiYearsNormal = isProfitableNormal
+    ? investmentWon / annualNetNormal
+    : 0;
+  const roiYearsClean = isProfitableClean
+    ? investmentWon / annualNetClean
+    : 0;
 
   // 소형 사업장 판정: 원시 평균 출력이 상용 최소 단위(100 kW) 미만
   // → 영업적으로 태양광 PV가 더 적합한 규모 (수소연료전지 단위 부정합)
@@ -137,8 +170,15 @@ export function computeHydrogenComparison(
     investmentUk,
     annualRevenueNormal,
     annualRevenueClean,
+    annualMaterialCost,
+    annualOmCostNormal,
+    annualOmCostClean,
+    annualNetNormal,
+    annualNetClean,
     roiYearsNormal,
     roiYearsClean,
+    isProfitableNormal,
+    isProfitableClean,
     basedOnActualUsage: hasActualUsage,
     simpleEstimateKwh,
     isUnderscaled,

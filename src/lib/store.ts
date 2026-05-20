@@ -64,6 +64,8 @@ export type SystemConfig = {
   price_hydrogen_per_mw: number; // 수소발전 1MW당 투자비 (단위: 억원)
   hydrogen_price_normal: number; // 일반수소 발전 판매단가 (원/kWh, 기본 250)
   hydrogen_price_clean: number; // 청정수소 발전 판매단가 (원/kWh, 기본 450)
+  hydrogen_material_cost: number; // 수소발전 재료비 단가 (원/kWh, 기본 250)
+  hydrogen_om_rate: number; // 수소발전 유지보수율 (%, 기본 13.3)
   re100_kepco_ratio: number; // RE100연계 한전 판매 적용 비율 (0~1, 기본 0.2)
   re100_rental_ratio: number; // RE100연계 임대료 적용 비율 (0~1, 기본 0.8)
   sub_price_standard: number; // 구독 서비스 절감 기준 단가 (원/kWh, 기본 210.5)
@@ -345,6 +347,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     price_hydrogen_per_mw: 60,
     hydrogen_price_normal: 250,
     hydrogen_price_clean: 450,
+    hydrogen_material_cost: 250,
+    hydrogen_om_rate: 13.3,
     re100_kepco_ratio: 0.2,
     re100_rental_ratio: 0.8,
     sub_price_standard: 210.5,

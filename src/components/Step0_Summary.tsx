@@ -93,6 +93,8 @@ export default function Step0_Summary() {
     annualUsageKwh: totalUsage,
     hydrogenPriceNormal: config.hydrogen_price_normal,
     hydrogenPriceClean: config.hydrogen_price_clean,
+    hydrogenMaterialCost: config.hydrogen_material_cost,
+    hydrogenOmRate: config.hydrogen_om_rate,
   });
 
   return (
@@ -350,25 +352,79 @@ export default function Step0_Summary() {
                 </div>
               </div>
             </div>
-            {/* ROI 카드 — 다른 카드와 동일한 흰 배경 톤 */}
+            {/* 순수익 / ROI 카드 — 매출에서 재료비·O&M 차감 후 */}
             <div className="bg-white rounded-lg border border-cyan-100 p-2">
-              <div className="text-[11px] text-slate-500 mb-1">ROI</div>
-              <div className="bg-cyan-50 border border-cyan-200 rounded px-1 py-0.5 mb-1">
-                <div className="text-[9px] text-cyan-700 leading-tight">
-                  일반수소
+              <div className="text-[11px] text-slate-500 mb-1">
+                순수익 / ROI
+              </div>
+              {/* 일반수소 */}
+              <div
+                className={`border rounded px-1 py-0.5 mb-1 ${
+                  hydrogen.isProfitableNormal
+                    ? 'bg-cyan-50 border-cyan-200'
+                    : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div
+                  className={`text-[9px] leading-tight ${
+                    hydrogen.isProfitableNormal
+                      ? 'text-cyan-700'
+                      : 'text-red-700'
+                  }`}
+                >
+                  일반수소{' '}
+                  {(hydrogen.annualNetNormal / 100000000).toFixed(2)}억
                 </div>
-                <div className="text-sm font-extrabold text-cyan-700 leading-tight">
-                  {hydrogen.roiYearsNormal.toFixed(2)}{' '}
-                  <span className="text-[10px] font-bold">년</span>
+                <div
+                  className={`text-sm font-extrabold leading-tight ${
+                    hydrogen.isProfitableNormal
+                      ? 'text-cyan-700'
+                      : 'text-red-700'
+                  }`}
+                >
+                  {hydrogen.isProfitableNormal ? (
+                    <>
+                      {hydrogen.roiYearsNormal.toFixed(2)}{' '}
+                      <span className="text-[10px] font-bold">년</span>
+                    </>
+                  ) : (
+                    <span>적자</span>
+                  )}
                 </div>
               </div>
-              <div className="bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5">
-                <div className="text-[9px] text-emerald-700 leading-tight">
-                  청정수소
+              {/* 청정수소 */}
+              <div
+                className={`border rounded px-1 py-0.5 ${
+                  hydrogen.isProfitableClean
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <div
+                  className={`text-[9px] leading-tight ${
+                    hydrogen.isProfitableClean
+                      ? 'text-emerald-700'
+                      : 'text-red-700'
+                  }`}
+                >
+                  청정수소{' '}
+                  {(hydrogen.annualNetClean / 100000000).toFixed(2)}억
                 </div>
-                <div className="text-sm font-extrabold text-emerald-700 leading-tight">
-                  {hydrogen.roiYearsClean.toFixed(2)}{' '}
-                  <span className="text-[10px] font-bold">년</span>
+                <div
+                  className={`text-sm font-extrabold leading-tight ${
+                    hydrogen.isProfitableClean
+                      ? 'text-emerald-700'
+                      : 'text-red-700'
+                  }`}
+                >
+                  {hydrogen.isProfitableClean ? (
+                    <>
+                      {hydrogen.roiYearsClean.toFixed(2)}{' '}
+                      <span className="text-[10px] font-bold">년</span>
+                    </>
+                  ) : (
+                    <span>적자</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -381,8 +437,8 @@ export default function Step0_Summary() {
             {hydrogen.basedOnActualUsage
               ? '실측 가정: 입력된 12개월 사용량(kWh) 합계를, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다.'
               : '역산 가정: 연간 전기료를 한전 단가로 나눈 필요 발전량을, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다. (실측 사용량을 입력하면 자동으로 정밀 모드로 전환됩니다)'}{' '}
-            ROI = 투자비 ÷ (연간 필요 발전량 × 수소 판매단가). 실제
-            설계용량·이용률·연료비는 별도 검토가 필요합니다.
+            ROI = 투자비 ÷ 순수익 (순수익 = 매출 − 재료비 − 유지보수).
+            실제 설계용량·이용률·연료비는 별도 검토가 필요합니다.
             <span className="ml-1 text-slate-400">
               · 용량은 100kW 단위 올림 적용 (최소 0.1 MW)
             </span>
