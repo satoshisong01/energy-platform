@@ -341,13 +341,15 @@ export default function PreviewSummary() {
 
   // [수소발전 역산 비교]
   // - 1순위: 실측 연간 사용량 (totalUsage = monthlyData.usageKwh 합계)
-  // - 폴백: 연간 전기료 ÷ 한전단가 (config.unit_price_kepco)
-  // 한전 판매가는 ConfigModal에서 수정 시 자동 반영됨.
+  // - 폴백: 연간 전기료 ÷ 한전단가 (사용량 미입력 시)
+  // ROI는 일반수소/청정수소 단가 각각으로 산정.
   const hydrogen = computeHydrogenComparison({
     annualBillWon: totalBillBefore,
     kepcoUnitPrice: config.unit_price_kepco,
     pricePerMwUk: config.price_hydrogen_per_mw,
     annualUsageKwh: totalUsage,
+    hydrogenPriceNormal: config.hydrogen_price_normal,
+    hydrogenPriceClean: config.hydrogen_price_clean,
   });
 
   // 하단 비교 섹션
@@ -709,8 +711,7 @@ export default function PreviewSummary() {
               )}
             </div>
             <div style={{ fontSize: '0.65rem', color: '#0e7490' }}>
-              한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
-              <strong>{config.price_hydrogen_per_mw}</strong>억
+              1MW당 <strong>{config.price_hydrogen_per_mw}</strong>억
             </div>
           </div>
 
@@ -797,20 +798,50 @@ export default function PreviewSummary() {
             <div className={styles.kArrow}>
               <LucideArrowRight size={14} />
             </div>
-            <div className={styles.kepcoItem}>
-              <span className={styles.kLabel}>ROI (전기료 회수)</span>
+            <div
+              className={styles.kepcoItem}
+              style={{ alignItems: 'stretch', minWidth: 130 }}
+            >
+              <span className={styles.kLabel}>수소 판매 ROI</span>
+              {/* 일반수소 */}
               <div
                 style={{
                   marginTop: 1,
-                  padding: '2px 8px',
+                  padding: '2px 6px',
                   backgroundColor: '#0891b2',
                   color: 'white',
                   borderRadius: 4,
-                  fontSize: '0.85rem',
-                  fontWeight: 800,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                 }}
               >
-                {hydrogen.roiYears.toFixed(2)}년
+                <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
+                  일반수소 {config.hydrogen_price_normal}원
+                </span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
+                  {hydrogen.roiYearsNormal.toFixed(2)}년
+                </span>
+              </div>
+              {/* 청정수소 */}
+              <div
+                style={{
+                  marginTop: 3,
+                  padding: '2px 6px',
+                  backgroundColor: '#047857',
+                  color: 'white',
+                  borderRadius: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: '0.55rem', opacity: 0.85 }}>
+                  청정수소 {config.hydrogen_price_clean}원
+                </span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>
+                  {hydrogen.roiYearsClean.toFixed(2)}년
+                </span>
               </div>
             </div>
           </div>
@@ -827,8 +858,9 @@ export default function PreviewSummary() {
             {hydrogen.basedOnActualUsage
               ? '입력된 12개월 실측 사용량(kWh) 합계를 24h·365d 균등 가동 기준으로 환산.'
               : '연간 전기료를 한전 단가로 나눈 필요 발전량을 24h·365d 균등 가동 기준으로 환산 (사용량 미입력 폴백).'}{' '}
-            1MW당 단가·한전 단가는 [설정 → 장비 투자비 단가] 및 [수익 분석
-            단가]에서 변경 가능합니다.
+            ROI = 투자비 ÷ (연간 필요 발전량 × 수소 판매단가). 1MW당 단가 및
+            일반/청정수소 판매단가는 [설정 → 장비 투자비 단가]에서 변경
+            가능합니다.
             {hydrogen.isUnderscaled && (
               <span
                 style={{

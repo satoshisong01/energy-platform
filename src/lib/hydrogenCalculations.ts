@@ -23,10 +23,12 @@
  */
 
 export interface HydrogenComparisonInput {
-  annualBillWon: number; // 연간 전기료 (원)
-  kepcoUnitPrice: number; // 한전 단가 (원/kWh) — 폴백 역산 및 헤더 표기용
+  annualBillWon: number; // 연간 전기료 (원) — 폴백 역산용
+  kepcoUnitPrice: number; // 한전 단가 (원/kWh) — 폴백 역산용 (UI 헤더에는 미노출)
   pricePerMwUk: number; // 1MW당 투자비 (억원)
   annualUsageKwh?: number; // 실측 연간 사용량 (kWh) — 있으면 우선 사용
+  hydrogenPriceNormal?: number; // 일반수소 발전 판매단가 (원/kWh, 기본 250)
+  hydrogenPriceClean?: number; // 청정수소 발전 판매단가 (원/kWh, 기본 450)
 }
 
 export interface HydrogenComparisonResult {
@@ -37,7 +39,11 @@ export interface HydrogenComparisonResult {
   requiredCapacityMw: number; // 필요 평균 출력 (MW)
   investmentWon: number; // 투자비 (원)
   investmentUk: number; // 투자비 (억원)
-  roiYears: number; // 회수 기간 (년)
+  // [단가별 연간 매출 + ROI] 일반수소 / 청정수소
+  annualRevenueNormal: number; // 일반수소 연간 매출 (원) = 필요발전량 × 일반수소단가
+  annualRevenueClean: number; // 청정수소 연간 매출 (원) = 필요발전량 × 청정수소단가
+  roiYearsNormal: number; // 일반수소 ROI (년) = 투자비 / 일반수소 연간 매출
+  roiYearsClean: number; // 청정수소 ROI (년) = 투자비 / 청정수소 연간 매출
   basedOnActualUsage: boolean; // true: 실측 사용량 / false: 단순 역산
   simpleEstimateKwh: number; // 참고용: 단순 역산치 (annualBillWon / kepcoUnitPrice)
   isUnderscaled: boolean; // true: 원시 필요 출력이 상용 수소연료전지 최소 단위(100kW) 미만
@@ -56,6 +62,8 @@ export function computeHydrogenComparison(
     kepcoUnitPrice,
     pricePerMwUk,
     annualUsageKwh = 0,
+    hydrogenPriceNormal = 250,
+    hydrogenPriceClean = 450,
   } = input;
 
   // 단순 역산치는 항상 계산해두어 참고/폴백 양쪽 모두에 활용
@@ -79,7 +87,10 @@ export function computeHydrogenComparison(
       requiredCapacityMw: 0,
       investmentWon: 0,
       investmentUk: 0,
-      roiYears: 0,
+      annualRevenueNormal: 0,
+      annualRevenueClean: 0,
+      roiYearsNormal: 0,
+      roiYearsClean: 0,
       basedOnActualUsage: false,
       simpleEstimateKwh,
       isUnderscaled: false,
@@ -102,10 +113,15 @@ export function computeHydrogenComparison(
   const investmentUk = requiredCapacityMw * pricePerMwUk;
   const investmentWon = investmentUk * WON_PER_UK;
 
-  // ROI는 "수소발전 투자비를 연간 전기료로 회수"하는 회수기간 개념
-  // → 사용량이 아닌 전기료(원) 기준을 유지하여 사용자 예시(150억/40억=3.75년)와 정합
-  const annualBillUk = annualBillWon / WON_PER_UK;
-  const roiYears = annualBillUk > 0 ? investmentUk / annualBillUk : 0;
+  // 단가별 연간 매출 + ROI
+  //   매출(원) = 필요 발전량(kWh) × 판매단가(원/kWh)
+  //   ROI(년) = 투자비(원) ÷ 연간 매출(원)
+  const annualRevenueNormal = annualNeededKwh * hydrogenPriceNormal;
+  const annualRevenueClean = annualNeededKwh * hydrogenPriceClean;
+  const roiYearsNormal =
+    annualRevenueNormal > 0 ? investmentWon / annualRevenueNormal : 0;
+  const roiYearsClean =
+    annualRevenueClean > 0 ? investmentWon / annualRevenueClean : 0;
 
   // 소형 사업장 판정: 원시 평균 출력이 상용 최소 단위(100 kW) 미만
   // → 영업적으로 태양광 PV가 더 적합한 규모 (수소연료전지 단위 부정합)
@@ -119,7 +135,10 @@ export function computeHydrogenComparison(
     requiredCapacityMw,
     investmentWon,
     investmentUk,
-    roiYears,
+    annualRevenueNormal,
+    annualRevenueClean,
+    roiYearsNormal,
+    roiYearsClean,
     basedOnActualUsage: hasActualUsage,
     simpleEstimateKwh,
     isUnderscaled,

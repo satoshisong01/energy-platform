@@ -233,31 +233,86 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                           store={store}
                         />
 
-                        {/* [NEW] 수소발전 1MW당 투자비 */}
+                        {/* [수소발전 단가 설정] 1MW당 투자비 + 일반/청정수소 판매단가 */}
                         <div className="col-span-2 p-3 border border-cyan-200 rounded-lg bg-cyan-50">
-                          <label className="block text-xs font-bold text-cyan-700 mb-1">
+                          <label className="block text-xs font-bold text-cyan-700 mb-2">
                             수소발전 단가 (1MW당 / 24·365 베이스로드 가정)
                           </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="1"
-                              className="w-full p-2 border border-cyan-300 rounded text-right pr-16 focus:ring-2 focus:ring-cyan-500 outline-none font-mono text-cyan-800 font-bold bg-white"
-                              value={store.config.price_hydrogen_per_mw}
-                              onChange={(e) =>
-                                store.updateConfig(
-                                  'price_hydrogen_per_mw',
-                                  Number(e.target.value),
-                                )
-                              }
-                            />
-                            <span className="absolute right-3 top-2 text-cyan-600 text-xs font-bold">
-                              억원/MW
-                            </span>
+                          <div className="grid grid-cols-3 gap-3">
+                            {/* 1MW당 투자비 */}
+                            <div>
+                              <label className="block text-[10px] text-cyan-700 mb-1 font-semibold">
+                                1MW당 투자비
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  className="w-full p-2 border border-cyan-300 rounded text-right pr-16 focus:ring-2 focus:ring-cyan-500 outline-none font-mono text-cyan-800 font-bold bg-white"
+                                  value={store.config.price_hydrogen_per_mw}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'price_hydrogen_per_mw',
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <span className="absolute right-3 top-2 text-cyan-600 text-[10px] font-bold">
+                                  억원/MW
+                                </span>
+                              </div>
+                            </div>
+                            {/* 일반수소 발전단가 */}
+                            <div>
+                              <label className="block text-[10px] text-cyan-700 mb-1 font-semibold">
+                                일반수소 발전단가
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  className="w-full p-2 border border-cyan-300 rounded text-right pr-12 focus:ring-2 focus:ring-cyan-500 outline-none font-mono text-cyan-800 font-bold bg-white"
+                                  value={store.config.hydrogen_price_normal}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'hydrogen_price_normal',
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <span className="absolute right-3 top-2 text-cyan-600 text-[10px] font-bold">
+                                  원/kWh
+                                </span>
+                              </div>
+                            </div>
+                            {/* 청정수소 발전단가 */}
+                            <div>
+                              <label className="block text-[10px] text-emerald-700 mb-1 font-semibold">
+                                청정수소 발전단가
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  className="w-full p-2 border border-emerald-300 rounded text-right pr-12 focus:ring-2 focus:ring-emerald-500 outline-none font-mono text-emerald-800 font-bold bg-white"
+                                  value={store.config.hydrogen_price_clean}
+                                  onChange={(e) =>
+                                    store.updateConfig(
+                                      'hydrogen_price_clean',
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                                <span className="absolute right-3 top-2 text-emerald-600 text-[10px] font-bold">
+                                  원/kWh
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-cyan-600 mt-1 leading-tight">
-                            * 연간 전기료 기준으로 필요 발전량을 역산하여
-                            수소발전(연료전지) 투자비·ROI를 비교 산출합니다.
+                          <p className="text-[10px] text-cyan-600 mt-2 leading-tight">
+                            * 연간 필요 발전량 × 발전단가 = 연간 매출,
+                            투자비 ÷ 연간 매출 = ROI. 일반/청정수소 단가를
+                            각각 적용해 두 가지 ROI가 동시 산출됩니다.
                           </p>
                         </div>
                       </div>

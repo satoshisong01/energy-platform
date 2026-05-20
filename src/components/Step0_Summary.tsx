@@ -84,13 +84,15 @@ export default function Step0_Summary() {
 
   // [수소발전 역산 비교]
   // - 1순위: 실측 연간 사용량 (totalUsage = monthlyData.usageKwh 합계)
-  // - 폴백: 연간 전기료 ÷ 한전단가 (config.unit_price_kepco)
-  // 한전 판매가는 ConfigModal에서 수정 시 자동 반영됨.
+  // - 폴백: 연간 전기료 ÷ 한전단가 (사용량 미입력 시)
+  // ROI는 일반수소/청정수소 단가 각각으로 산정.
   const hydrogen = computeHydrogenComparison({
     annualBillWon: totalBillBefore,
     kepcoUnitPrice: config.unit_price_kepco,
     pricePerMwUk: config.price_hydrogen_per_mw,
     annualUsageKwh: totalUsage,
+    hydrogenPriceNormal: config.hydrogen_price_normal,
+    hydrogenPriceClean: config.hydrogen_price_clean,
   });
 
   return (
@@ -257,8 +259,7 @@ export default function Step0_Summary() {
               </span>
             )}
             <span>
-              한전단가 {config.unit_price_kepco.toLocaleString()}원/kWh · 1MW당{' '}
-              <strong>{config.price_hydrogen_per_mw}</strong>억원
+              1MW당 <strong>{config.price_hydrogen_per_mw}</strong>억원
             </span>
           </div>
         </div>
@@ -327,16 +328,29 @@ export default function Step0_Summary() {
                 {config.price_hydrogen_per_mw}억
               </div>
             </div>
-            <div className="bg-cyan-600 rounded-lg p-2 text-white">
+            <div className="rounded-lg p-2 text-white bg-gradient-to-b from-cyan-600 to-emerald-700">
               <div className="text-[11px] text-cyan-100 mb-1">
-                ROI (전기료 회수)
+                수소 판매 ROI
               </div>
-              <div className="text-lg font-extrabold">
-                {hydrogen.roiYears.toFixed(2)}{' '}
-                <span className="text-xs font-bold">년</span>
+              {/* 일반수소 */}
+              <div className="bg-cyan-700/40 rounded px-1 py-0.5 mb-1">
+                <div className="text-[9px] text-cyan-100 leading-tight">
+                  일반수소 {config.hydrogen_price_normal}원
+                </div>
+                <div className="text-sm font-extrabold leading-tight">
+                  {hydrogen.roiYearsNormal.toFixed(2)}{' '}
+                  <span className="text-[10px] font-bold">년</span>
+                </div>
               </div>
-              <div className="text-[10px] text-cyan-100">
-                투자비 ÷ 연간 전기료
+              {/* 청정수소 */}
+              <div className="bg-emerald-700/40 rounded px-1 py-0.5">
+                <div className="text-[9px] text-emerald-100 leading-tight">
+                  청정수소 {config.hydrogen_price_clean}원
+                </div>
+                <div className="text-sm font-extrabold leading-tight">
+                  {hydrogen.roiYearsClean.toFixed(2)}{' '}
+                  <span className="text-[10px] font-bold">년</span>
+                </div>
               </div>
             </div>
           </div>
@@ -348,7 +362,8 @@ export default function Step0_Summary() {
             {hydrogen.basedOnActualUsage
               ? '실측 가정: 입력된 12개월 사용량(kWh) 합계를, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다.'
               : '역산 가정: 연간 전기료를 한전 단가로 나눈 필요 발전량을, 수소 연료전지가 24시간·365일 균등 가동하여 충당한다고 가정합니다. (실측 사용량을 입력하면 자동으로 정밀 모드로 전환됩니다)'}{' '}
-            실제 설계용량·이용률·연료비는 별도 검토가 필요합니다.
+            ROI = 투자비 ÷ (연간 필요 발전량 × 수소 판매단가). 실제
+            설계용량·이용률·연료비는 별도 검토가 필요합니다.
             <span className="ml-1 text-slate-400">
               · 용량은 100kW 단위 올림 적용 (최소 0.1 MW)
             </span>
