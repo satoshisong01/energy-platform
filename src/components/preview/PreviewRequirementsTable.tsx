@@ -39,9 +39,9 @@ export default function PreviewRequirementsTable() {
 
   // [NEW] 컬럼 너비 동적 계산
   // 숨겨질 때는 4개 컬럼(구분+3개)이므로 각각 25%
-  // 보여질 때는 6개 임대/구독/수익배분형 포함 균형 배분
+  // 보여질 때는 7개 컬럼 균형 배분 (수익배분형 17%)
   const widthLabel = showRentSub ? '11%' : '25%';
-  const widthSelf = showRentSub ? '11%' : '25%';
+  const widthSelf = showRentSub ? '12%' : '25%';
   const widthRps = showRentSub ? '15%' : '25%';
   const widthFac = showRentSub ? '15%' : '25%';
   // 팩토링이 마지막일 경우 우측 테두리 제거
@@ -89,12 +89,12 @@ export default function PreviewRequirementsTable() {
               {/* 조건부 렌더링 */}
               {showRentSub && (
                 <>
-                  <th style={{ ...headerStyle, width: '14%' }}>
+                  <th style={{ ...headerStyle, width: '15%' }}>
                     RE100연계
                     <br />
                     <span className={styles.subText}>임대형</span>
                   </th>
-                  <th style={{ ...headerStyle, width: '14%' }}>
+                  <th style={{ ...headerStyle, width: '15%' }}>
                     구독
                     <br />
                     <span className={styles.subText}>서비스</span>
@@ -102,7 +102,7 @@ export default function PreviewRequirementsTable() {
                   <th
                     style={{
                       ...headerStyle,
-                      width: '20%',
+                      width: '17%',
                       borderRight: 'none',
                       backgroundColor: '#ecfdf5',
                       color: '#047857',
