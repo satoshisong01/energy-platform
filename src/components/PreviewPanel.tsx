@@ -187,6 +187,13 @@ export default function PreviewPanel() {
         {!showHydrogen && <PageFooter page={1} />}
       </div>
 
+      {/* 강제 페이지 분할 — 02번이 페이지 1 끝에 흘러오지 않도록 */}
+      <div
+        aria-hidden="true"
+        style={{ breakAfter: 'page', pageBreakAfter: 'always', height: 0 }}
+        className="hidden print:block"
+      />
+
       {/* 페이지 2~9 — 청정수소 발전 모드에서는 CSS로만 숨김 (unmount 안 함)
           이유: 페이지 7의 video 3개·페이지 3/6의 recharts·이미지 등이
           매번 remount되며 토글 시 메인 스레드 freeze가 발생하기 때문.

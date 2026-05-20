@@ -101,10 +101,18 @@ body {
     page-break-before: auto !important;
   }
 
-  /* 페이지 1이 끝나면 다음 페이지가 무조건 새 페이지에서 시작 */
+  /* 페이지 1이 끝나면 다음 페이지가 무조건 새 페이지에서 시작
+     - height: 100vh 강제 해제 (콘텐츠 양에 맞춰 자연스럽게 차지)
+     - break-after: page 강제로 페이지 2가 무조건 새 페이지에서 시작
+     - break-inside: avoid 로 페이지 1 내부가 중간에 잘리지 않게 */
   .print-page-first {
+    height: auto !important;
+    min-height: 0 !important;
     break-after: page !important;
     page-break-after: always !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    justify-content: flex-start !important;
   }
 
   /* 표나 차트 내부에서 잘림 방지 */
