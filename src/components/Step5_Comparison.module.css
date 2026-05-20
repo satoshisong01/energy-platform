@@ -70,6 +70,9 @@
 .colSub {
   background-color: #059669;
 } /* emerald */
+.colShare {
+  background-color: #047857;
+} /* emerald 700 - 수익배분형 */
 
 .compTable td {
   padding: 0.6rem 0.8rem;

@@ -70,10 +70,18 @@ export default function Step5_Comparison() {
       invest: 0,
     },
     { id: 'sub', name: '구독', profit: results.sub_final_profit, invest: 0 },
+    {
+      id: 'share',
+      name: '수익배분형',
+      profit: results.share_final_profit_partner,
+      invest: 0,
+    },
   ];
 
   if (!showRentSub) {
-    models = models.filter((m) => m.id !== 'rent' && m.id !== 'sub');
+    models = models.filter(
+      (m) => m.id !== 'rent' && m.id !== 'sub' && m.id !== 'share'
+    );
   }
 
   const bestProfitModel = models.reduce((prev, current) =>
@@ -158,6 +166,13 @@ export default function Step5_Comparison() {
                     <br />
                     <span className={styles.subText}>서비스</span>
                   </th>
+                  <th className={styles.colShare}>
+                    수익배분형
+                    <br />
+                    <span className={styles.subText}>
+                      50:50 / {results.share_transfer_years}년 이전
+                    </span>
+                  </th>
                 </>
               )}
             </tr>
@@ -187,8 +202,27 @@ export default function Step5_Comparison() {
               </td>
               {showRentSub && (
                 <>
-                  <EmptyCell />
-                  <EmptyCell />
+                  <td className={styles.valBold}>
+                    0 원
+                    <br />
+                    <span className="text-[10px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
+                  <td className={styles.valBold}>
+                    0 원
+                    <br />
+                    <span className="text-[10px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
+                  <td className={styles.valBold}>
+                    0 원
+                    <br />
+                    <span className="text-[10px] text-emerald-600">
+                      (자부담 0%)
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -206,6 +240,20 @@ export default function Step5_Comparison() {
                   </td>
                   <td className={styles.val}>
                     {toWon(results.sub_revenue_yr)} 원
+                  </td>
+                  <td className={styles.val}>
+                    <div className="text-[10px] text-emerald-700 font-bold">
+                      1~{results.share_transfer_years}년 (50%)
+                    </div>
+                    <div className="text-[13px] font-bold">
+                      {toWon(results.share_revenue_partner_yr)} 원
+                    </div>
+                    <div className="text-[10px] text-emerald-700 font-bold mt-1 pt-1 border-t border-emerald-200">
+                      {results.share_transfer_years + 1}~20년 (100%)
+                    </div>
+                    <div className="text-[13px] font-bold">
+                      {toWon(results.share_revenue_partner_after_yr)} 원
+                    </div>
                   </td>
                 </>
               )}
@@ -229,6 +277,7 @@ export default function Step5_Comparison() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -249,6 +298,13 @@ export default function Step5_Comparison() {
                   <td className={styles.val}>
                     {toWon(results.sub_revenue_yr)} 원
                   </td>
+                  <td className={styles.val}>
+                    {toWon(results.share_revenue_avg_yr)} 원
+                    <br />
+                    <span className="text-[10px] text-emerald-700">
+                      20년 가중평균
+                    </span>
+                  </td>
                 </>
               )}
             </tr>
@@ -265,6 +321,7 @@ export default function Step5_Comparison() {
               <EmptyCell />
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -284,6 +341,7 @@ export default function Step5_Comparison() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -301,6 +359,7 @@ export default function Step5_Comparison() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -316,6 +375,7 @@ export default function Step5_Comparison() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -336,6 +396,7 @@ export default function Step5_Comparison() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -353,6 +414,7 @@ export default function Step5_Comparison() {
                 <>
                   <EmptyCell />
                   <EmptyCell />
+                  <EmptyCell />
                 </>
               )}
             </tr>
@@ -366,6 +428,7 @@ export default function Step5_Comparison() {
               <td className={styles.valBlue}>{toWon(results.fac_net_1)} 원</td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -383,6 +446,7 @@ export default function Step5_Comparison() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>
@@ -408,6 +472,9 @@ export default function Step5_Comparison() {
                   </td>
                   <td className={styles.val}>
                     {results.rec_1000_sub.toFixed(2)}
+                  </td>
+                  <td className={styles.val}>
+                    {results.share_rec_count.toFixed(2)}
                   </td>
                 </>
               )}
@@ -435,6 +502,9 @@ export default function Step5_Comparison() {
                   <td className={styles.val} style={{ fontSize: '0.8rem' }}>
                     {toWon(results.rec_annual_sub)} 원
                   </td>
+                  <td className={styles.val} style={{ fontSize: '0.8rem' }}>
+                    {toWon(results.share_rec_annual)} 원
+                  </td>
                 </>
               )}
             </tr>
@@ -453,6 +523,10 @@ export default function Step5_Comparison() {
                   <td>
                     {(results.sub_final_profit / 100000000).toFixed(2)} 억원
                   </td>
+                  <td>
+                    {(results.share_final_profit_partner / 100000000).toFixed(2)}{' '}
+                    억원
+                  </td>
                 </>
               )}
             </tr>
@@ -465,8 +539,15 @@ export default function Step5_Comparison() {
               <td className={styles.val}>{toWon(fac_avg)} 원</td>
               {showRentSub && (
                 <>
-                  <EmptyCell />
-                  <EmptyCell />
+                  <td className={styles.val}>
+                    {toWon(results.rental_final_profit / 20)} 원
+                  </td>
+                  <td className={styles.val}>
+                    {toWon(results.sub_final_profit / 20)} 원
+                  </td>
+                  <td className={styles.val}>
+                    {toWon(results.share_revenue_avg_yr)} 원
+                  </td>
                 </>
               )}
             </tr>
@@ -485,6 +566,7 @@ export default function Step5_Comparison() {
               </td>
               {showRentSub && (
                 <>
+                  <EmptyCell />
                   <EmptyCell />
                   <EmptyCell />
                 </>

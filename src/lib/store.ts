@@ -1151,12 +1151,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     // 임대/구독 등 기타 계산
     // RE100연계: 용량의 일부(re100_kepco_ratio)는 한전 판매, 나머지(re100_rental_ratio)는 임대료
+    // 자연감소(degradationRate)는 한전 판매 부분에만 적용 (임대료는 계약 고정)
     const re100KepcoRatio = config.re100_kepco_ratio ?? 0.2;
     const re100RentalRatio = config.re100_rental_ratio ?? 0.8;
-    const rental_revenue_yr =
-      capacityKw * re100KepcoRatio * config.unit_price_kepco * solarRadiation * 365 +
+    const rental_kepco_part_yr =
+      capacityKw * re100KepcoRatio * config.unit_price_kepco * solarRadiation * 365;
+    const rental_rental_part_yr =
       capacityKw * re100RentalRatio * config.rental_price_per_kw;
-    const rental_final_profit = rental_revenue_yr * 20;
+    const rental_revenue_yr = rental_kepco_part_yr + rental_rental_part_yr;
+    // 20년 등비수열 합 (R = 1 - degradationRate)
+    const geomSum20 = (1 - Math.pow(R, 20)) / (1 - R);
+    const rental_final_profit =
+      rental_kepco_part_yr * geomSum20 + rental_rental_part_yr * 20;
 
     // 구독 서비스: 절감 베이스 단가(sub_price_standard) - 가입자 자가소비 단가(sub_price_self)
     const price_standard = config.sub_price_standard ?? 210.5;
@@ -1172,7 +1178,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     );
     const sub_revenue_surplus = rawSurplusForSub * config.sub_price_surplus;
     const sub_revenue_yr = sub_benefit_savings + sub_revenue_surplus;
-    const sub_final_profit = sub_revenue_yr * 20;
+    // 자연감소 등비수열 적용 (자가소비량·잉여량 모두 발전량 기반)
+    const sub_final_profit = sub_revenue_yr * geomSum20;
 
     // 수익배분형 (지붕 임대 + 발전사업자 운영 모델)
     // - 사업 구조: 고객사는 자가소비 없이 지붕만 임대, 설치된 태양광 패널의
@@ -1190,13 +1197,18 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     // 20년 누적 산정 (소유권 이전 시점 N년 기준):
     //  - 회사 측: 1~N년차만 수익, 이후 0 (설비 무상 이전)
     //  - 고객 측: 1~N년차는 배분 비율 적용, N+1~20년차는 발전 매출 100% 귀속
+    // 자연감소(R) 등비수열 적용 — 발전량 매년 -degradationRate% 감소 반영
     const yearsBeforeTransfer = Math.min(20, Math.max(0, shareTransferYears));
     const yearsAfterTransfer = Math.max(0, 20 - yearsBeforeTransfer);
+    const geomSumBefore = (1 - Math.pow(R, yearsBeforeTransfer)) / (1 - R);
+    const geomSumAfter =
+      Math.pow(R, yearsBeforeTransfer) *
+      ((1 - Math.pow(R, yearsAfterTransfer)) / (1 - R));
     const share_final_profit_company =
-      share_revenue_company_yr * yearsBeforeTransfer;
+      share_revenue_company_yr * geomSumBefore;
     const share_final_profit_partner =
-      share_revenue_partner_yr * yearsBeforeTransfer +
-      shareSalesRevenue * yearsAfterTransfer;
+      share_revenue_partner_yr * geomSumBefore +
+      shareSalesRevenue * geomSumAfter;
 
     // 20년 가중평균 연간수익 (1~N년 절반 + N+1~20년 전액)
     // = J13 in 엑셀 = (1~15년 연간수입 × 15 + 16~20년 연간수입 × 5) / 20

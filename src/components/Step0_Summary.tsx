@@ -350,11 +350,11 @@ export default function Step0_Summary() {
                 </div>
               </div>
             </div>
-            {/* ROI 카드 — 단가별 년수만 */}
-            <div className="rounded-lg p-2 text-white bg-gradient-to-b from-cyan-600 to-emerald-700">
-              <div className="text-[11px] text-cyan-100 mb-1">ROI</div>
-              <div className="bg-cyan-700/40 rounded px-1 py-0.5 mb-1">
-                <div className="text-[9px] text-cyan-100 leading-tight">
+            {/* ROI 카드 — 단가별 년수만 (진한 단색 슬레이트 톤으로 박스 배경과 대비) */}
+            <div className="rounded-lg p-2 text-white bg-slate-800">
+              <div className="text-[11px] text-slate-300 mb-1">ROI</div>
+              <div className="bg-cyan-600 rounded px-1 py-0.5 mb-1">
+                <div className="text-[9px] text-cyan-50 leading-tight">
                   일반수소
                 </div>
                 <div className="text-sm font-extrabold leading-tight">
@@ -362,8 +362,8 @@ export default function Step0_Summary() {
                   <span className="text-[10px] font-bold">년</span>
                 </div>
               </div>
-              <div className="bg-emerald-700/40 rounded px-1 py-0.5">
-                <div className="text-[9px] text-emerald-100 leading-tight">
+              <div className="bg-emerald-600 rounded px-1 py-0.5">
+                <div className="text-[9px] text-emerald-50 leading-tight">
                   청정수소
                 </div>
                 <div className="text-sm font-extrabold leading-tight">
