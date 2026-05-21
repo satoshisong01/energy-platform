@@ -5,10 +5,12 @@
 import React from 'react';
 import { Document } from '@react-pdf/renderer';
 import { PdfPage1Summary, Page1Data } from './PdfPage1Summary';
+import { PdfPage2SiteAnalysis, Page2Data } from './PdfPage2SiteAnalysis';
 
 export interface MyEnergyPdfData {
   page1: Page1Data;
-  // page2, page3, ... 향후 추가
+  page2: Page2Data;
+  // page3, page4, ... 향후 추가
 }
 
 export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
@@ -20,6 +22,7 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
     creator="RE100 Energy Platform"
   >
     <PdfPage1Summary data={data.page1} />
-    {/* 향후 추가: <PdfPage2SiteAnalysis />, <PdfPage3Chart /> 등 */}
+    <PdfPage2SiteAnalysis data={data.page2} />
+    {/* 향후: <PdfPage3Chart />, <PdfPage4Detail /> 등 */}
   </Document>
 );

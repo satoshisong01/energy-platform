@@ -11,7 +11,7 @@
  * 사용:
  *   <PdfDownloadButton />
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { LucideDownload, LucideLoader2 } from 'lucide-react';
 import { useProposalStore, type ProposalState } from '../../lib/store';
@@ -19,6 +19,7 @@ import { computeHydrogenComparison } from '../../lib/hydrogenCalculations';
 import { computeMonthlyEnergyMetrics } from '../../lib/energyCalculations';
 import { MyEnergyPdfDocument, MyEnergyPdfData } from './MyEnergyPdfDocument';
 import type { Page1Data } from './PdfPage1Summary';
+import type { Page2Data } from './PdfPage2SiteAnalysis';
 
 // PDFDownloadLink는 SSR 비호환 (브라우저 전용) → 동적 import
 const PDFDownloadLink = dynamic(
@@ -193,44 +194,107 @@ function buildPage1Data(store: ProposalState): Page1Data {
   };
 }
 
-export const PdfDownloadButton: React.FC = () => {
+/**
+ * 화면 store → Page2Data 변환 (02. 설치 공간 분석)
+ */
+function buildPage2Data(store: ProposalState): Page2Data {
+  const { roofAreas, capacityKw, address, siteImage, config } = store;
+  const totalAreaM2 = roofAreas.reduce(
+    (acc, cur) => acc + (cur.valueM2 || 0),
+    0
+  );
+  const totalAreaPyeong = totalAreaM2 / 3.3058;
+  const capacityFactor = config.solar_capacity_factor || 2.0;
+  const maxPotentialKw =
+    totalAreaPyeong > 0 ? Math.floor(totalAreaPyeong / capacityFactor) : 0;
+  const panelWatt = config.solar_panel_wattage || 645;
+  const moduleCount =
+    capacityKw > 0 ? Math.round((capacityKw * 1000) / panelWatt) : 0;
+
+  return {
+    totalAreaPyeong,
+    totalAreaM2,
+    address,
+    siteImage,
+    maxPotentialKw,
+    capacityKw,
+    panelWatt,
+    moduleCount,
+    fileName: store.getProposalFileName(),
+    pageNumber: 2,
+  };
+}
+
+/**
+ * PdfDownloadButton 본체.
+ *
+ * 메모이제이션 핵심:
+ * - data 객체가 동일할 때 PDF document JSX를 useMemo로 캐싱 → PDFDownloadLink
+ *   가 매번 PDF를 재생성하지 않음 (1초마다 새로고침되는 현상 해결)
+ * - 컴포넌트 자체는 React.memo로 감싸서 PreviewPanel의 세션타이머 리렌더링
+ *   에도 영향을 안 받도록 함
+ */
+const PdfDownloadButtonInner: React.FC = () => {
   const store = useProposalStore();
   const [data, setData] = useState<MyEnergyPdfData | null>(null);
 
-  const prepare = () => {
-    setData({ page1: buildPage1Data(store) });
-  };
+  const prepare = useCallback(() => {
+    setData({
+      page1: buildPage1Data(store),
+      page2: buildPage2Data(store),
+    });
+  }, [store]);
+
+  // data 가 같은 객체일 때 동일 React element 반환 → PDFDownloadLink 안정
+  const pdfDocument = useMemo(
+    () => (data ? <MyEnergyPdfDocument data={data} /> : null),
+    [data]
+  );
 
   // 데이터 준비 전 — 클릭하면 데이터 생성 후 PDFDownloadLink 표시
-  if (!data) {
+  if (!data || !pdfDocument) {
     return (
       <button
         onClick={prepare}
         className="flex items-center gap-1 bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-700 transition shadow-sm no-print"
-        title="페이지 1을 정확한 A4 PDF로 다운로드 (베타)"
+        title="페이지 1~2를 정확한 A4 가로 PDF로 다운로드 (베타)"
       >
-        <LucideDownload size={16} /> PDF 다운로드 (1p, 베타)
+        <LucideDownload size={16} /> PDF 다운로드 (2p, 베타)
       </button>
     );
   }
 
   return (
-    <PDFDownloadLink
-      document={<MyEnergyPdfDocument data={data} />}
-      fileName={`${data.page1.fileName}.pdf`}
-      className="flex items-center gap-1 bg-cyan-700 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-800 transition shadow-sm no-print"
-    >
-      {({ loading }) =>
-        loading ? (
-          <>
-            <LucideLoader2 size={16} className="animate-spin" /> 생성 중...
-          </>
-        ) : (
-          <>
-            <LucideDownload size={16} /> 다시 다운로드
-          </>
-        )
-      }
-    </PDFDownloadLink>
+    <div className="flex items-center gap-1 no-print">
+      <PDFDownloadLink
+        document={pdfDocument}
+        fileName={`${data.page1.fileName}.pdf`}
+        className="flex items-center gap-1 bg-cyan-700 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-800 transition shadow-sm"
+      >
+        {({ loading }) =>
+          loading ? (
+            <>
+              <LucideLoader2 size={16} className="animate-spin" /> 생성 중...
+            </>
+          ) : (
+            <>
+              <LucideDownload size={16} /> PDF 다운로드
+            </>
+          )
+        }
+      </PDFDownloadLink>
+      {/* 다시 빌드 버튼 — 사용자가 입력 변경 후 PDF 갱신 시 사용 */}
+      <button
+        onClick={prepare}
+        className="text-[10px] text-cyan-700 underline hover:text-cyan-900"
+        title="현재 입력값으로 PDF 다시 빌드"
+      >
+        새로고침
+      </button>
+    </div>
   );
 };
+
+// React.memo 로 PreviewPanel 의 세션타이머 리렌더링을 차단
+// (props 가 없으므로 항상 같음 → 자체 state 변경 시에만 리렌더링)
+export const PdfDownloadButton = React.memo(PdfDownloadButtonInner);
