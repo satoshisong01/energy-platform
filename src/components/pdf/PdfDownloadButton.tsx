@@ -466,7 +466,7 @@ function buildPage9Data(store: ProposalState): Page9Data {
   };
 }
 
-/** 전체 PDF 데이터 빌드 */
+/** 전체 PDF 데이터 빌드 (캡처 없이 native 컴포넌트 기반) */
 function buildAllPdfData(store: ProposalState): MyEnergyPdfData {
   return {
     page1: buildPage1Data(store),
@@ -482,13 +482,59 @@ function buildAllPdfData(store: ProposalState): MyEnergyPdfData {
   };
 }
 
+/**
+ * 페이지 3~7 의 웹 미리보기 화면을 html2canvas-pro 로 캡처해
+ * PNG dataURL 맵으로 반환. 캡처 실패한 페이지는 undefined → native 폴백.
+ */
+async function captureSections(): Promise<MyEnergyPdfData['captures']> {
+  if (typeof window === 'undefined') return {};
+  const html2canvas = (await import('html2canvas-pro')).default;
+  const pages: Array<keyof NonNullable<MyEnergyPdfData['captures']>> = [
+    'page3',
+    'page4',
+    'page5',
+    'page6',
+    'page7',
+  ];
+  const result: NonNullable<MyEnergyPdfData['captures']> = {};
+
+  for (const key of pages) {
+    const n = key.replace('page', '');
+    const el = document.querySelector<HTMLElement>(
+      `[data-pdf-section="${n}"]`
+    );
+    if (!el) continue;
+    try {
+      const canvas = await html2canvas(el, {
+        backgroundColor: '#ffffff',
+        scale: 2, // 고해상도
+        useCORS: true,
+        logging: false,
+      });
+      result[key] = canvas.toDataURL('image/png');
+    } catch (err) {
+      // 캡처 실패 시 해당 페이지만 폴백
+      console.warn(`[PDF] page ${n} 캡처 실패 — native 폴백`, err);
+    }
+  }
+  return result;
+}
+
 /** 본체 컴포넌트 (React.memo 로 감싸서 export) */
 const PdfDownloadButtonInner: React.FC = () => {
   const store = useProposalStore();
   const [data, setData] = useState<MyEnergyPdfData | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  const prepare = useCallback(() => {
-    setData(buildAllPdfData(store));
+  const prepare = useCallback(async () => {
+    setIsCapturing(true);
+    try {
+      const base = buildAllPdfData(store);
+      const captures = store.showHydrogen ? {} : await captureSections();
+      setData({ ...base, captures });
+    } finally {
+      setIsCapturing(false);
+    }
   }, [store]);
 
   const pdfDocument = useMemo(
@@ -500,10 +546,19 @@ const PdfDownloadButtonInner: React.FC = () => {
     return (
       <button
         onClick={prepare}
-        className="flex items-center gap-1 bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-700 transition shadow-sm no-print"
-        title="9 페이지 전체를 정확한 A4 가로 PDF로 다운로드"
+        disabled={isCapturing}
+        className="flex items-center gap-1 bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-700 transition shadow-sm no-print disabled:opacity-60"
+        title="9 페이지 전체를 정확한 A4 가로 PDF로 다운로드 (3~7페이지는 웹 화면 캡처 사용)"
       >
-        <LucideDownload size={16} /> PDF 다운로드
+        {isCapturing ? (
+          <>
+            <LucideLoader2 size={16} className="animate-spin" /> 캡처 중...
+          </>
+        ) : (
+          <>
+            <LucideDownload size={16} /> PDF 다운로드
+          </>
+        )}
       </button>
     );
   }
@@ -529,10 +584,11 @@ const PdfDownloadButtonInner: React.FC = () => {
       </PDFDownloadLink>
       <button
         onClick={prepare}
-        className="text-[10px] text-cyan-700 underline hover:text-cyan-900"
-        title="현재 입력값으로 PDF 다시 빌드"
+        disabled={isCapturing}
+        className="text-[10px] text-cyan-700 underline hover:text-cyan-900 disabled:opacity-50"
+        title="현재 입력값으로 PDF 다시 빌드 (3~7페이지 재캡처 포함)"
       >
-        새로고침
+        {isCapturing ? '캡처 중...' : '새로고침'}
       </button>
     </div>
   );

@@ -121,9 +121,10 @@ export const PdfPage5Financial: React.FC<{ data: Page5Data }> = ({ data }) => (
       ))}
     </View>
 
-    <View style={{ flexDirection: 'row', gap: 6 }}>
+    {/* A·B 표는 웹과 동일하게 위/아래 풀폭 스택 */}
+    <View style={{ flexDirection: 'column', gap: 6 }}>
       {/* A. 초기 투자비 표 */}
-      <View style={{ flex: 1 }}>
+      <View style={{ width: '100%' }}>
         <Text
           style={{
             fontSize: 8,
@@ -222,7 +223,7 @@ export const PdfPage5Financial: React.FC<{ data: Page5Data }> = ({ data }) => (
       </View>
 
       {/* B. 연간 수익 분석 표 */}
-      <View style={{ flex: 1.2 }}>
+      <View style={{ width: '100%' }}>
         <Text
           style={{
             fontSize: 8,

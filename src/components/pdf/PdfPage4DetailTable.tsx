@@ -101,39 +101,72 @@ export const PdfPage4DetailTable: React.FC<{ data: Page4Data }> = ({ data }) => 
     <HeaderRow />
     <Text style={s.sectionTitlePill}>03. 월별 상세 분석 데이터</Text>
 
-    {/* === 표 헤더 (2단) === */}
-    {/* 1단: 월(rowSpan 효과) + 4개 그룹 헤더 */}
+    {/* === 표 헤더 (2단) — '월' 컬럼은 좌측에서 두 줄 전체 높이를 차지 === */}
     <View style={{ flexDirection: 'row' }}>
-      {/* 월 (2줄 높이) — minHeight 로 두 줄 합친 효과 */}
+      {/* 좌측: 월 컬럼 (rowSpan=2 효과 — 우측 컬럼 두 줄의 자연 높이를 따라감) */}
       <View
         style={{
           width: `${COLS.month}%`,
-          ...headerCell,
-          paddingVertical: 12,
+          border: `0.5px solid ${PDF_COLORS.border}`,
+          backgroundColor: '#f1f5f9',
           justifyContent: 'center',
+          alignItems: 'center',
         }}
       >
-        <Text style={{ fontSize: 7, fontWeight: 700, textAlign: 'center' }}>월</Text>
+        <Text style={{ fontSize: 8, fontWeight: 700, color: PDF_COLORS.text }}>월</Text>
       </View>
-      <Text style={[headerCell, { width: `${GROUP.usage}%` }]}>사용량 분석</Text>
-      <Text style={[headerBlue, { width: `${GROUP.solar}%` }]}>태양광 발전</Text>
-      <Text style={[headerOrange, { width: `${GROUP.fee}%` }]}>요금 분석 (원)</Text>
-      <Text style={[headerOrange, { width: `${GROUP.econ}%` }]}>경제성 분석 (원)</Text>
-    </View>
 
-    {/* 2단: 각 컬럼 라벨 */}
-    <View style={{ flexDirection: 'row' }}>
-      <View style={{ width: `${COLS.month}%` }} />
-      <Text style={[headerCell, { width: `${COLS.usage}%` }]}>사용량</Text>
-      <Text style={[headerCell, { width: `${COLS.self}%` }]}>자가소비</Text>
-      <Text style={[headerBlue, { width: `${COLS.gen}%` }]}>발전량</Text>
-      <Text style={[headerBlue, { width: `${COLS.surplus}%` }]}>잉여전력</Text>
-      <Text style={[headerOrange, { width: `${COLS.bill}%` }]}>기존요금</Text>
-      <Text style={[headerOrange, { width: `${COLS.base}%` }]}>기본요금</Text>
-      <Text style={[headerOrange, { width: `${COLS.saving}%` }]}>최대부하절감</Text>
-      <Text style={[headerOrange, { width: `${COLS.baseSaving}%` }]}>기본요금절감</Text>
-      <Text style={[headerOrange, { width: `${COLS.after}%` }]}>설치후요금</Text>
-      <Text style={[headerOrange, { width: `${COLS.surplusRev}%` }]}>잉여수익</Text>
+      {/* 우측: 2단 헤더 (그룹 → 컬럼 라벨) */}
+      <View style={{ width: `${100 - COLS.month}%`, flexDirection: 'column' }}>
+        {/* 1단: 4개 그룹 헤더 */}
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={[headerCell, { width: `${(GROUP.usage / (100 - COLS.month)) * 100}%` }]}>
+            사용량 분석
+          </Text>
+          <Text style={[headerBlue, { width: `${(GROUP.solar / (100 - COLS.month)) * 100}%` }]}>
+            태양광 발전
+          </Text>
+          <Text style={[headerOrange, { width: `${(GROUP.fee / (100 - COLS.month)) * 100}%` }]}>
+            요금 분석 (원)
+          </Text>
+          <Text style={[headerOrange, { width: `${(GROUP.econ / (100 - COLS.month)) * 100}%` }]}>
+            경제성 분석 (원)
+          </Text>
+        </View>
+        {/* 2단: 개별 컬럼 라벨 */}
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={[headerCell, { width: `${(COLS.usage / (100 - COLS.month)) * 100}%` }]}>
+            사용량
+          </Text>
+          <Text style={[headerCell, { width: `${(COLS.self / (100 - COLS.month)) * 100}%` }]}>
+            자가소비
+          </Text>
+          <Text style={[headerBlue, { width: `${(COLS.gen / (100 - COLS.month)) * 100}%` }]}>
+            발전량
+          </Text>
+          <Text style={[headerBlue, { width: `${(COLS.surplus / (100 - COLS.month)) * 100}%` }]}>
+            잉여전력
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.bill / (100 - COLS.month)) * 100}%` }]}>
+            기존요금
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.base / (100 - COLS.month)) * 100}%` }]}>
+            기본요금
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.saving / (100 - COLS.month)) * 100}%` }]}>
+            최대부하절감
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.baseSaving / (100 - COLS.month)) * 100}%` }]}>
+            기본요금절감
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.after / (100 - COLS.month)) * 100}%` }]}>
+            설치후요금
+          </Text>
+          <Text style={[headerOrange, { width: `${(COLS.surplusRev / (100 - COLS.month)) * 100}%` }]}>
+            잉여수익
+          </Text>
+        </View>
+      </View>
     </View>
 
     {/* === 본문 12개월 === */}

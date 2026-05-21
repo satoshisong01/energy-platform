@@ -215,8 +215,12 @@ export default function PreviewPanel() {
         <PageFooter page={2} />
       </div>
 
-      {/* [페이지 3] 차트 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      {/* [페이지 3] 차트 — PDF 캡처 대상 (data-pdf-section) */}
+      <div
+        className="print-page-center"
+        style={{ position: 'relative' }}
+        data-pdf-section="3"
+      >
         <div style={{ width: '100%' }}>
           <PreviewChart
             data={computedData}
@@ -231,10 +235,11 @@ export default function PreviewPanel() {
         <PageFooter page={3} />
       </div>
 
-      {/* [페이지 4] 상세 데이터 테이블 */}
+      {/* [페이지 4] 상세 데이터 테이블 — PDF 캡처 대상 */}
       <div
         className="print-page-center"
         style={{ position: 'relative', marginTop: '20px' }}
+        data-pdf-section="4"
       >
         <div style={{ width: '100%' }}>
           <PreviewDetailTable
@@ -252,16 +257,24 @@ export default function PreviewPanel() {
         <PageFooter page={4} />
       </div>
 
-      {/* [페이지 5] 투자 및 수익 분석 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      {/* [페이지 5] 투자 및 수익 분석 — PDF 캡처 대상 */}
+      <div
+        className="print-page-center"
+        style={{ position: 'relative' }}
+        data-pdf-section="5"
+      >
         <div style={{ width: '100%' }}>
           <PreviewFinancialTable />
         </div>
         <PageFooter page={5} />
       </div>
 
-      {/* [페이지 6] 모델 비주얼 - 그래프 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      {/* [페이지 6] 모델 비주얼 - 그래프 — PDF 캡처 대상 */}
+      <div
+        className="print-page-center"
+        style={{ position: 'relative' }}
+        data-pdf-section="6"
+      >
         <div style={{ width: '100%' }}>
           <PreviewModelGraph /> {/* 그래프 컴포넌트 */}
         </div>
@@ -269,8 +282,12 @@ export default function PreviewPanel() {
         <PageFooter page={6} />
       </div>
 
-      {/* [페이지 7] 모델 비주얼 - 이미지/영상 */}
-      <div className="print-page-center" style={{ position: 'relative' }}>
+      {/* [페이지 7] 모델 비주얼 - 이미지/영상 — PDF 캡처 대상 */}
+      <div
+        className="print-page-center"
+        style={{ position: 'relative' }}
+        data-pdf-section="7"
+      >
         <div style={{ width: '100%' }}>
           <PreviewModelImage /> {/* 이미지 컴포넌트 */}
         </div>
