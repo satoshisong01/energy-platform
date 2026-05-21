@@ -484,7 +484,9 @@ function buildAllPdfData(store: ProposalState): MyEnergyPdfData {
 
 /**
  * 페이지 3~7 의 웹 미리보기 화면을 html2canvas-pro 로 캡처해
- * PNG dataURL 맵으로 반환. 캡처 실패한 페이지는 undefined → native 폴백.
+ * { dataUrl, width, height } 맵으로 반환. 캡처 실패한 페이지는 undefined → native 폴백.
+ *
+ * width/height 는 PdfImagePage 에서 A4 가로 content 영역에 비율 유지 fit 계산용.
  */
 async function captureSections(): Promise<MyEnergyPdfData['captures']> {
   if (typeof window === 'undefined') return {};
@@ -511,7 +513,11 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
         useCORS: true,
         logging: false,
       });
-      result[key] = canvas.toDataURL('image/png');
+      result[key] = {
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height,
+      };
     } catch (err) {
       // 캡처 실패 시 해당 페이지만 폴백
       console.warn(`[PDF] page ${n} 캡처 실패 — native 폴백`, err);

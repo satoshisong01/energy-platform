@@ -30,14 +30,20 @@ export interface MyEnergyPdfData {
   page8: Page8Data;
   page9: Page9Data;
   hydrogenMode: boolean;
-  /** 페이지 3~7 의 웹 캡처 PNG dataURL — 있으면 캡처 사용, 없으면 native 폴백 */
+  /** 페이지 3~7 의 웹 캡처 — dataURL + 자연 픽셀 크기 (빈 페이지 방지에 사용) */
   captures?: {
-    page3?: string;
-    page4?: string;
-    page5?: string;
-    page6?: string;
-    page7?: string;
+    page3?: PdfCapture;
+    page4?: PdfCapture;
+    page5?: PdfCapture;
+    page6?: PdfCapture;
+    page7?: PdfCapture;
   };
+}
+
+export interface PdfCapture {
+  dataUrl: string;
+  width: number;
+  height: number;
 }
 
 export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
@@ -60,7 +66,13 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
 
           {cap.page3 ? (
             <PdfImagePage
-              data={{ imageDataUrl: cap.page3, pageNumber: 3, fileName }}
+              data={{
+                imageDataUrl: cap.page3.dataUrl,
+                imageWidth: cap.page3.width,
+                imageHeight: cap.page3.height,
+                pageNumber: 3,
+                fileName,
+              }}
             />
           ) : (
             <PdfPage3Chart data={data.page3} />
@@ -68,7 +80,13 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
 
           {cap.page4 ? (
             <PdfImagePage
-              data={{ imageDataUrl: cap.page4, pageNumber: 4, fileName }}
+              data={{
+                imageDataUrl: cap.page4.dataUrl,
+                imageWidth: cap.page4.width,
+                imageHeight: cap.page4.height,
+                pageNumber: 4,
+                fileName,
+              }}
             />
           ) : (
             <PdfPage4DetailTable data={data.page4} />
@@ -76,7 +94,13 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
 
           {cap.page5 ? (
             <PdfImagePage
-              data={{ imageDataUrl: cap.page5, pageNumber: 5, fileName }}
+              data={{
+                imageDataUrl: cap.page5.dataUrl,
+                imageWidth: cap.page5.width,
+                imageHeight: cap.page5.height,
+                pageNumber: 5,
+                fileName,
+              }}
             />
           ) : (
             <PdfPage5Financial data={data.page5} />
@@ -84,7 +108,13 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
 
           {cap.page6 ? (
             <PdfImagePage
-              data={{ imageDataUrl: cap.page6, pageNumber: 6, fileName }}
+              data={{
+                imageDataUrl: cap.page6.dataUrl,
+                imageWidth: cap.page6.width,
+                imageHeight: cap.page6.height,
+                pageNumber: 6,
+                fileName,
+              }}
             />
           ) : (
             <PdfPage6ModelGraph data={data.page6} />
@@ -92,7 +122,13 @@ export const MyEnergyPdfDocument: React.FC<{ data: MyEnergyPdfData }> = ({
 
           {cap.page7 ? (
             <PdfImagePage
-              data={{ imageDataUrl: cap.page7, pageNumber: 7, fileName }}
+              data={{
+                imageDataUrl: cap.page7.dataUrl,
+                imageWidth: cap.page7.width,
+                imageHeight: cap.page7.height,
+                pageNumber: 7,
+                fileName,
+              }}
             />
           ) : (
             <PdfPage7ModelImage data={data.page7} />
