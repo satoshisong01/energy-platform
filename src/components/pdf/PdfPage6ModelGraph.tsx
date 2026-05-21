@@ -1,6 +1,6 @@
 /**
  * [PDF 페이지 6] RE100 에너지 발전 수익 분석 그래프 (일일 평균)
- * 시간대별 (24시간) 발전·사용·EC 방전 패턴 차트
+ * 시간대별 (24시간) 발전·사용·EC 방전 패턴 차트 (부드러운 곡선)
  */
 import React from 'react';
 import {
@@ -8,7 +8,7 @@ import {
   View,
   Text,
   Svg,
-  Polyline,
+  Path,
   Rect,
   Line,
   Text as SvgText,
@@ -40,6 +40,32 @@ const HeaderRow = () => (
   </View>
 );
 
+/** Catmull-Rom 스플라인 → 베지어 변환으로 부드러운 곡선 생성 */
+const buildSmoothPath = (points: Array<[number, number]>): string => {
+  if (points.length === 0) return '';
+  if (points.length === 1) return `M ${points[0][0]},${points[0][1]}`;
+  if (points.length === 2) {
+    return `M ${points[0][0]},${points[0][1]} L ${points[1][0]},${points[1][1]}`;
+  }
+
+  let d = `M ${points[0][0]},${points[0][1]}`;
+  const tension = 0.5;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1[0] + ((p2[0] - p0[0]) / 6) * tension * 2;
+    const cp1y = p1[1] + ((p2[1] - p0[1]) / 6) * tension * 2;
+    const cp2x = p2[0] - ((p3[0] - p1[0]) / 6) * tension * 2;
+    const cp2y = p2[1] - ((p3[1] - p1[1]) / 6) * tension * 2;
+
+    d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+};
+
 const HourlyChartSvg: React.FC<{
   data: Page6HourlyData[];
   isEcActive: boolean;
@@ -59,8 +85,13 @@ const HourlyChartSvg: React.FC<{
 
   const yPos = (val: number) => PAD_T + innerH - (val / maxY) * innerH;
 
-  const buildPoints = (key: keyof Page6HourlyData) =>
-    data.map((d, i) => `${PAD_L + i * xStep},${yPos(d[key] as number)}`).join(' ');
+  const buildSmoothLine = (key: keyof Page6HourlyData) =>
+    buildSmoothPath(
+      data.map<[number, number]>((d, i) => [
+        PAD_L + i * xStep,
+        yPos(d[key] as number),
+      ])
+    );
 
   const yTicks = 5;
   const tickVals = Array.from({ length: yTicks + 1 }, (_, i) =>
@@ -84,9 +115,9 @@ const HourlyChartSvg: React.FC<{
               strokeDasharray="2 2"
             />
             <SvgText
-              x={PAD_L - 5}
+              x={PAD_L - 8}
               y={y + 3}
-              style={{ fontSize: 7, color: PDF_COLORS.textLight }}
+              style={{ fontSize: 7, color: PDF_COLORS.textLight, textAlign: 'right' }}
             >
               {`${v}`}
             </SvgText>
@@ -94,12 +125,12 @@ const HourlyChartSvg: React.FC<{
         );
       })}
 
-      {/* X축 라벨 (3시간 간격) */}
+      {/* X축 라벨 (3시간 간격, 중앙 정렬) */}
       {data.map((d, i) =>
         i % 3 === 0 ? (
           <SvgText
             key={i}
-            x={PAD_L + i * xStep}
+            x={PAD_L + i * xStep - 6}
             y={HEIGHT - PAD_B + 12}
             style={{ fontSize: 7, color: PDF_COLORS.textLight }}
           >
@@ -108,7 +139,7 @@ const HourlyChartSvg: React.FC<{
         ) : null
       )}
 
-      {/* 잉여 영역 (빨강 빗금 아닌 단색 area 형태로 단순화: 잉여 = 발전-사용 영역) */}
+      {/* 잉여 영역 (빨강 옅은) */}
       {data.map((d, i) => {
         if (d.generation <= d.usage) return null;
         const x = PAD_L + i * xStep - xStep / 2;
@@ -127,30 +158,30 @@ const HourlyChartSvg: React.FC<{
         );
       })}
 
-      {/* 발전량 라인 (orange) */}
-      <Polyline
-        points={buildPoints('generation')}
+      {/* 발전량 곡선 (orange) */}
+      <Path
+        d={buildSmoothLine('generation')}
         fill="none"
         stroke="#f97316"
         strokeWidth={2}
       />
 
-      {/* 사용량 라인 (blue) */}
-      <Polyline
-        points={buildPoints('usage')}
+      {/* 사용량 곡선 (blue) */}
+      <Path
+        d={buildSmoothLine('usage')}
         fill="none"
         stroke={PDF_COLORS.primary}
         strokeWidth={2}
       />
 
-      {/* EC 방전 (초록, isEcActive일 때만) */}
+      {/* EC 방전 곡선 (초록, isEcActive일 때만, 점선) */}
       {isEcActive && (
-        <Polyline
-          points={buildPoints('ecDischarge')}
+        <Path
+          d={buildSmoothLine('ecDischarge')}
           fill="none"
           stroke="#16a34a"
           strokeWidth={2}
-          strokeDasharray="3 2"
+          strokeDasharray="4 2"
         />
       )}
     </Svg>

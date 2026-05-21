@@ -1,5 +1,8 @@
 /**
- * [PDF 페이지 4] 03. 월별 상세 분석 데이터 (12개월 × 10개 컬럼 표)
+ * [PDF 페이지 4] 03. 월별 상세 분석 데이터
+ *
+ * 11개 컬럼 (월 포함) — 헤더 그룹과 본문 컬럼이 동일한 % 기준으로 정렬되도록
+ * 모든 컬럼 폭을 한 곳(COLS)에서 관리.
  */
 import React from 'react';
 import { Page, View, Text } from '@react-pdf/renderer';
@@ -44,6 +47,28 @@ export interface Page4Data {
   pageNumber: number;
 }
 
+// 컬럼 폭 정의 (% 단위, 합 = 100%)
+const COLS = {
+  month: 5,
+  usage: 8,
+  self: 8,
+  gen: 9,
+  surplus: 8,
+  bill: 11,
+  base: 10,
+  saving: 11,
+  baseSaving: 10,
+  after: 11,
+  surplusRev: 9,
+};
+// 그룹 헤더 폭 (자식 컬럼 폭 합)
+const GROUP = {
+  usage: COLS.usage + COLS.self, // 16%
+  solar: COLS.gen + COLS.surplus, // 17%
+  fee: COLS.bill + COLS.base, // 21%
+  econ: COLS.saving + COLS.baseSaving + COLS.after + COLS.surplusRev, // 41%
+};
+
 const HeaderRow = () => (
   <View style={s.headerRow}>
     <Text style={s.logoBox}>FIRST C&D</Text>
@@ -56,185 +81,119 @@ const HeaderRow = () => (
 
 const cellBase = {
   paddingVertical: 3,
-  paddingHorizontal: 4,
+  paddingHorizontal: 3,
   border: `0.5px solid ${PDF_COLORS.border}`,
   fontSize: 7,
   color: PDF_COLORS.text,
   textAlign: 'right' as const,
 };
-const cellLeft = { ...cellBase, textAlign: 'left' as const };
 const cellCenter = { ...cellBase, textAlign: 'center' as const };
 const headerCell = {
-  ...cellBase,
-  fontSize: 7,
+  ...cellCenter,
   fontWeight: 700 as const,
-  textAlign: 'center' as const,
   backgroundColor: '#f1f5f9',
-  color: PDF_COLORS.text,
 };
-const headerBlue = {
-  ...headerCell,
-  backgroundColor: '#dbeafe',
-  color: PDF_COLORS.primary,
-};
-const headerOrange = {
-  ...headerCell,
-  backgroundColor: '#fed7aa',
-  color: '#9a3412',
-};
+const headerBlue = { ...headerCell, backgroundColor: '#dbeafe', color: PDF_COLORS.primary };
+const headerOrange = { ...headerCell, backgroundColor: '#fed7aa', color: '#9a3412' };
 
-// 컬럼 폭 (총 100% 기준)
-const colW = {
-  month: '4%',
-  usage: '8%',
-  self: '8%',
-  gen: '8%',
-  surplus: '8%',
-  bill: '10%',
-  base: '9%',
-  saving: '10%',
-  baseSaving: '10%',
-  after: '11%',
-  surplusRev: '10%',
-  // 합 = 96% (총합 미세조정 가능)
-};
-
-export const PdfPage4DetailTable: React.FC<{ data: Page4Data }> = ({
-  data,
-}) => (
+export const PdfPage4DetailTable: React.FC<{ data: Page4Data }> = ({ data }) => (
   <Page size={PAGE_SIZE} orientation={PAGE_ORIENTATION} style={s.page}>
     <HeaderRow />
     <Text style={s.sectionTitlePill}>03. 월별 상세 분석 데이터</Text>
 
-    {/* 표 헤더 (2행) */}
-    <View style={{ flexDirection: 'row', marginTop: 4 }}>
-      <View style={{ width: colW.month, justifyContent: 'center' }}>
-        <Text style={headerCell}>월</Text>
+    {/* === 표 헤더 (2단) === */}
+    {/* 1단: 월(rowSpan 효과) + 4개 그룹 헤더 */}
+    <View style={{ flexDirection: 'row' }}>
+      {/* 월 (2줄 높이) — minHeight 로 두 줄 합친 효과 */}
+      <View
+        style={{
+          width: `${COLS.month}%`,
+          ...headerCell,
+          paddingVertical: 12,
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 7, fontWeight: 700, textAlign: 'center' }}>월</Text>
       </View>
-      <View style={{ flexDirection: 'column', flex: 1 }}>
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ width: '17.6%' /* 8+8 = 16% of total but normalized */ }}>
-            <Text style={headerCell}>사용량 분석</Text>
-          </View>
-          <View style={{ width: '17.6%' }}>
-            <Text style={headerBlue}>태양광 발전</Text>
-          </View>
-          <View style={{ width: '20.9%' }}>
-            <Text style={headerOrange}>요금 분석 (원)</Text>
-          </View>
-          <View style={{ width: '43.9%' }}>
-            <Text style={headerOrange}>경제성 분석 (원)</Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row' }}>
-          <Text style={[headerCell, { width: '8.8%' }]}>사용량</Text>
-          <Text style={[headerCell, { width: '8.8%' }]}>자가소비</Text>
-          <Text style={[headerBlue, { width: '8.8%' }]}>발전량</Text>
-          <Text style={[headerBlue, { width: '8.8%' }]}>잉여전력</Text>
-          <Text style={[headerOrange, { width: '11%' }]}>기존요금</Text>
-          <Text style={[headerOrange, { width: '9.9%' }]}>기본요금</Text>
-          <Text style={[headerOrange, { width: '11%' }]}>최대부하절감</Text>
-          <Text style={[headerOrange, { width: '11%' }]}>기본요금절감</Text>
-          <Text style={[headerOrange, { width: '12.1%' }]}>설치후요금</Text>
-          <Text style={[headerOrange, { width: '11%' }]}>잉여수익</Text>
-        </View>
-      </View>
+      <Text style={[headerCell, { width: `${GROUP.usage}%` }]}>사용량 분석</Text>
+      <Text style={[headerBlue, { width: `${GROUP.solar}%` }]}>태양광 발전</Text>
+      <Text style={[headerOrange, { width: `${GROUP.fee}%` }]}>요금 분석 (원)</Text>
+      <Text style={[headerOrange, { width: `${GROUP.econ}%` }]}>경제성 분석 (원)</Text>
     </View>
 
-    {/* 표 본문 — 12개월 행 */}
+    {/* 2단: 각 컬럼 라벨 */}
+    <View style={{ flexDirection: 'row' }}>
+      <View style={{ width: `${COLS.month}%` }} />
+      <Text style={[headerCell, { width: `${COLS.usage}%` }]}>사용량</Text>
+      <Text style={[headerCell, { width: `${COLS.self}%` }]}>자가소비</Text>
+      <Text style={[headerBlue, { width: `${COLS.gen}%` }]}>발전량</Text>
+      <Text style={[headerBlue, { width: `${COLS.surplus}%` }]}>잉여전력</Text>
+      <Text style={[headerOrange, { width: `${COLS.bill}%` }]}>기존요금</Text>
+      <Text style={[headerOrange, { width: `${COLS.base}%` }]}>기본요금</Text>
+      <Text style={[headerOrange, { width: `${COLS.saving}%` }]}>최대부하절감</Text>
+      <Text style={[headerOrange, { width: `${COLS.baseSaving}%` }]}>기본요금절감</Text>
+      <Text style={[headerOrange, { width: `${COLS.after}%` }]}>설치후요금</Text>
+      <Text style={[headerOrange, { width: `${COLS.surplusRev}%` }]}>잉여수익</Text>
+    </View>
+
+    {/* === 본문 12개월 === */}
     {data.rows.map((row) => (
       <View key={row.month} style={{ flexDirection: 'row' }}>
-        <Text style={[cellCenter, { width: colW.month }]}>{row.month}월</Text>
-        <Text style={[cellBase, { width: colW.usage }]}>
-          {row.usageKwh.toLocaleString()}
-        </Text>
-        <Text style={[cellBase, { width: colW.self }]}>
-          {row.selfConsumption.toLocaleString()}
-        </Text>
-        <Text
-          style={[
-            cellBase,
-            { width: colW.gen, color: PDF_COLORS.primary, fontWeight: 700 },
-          ]}
-        >
+        <Text style={[cellCenter, { width: `${COLS.month}%` }]}>{row.month}월</Text>
+        <Text style={[cellBase, { width: `${COLS.usage}%` }]}>{row.usageKwh.toLocaleString()}</Text>
+        <Text style={[cellBase, { width: `${COLS.self}%` }]}>{row.selfConsumption.toLocaleString()}</Text>
+        <Text style={[cellBase, { width: `${COLS.gen}%`, color: PDF_COLORS.primary, fontWeight: 700 }]}>
           {Math.round(row.solarGeneration).toLocaleString()}
         </Text>
-        <Text style={[cellBase, { width: colW.surplus }]}>
-          {Math.round(row.surplusPower).toLocaleString()}
-        </Text>
-        <Text style={[cellBase, { width: colW.bill }]}>
-          {Math.round(row.totalBill).toLocaleString()}
-        </Text>
-        <Text style={[cellBase, { width: colW.base }]}>
-          {Math.round(row.baseBill).toLocaleString()}
-        </Text>
-        <Text
-          style={[cellBase, { width: colW.saving, color: '#ea580c' }]}
-        >
+        <Text style={[cellBase, { width: `${COLS.surplus}%` }]}>{Math.round(row.surplusPower).toLocaleString()}</Text>
+        <Text style={[cellBase, { width: `${COLS.bill}%` }]}>{Math.round(row.totalBill).toLocaleString()}</Text>
+        <Text style={[cellBase, { width: `${COLS.base}%` }]}>{Math.round(row.baseBill).toLocaleString()}</Text>
+        <Text style={[cellBase, { width: `${COLS.saving}%`, color: '#ea580c' }]}>
           {Math.round(row.maxLoadSavings).toLocaleString()}
         </Text>
-        <Text
-          style={[cellBase, { width: colW.baseSaving, color: '#ea580c' }]}
-        >
+        <Text style={[cellBase, { width: `${COLS.baseSaving}%`, color: '#ea580c' }]}>
           {Math.round(row.baseBillSavings).toLocaleString()}
         </Text>
-        <Text
-          style={[
-            cellBase,
-            { width: colW.after, color: PDF_COLORS.primary, fontWeight: 700 },
-          ]}
-        >
+        <Text style={[cellBase, { width: `${COLS.after}%`, color: PDF_COLORS.primary, fontWeight: 700 }]}>
           {Math.round(row.afterBill).toLocaleString()}
         </Text>
-        <Text
-          style={[
-            cellBase,
-            { width: colW.surplusRev, color: '#16a34a', fontWeight: 700 },
-          ]}
-        >
+        <Text style={[cellBase, { width: `${COLS.surplusRev}%`, color: '#16a34a', fontWeight: 700 }]}>
           {Math.round(row.surplusRevenue).toLocaleString()}
         </Text>
       </View>
     ))}
 
     {/* 합계 행 */}
-    <View
-      style={{
-        flexDirection: 'row',
-        backgroundColor: '#fef3c7',
-      }}
-    >
-      <Text style={[cellCenter, { width: colW.month, fontWeight: 800 }]}>
-        합계
-      </Text>
-      <Text style={[cellBase, { width: colW.usage, fontWeight: 800 }]}>
+    <View style={{ flexDirection: 'row', backgroundColor: '#fef3c7' }}>
+      <Text style={[cellCenter, { width: `${COLS.month}%`, fontWeight: 800 }]}>합계</Text>
+      <Text style={[cellBase, { width: `${COLS.usage}%`, fontWeight: 800 }]}>
         {data.totals.usageKwh.toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.self, fontWeight: 800 }]}>
+      <Text style={[cellBase, { width: `${COLS.self}%`, fontWeight: 800 }]}>
         {data.totals.selfConsumption.toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.gen, fontWeight: 800, color: PDF_COLORS.primary }]}>
+      <Text style={[cellBase, { width: `${COLS.gen}%`, fontWeight: 800, color: PDF_COLORS.primary }]}>
         {Math.round(data.totals.solarGeneration).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.surplus, fontWeight: 800 }]}>
+      <Text style={[cellBase, { width: `${COLS.surplus}%`, fontWeight: 800 }]}>
         {Math.round(data.totals.surplusPower).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.bill, fontWeight: 800 }]}>
+      <Text style={[cellBase, { width: `${COLS.bill}%`, fontWeight: 800 }]}>
         {Math.round(data.totals.totalBill).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.base, fontWeight: 800 }]}>
+      <Text style={[cellBase, { width: `${COLS.base}%`, fontWeight: 800 }]}>
         {Math.round(data.totals.baseBill).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.saving, fontWeight: 800, color: '#ea580c' }]}>
+      <Text style={[cellBase, { width: `${COLS.saving}%`, fontWeight: 800, color: '#ea580c' }]}>
         {Math.round(data.totals.maxLoadSavings).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.baseSaving, fontWeight: 800, color: '#ea580c' }]}>
+      <Text style={[cellBase, { width: `${COLS.baseSaving}%`, fontWeight: 800, color: '#ea580c' }]}>
         {Math.round(data.totals.baseBillSavings).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.after, fontWeight: 800, color: PDF_COLORS.primary }]}>
+      <Text style={[cellBase, { width: `${COLS.after}%`, fontWeight: 800, color: PDF_COLORS.primary }]}>
         {Math.round(data.totals.afterBill).toLocaleString()}
       </Text>
-      <Text style={[cellBase, { width: colW.surplusRev, fontWeight: 800, color: '#16a34a' }]}>
+      <Text style={[cellBase, { width: `${COLS.surplusRev}%`, fontWeight: 800, color: '#16a34a' }]}>
         {Math.round(data.totals.surplusRevenue).toLocaleString()}
       </Text>
     </View>
@@ -259,14 +218,8 @@ export const PdfPage4DetailTable: React.FC<{ data: Page4Data }> = ({
       </View>
     )}
 
-    {/* 요약 박스 */}
-    <View
-      style={{
-        flexDirection: 'row',
-        marginTop: 6,
-        gap: 4,
-      }}
-    >
+    {/* 요약 박스 4개 */}
+    <View style={{ flexDirection: 'row', marginTop: 6, gap: 4 }}>
       <View style={{ flex: 1, padding: 4, backgroundColor: '#f1f5f9', borderRadius: 3 }}>
         <Text style={{ fontSize: 6, color: PDF_COLORS.textMuted }}>예상 절감율</Text>
         <Text style={{ fontSize: 11, fontWeight: 800, color: '#22c55e' }}>

@@ -80,7 +80,6 @@ const thead = {
   fontWeight: 700 as const,
   color: 'white',
 };
-const fmtWon = (v: number) => Math.round(v).toLocaleString();
 const fmtUk = (v: number) => (v / 100000000).toFixed(2);
 
 export const PdfPage5Financial: React.FC<{ data: Page5Data }> = ({ data }) => (
@@ -244,63 +243,78 @@ export const PdfPage5Financial: React.FC<{ data: Page5Data }> = ({ data }) => (
           <Text style={[thead, { width: '15%' }]}>단가 (원)</Text>
           <Text style={[thead, { width: '20%' }]}>금액 (억원)</Text>
         </View>
-        {/* 수익 4행 */}
-        {[
-          {
-            구분: '수익',
-            상세: '① 자가소비(최대부하) 절감',
-            물량: data.volumeSelf,
-            단가: data.appliedSavingsPrice,
-            금액: data.revenueSaving,
-            rowSpan: true,
-          },
-          {
-            구분: '',
-            상세: '② 잉여 한전 판매 수익',
-            물량: data.surplusVolume,
-            단가: data.kepcoUnitPrice,
-            금액: data.revenueSurplus,
-          },
-          {
-            구분: '',
-            상세: '③ EC-전력 판매 수익',
-            물량: data.volumeEc,
-            단가: data.appliedSellPrice,
-            금액: data.revenueEc,
-          },
-          {
-            구분: '',
-            상세: '④ 기본료 절감',
-            물량: 0,
-            단가: 0,
-            금액: data.revenueBaseBillSavings,
-            isBaseBill: true,
-          },
-        ].map((row, i) => (
-          <View key={i} style={{ flexDirection: 'row' }}>
-            <Text style={[tcellCenter, { width: '12%', fontWeight: row.rowSpan ? 800 : 400 }]}>
-              {row.구분}
+        {/* 수익 4행 — '수익' 라벨이 4행을 세로로 잇는 rowSpan 효과 */}
+        <View style={{ flexDirection: 'row' }}>
+          {/* 좌측 '수익' 통합 라벨 (rowSpan=4) */}
+          <View
+            style={{
+              width: '12%',
+              border: `0.5px solid ${PDF_COLORS.border}`,
+              backgroundColor: '#f8fafc',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 9, fontWeight: 800, color: PDF_COLORS.text }}>
+              수익
             </Text>
-            <Text style={[tcellLeft, { width: '36%' }]}>{row.상세}</Text>
-            <Text
-              style={[
-                tcell,
-                { width: '17%', backgroundColor: '#fce7f3' },
-              ]}
-            >
-              {row.isBaseBill ? '-' : Math.round(row.물량).toLocaleString()}
-            </Text>
-            <Text
-              style={[
-                tcell,
-                { width: '15%', backgroundColor: '#fef9c3' },
-              ]}
-            >
-              {row.isBaseBill ? '-' : row.단가.toLocaleString()}
-            </Text>
-            <Text style={[tcell, { width: '20%' }]}>{fmtUk(row.금액)}</Text>
           </View>
-        ))}
+          {/* 우측 4행 */}
+          <View style={{ width: '88%' }}>
+            {[
+              {
+                상세: '① 자가소비(최대부하) 절감',
+                물량: data.volumeSelf,
+                단가: data.appliedSavingsPrice,
+                금액: data.revenueSaving,
+              },
+              {
+                상세: '② 잉여 한전 판매 수익',
+                물량: data.surplusVolume,
+                단가: data.kepcoUnitPrice,
+                금액: data.revenueSurplus,
+              },
+              {
+                상세: '③ EC-전력 판매 수익',
+                물량: data.volumeEc,
+                단가: data.appliedSellPrice,
+                금액: data.revenueEc,
+              },
+              {
+                상세: '④ 기본료 절감',
+                물량: 0,
+                단가: 0,
+                금액: data.revenueBaseBillSavings,
+                isBaseBill: true,
+              },
+            ].map((row, i) => (
+              <View key={i} style={{ flexDirection: 'row' }}>
+                <Text style={[tcellLeft, { width: `${(36 / 88) * 100}%` }]}>
+                  {row.상세}
+                </Text>
+                <Text
+                  style={[
+                    tcell,
+                    { width: `${(17 / 88) * 100}%`, backgroundColor: '#fce7f3' },
+                  ]}
+                >
+                  {row.isBaseBill ? '-' : Math.round(row.물량).toLocaleString()}
+                </Text>
+                <Text
+                  style={[
+                    tcell,
+                    { width: `${(15 / 88) * 100}%`, backgroundColor: '#fef9c3' },
+                  ]}
+                >
+                  {row.isBaseBill ? '-' : row.단가.toLocaleString()}
+                </Text>
+                <Text style={[tcell, { width: `${(20 / 88) * 100}%` }]}>
+                  {fmtUk(row.금액)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
         {/* 연간 수익 총액 */}
         <View style={{ flexDirection: 'row', backgroundColor: '#dcfce7' }}>
           <Text
