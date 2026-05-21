@@ -168,7 +168,7 @@ type SimulationResult = {
   share_transfer_years: number; // 소유권 이전 시점(년)
 };
 
-interface ProposalState {
+export interface ProposalState {
   siteImage: string | null;
   proposalId: number | null;
   proposalName: string;

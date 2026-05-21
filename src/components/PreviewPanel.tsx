@@ -18,6 +18,7 @@ import PreviewSummary from './preview/PreviewSummary';
 import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
 import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 import { computeMonthlyEnergyMetrics } from '../lib/energyCalculations';
+import { PdfDownloadButton } from './pdf/PdfDownloadButton';
 
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -105,13 +106,16 @@ export default function PreviewPanel() {
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
             <p className={styles.companySub}>FIRST C&D Inc.</p>
           </div>
-          {/* 상단 컨트롤바가 따로 없으므로 여기 버튼 유지 */}
-          <button
-            onClick={handlePrint}
-            className={`${styles.printButton} no-print`}
-          >
-            <LucidePrinter size={18} /> PDF 저장 / 인쇄
-          </button>
+          {/* 상단 컨트롤바 — 기존 인쇄 버튼 + 신규 PDF 직접 생성 버튼(베타) */}
+          <div className="flex gap-2 no-print">
+            <PdfDownloadButton />
+            <button
+              onClick={handlePrint}
+              className={`${styles.printButton} no-print`}
+            >
+              <LucidePrinter size={18} /> PDF 저장 / 인쇄
+            </button>
+          </div>
         </div>
 
         <div className={styles.titleSection} style={{ width: '100%' }}>
