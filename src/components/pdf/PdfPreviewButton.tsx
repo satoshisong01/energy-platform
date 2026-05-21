@@ -1,14 +1,18 @@
 'use client';
 
 /**
- * PDF 다운로드 버튼 — 9 페이지 전체 (청정수소 모드면 페이지 1만)
+ * PDF 미리보기 버튼
  *
- * - PDFDownloadLink 는 SSR 비호환 → dynamic import
+ * 클릭 → 웹 미리보기 화면 캡처(3~7페이지) → 모달에 @react-pdf 의 PDFViewer 로
+ * 전체 PDF 를 실시간 렌더해서 보여준다. 모달 안에서 그대로 다운로드 가능.
+ *
+ * - PDFViewer / PDFDownloadLink 는 SSR 비호환 → dynamic import
  * - data 객체 useMemo + React.memo 로 1초 리렌더링 차단
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { LucideDownload, LucideLoader2 } from 'lucide-react';
+import type { DocumentProps } from '@react-pdf/renderer';
+import { LucideEye, LucideDownload, LucideLoader2, LucideX } from 'lucide-react';
 import { useProposalStore, type ProposalState } from '../../lib/store';
 import { computeHydrogenComparison } from '../../lib/hydrogenCalculations';
 import { computeMonthlyEnergyMetrics } from '../../lib/energyCalculations';
@@ -24,15 +28,21 @@ import type { Page8Data } from './PdfPage8Comparison';
 import type { Page9Data } from './PdfPage9Requirements';
 import { buildHourlyData } from './buildHourlyData';
 
-const PDFDownloadLink = dynamic(
-  () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
-  { ssr: false, loading: () => <Spinner /> }
+const PDFViewer = dynamic(
+  () => import('@react-pdf/renderer').then((mod) => mod.PDFViewer),
+  { ssr: false, loading: () => <ViewerSpinner /> }
 );
 
-const Spinner: React.FC = () => (
-  <span className="inline-flex items-center gap-1 text-xs text-cyan-700">
-    <LucideLoader2 size={12} className="animate-spin" /> 준비 중...
-  </span>
+const PDFDownloadLink = dynamic(
+  () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
+  { ssr: false, loading: () => <span className="text-xs">준비 중...</span> }
+);
+
+const ViewerSpinner: React.FC = () => (
+  <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm gap-2">
+    <LucideLoader2 size={18} className="animate-spin" />
+    PDF 렌더링 중...
+  </div>
 );
 
 // ---- 페이지별 데이터 빌더 ----
@@ -367,8 +377,6 @@ function buildPage6Data(store: ProposalState): Page6Data {
 }
 
 function buildPage7Data(store: ProposalState): Page7Data {
-  // PreviewModelImage 의 기본 모델 (현재 선택된 사업모델에 대응)
-  // 단순화: 모델 선택 UI는 PDF 에 그대로 반영 불가하므로 selectedModel 기반 안내만
   const modelLabelMap: Record<string, string> = {
     KEPCO: '한전 장기 계약형',
     RE100: 'RE100 / REC 1.5',
@@ -376,7 +384,7 @@ function buildPage7Data(store: ProposalState): Page7Data {
   };
   return {
     modelLabel: modelLabelMap[store.selectedModel] || store.selectedModel,
-    modelType: 'video', // 모든 모델이 영상 — PDF 에서는 안내문구로 대체됨
+    modelType: 'video',
     modelSrc: '',
     fileName: store.getProposalFileName(),
     pageNumber: 7,
@@ -485,8 +493,6 @@ function buildAllPdfData(store: ProposalState): MyEnergyPdfData {
 /**
  * 페이지 3~7 의 웹 미리보기 화면을 html2canvas-pro 로 캡처해
  * { dataUrl, width, height } 맵으로 반환. 캡처 실패한 페이지는 undefined → native 폴백.
- *
- * width/height 는 PdfImagePage 에서 A4 가로 content 영역에 비율 유지 fit 계산용.
  */
 async function captureSections(): Promise<MyEnergyPdfData['captures']> {
   if (typeof window === 'undefined') return {};
@@ -509,7 +515,7 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
     try {
       const canvas = await html2canvas(el, {
         backgroundColor: '#ffffff',
-        scale: 2, // 고해상도
+        scale: 2,
         useCORS: true,
         logging: false,
       });
@@ -519,25 +525,116 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
         height: canvas.height,
       };
     } catch (err) {
-      // 캡처 실패 시 해당 페이지만 폴백
       console.warn(`[PDF] page ${n} 캡처 실패 — native 폴백`, err);
     }
   }
   return result;
 }
 
-/** 본체 컴포넌트 (React.memo 로 감싸서 export) */
-const PdfDownloadButtonInner: React.FC = () => {
+// ----------------------------------------------------------------
+// 미리보기 모달
+// ----------------------------------------------------------------
+interface PdfPreviewModalProps {
+  data: MyEnergyPdfData;
+  pdfDocument: React.ReactElement<DocumentProps>;
+  onClose: () => void;
+}
+
+const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
+  data,
+  pdfDocument,
+  onClose,
+}) => {
+  // ESC 키로 닫기
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    // 모달 열려 있는 동안 body 스크롤 차단
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4 no-print"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-2xl w-full max-w-[1200px] h-[92vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 상단 바 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <LucideEye size={18} className="text-cyan-700" />
+            <h3 className="font-bold text-slate-800 text-sm">
+              PDF 미리보기 — {data.page1.fileName}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <PDFDownloadLink
+              document={pdfDocument}
+              fileName={`${data.page1.fileName}.pdf`}
+              className="flex items-center gap-1 bg-cyan-700 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-800 transition shadow-sm"
+            >
+              {({ loading }) =>
+                loading ? (
+                  <>
+                    <LucideLoader2 size={14} className="animate-spin" />
+                    준비 중...
+                  </>
+                ) : (
+                  <>
+                    <LucideDownload size={14} />
+                    PDF 다운로드
+                  </>
+                )
+              }
+            </PDFDownloadLink>
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-300 transition"
+              aria-label="미리보기 닫기"
+            >
+              <LucideX size={14} />
+              닫기
+            </button>
+          </div>
+        </div>
+
+        {/* 미리보기 본문 */}
+        <div className="flex-1 bg-slate-100 overflow-hidden">
+          <PDFViewer width="100%" height="100%" showToolbar={false}>
+            {pdfDocument}
+          </PDFViewer>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ----------------------------------------------------------------
+// 본체 버튼
+// ----------------------------------------------------------------
+const PdfPreviewButtonInner: React.FC = () => {
   const store = useProposalStore();
   const [data, setData] = useState<MyEnergyPdfData | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  const prepare = useCallback(async () => {
+  const prepareAndOpen = useCallback(async () => {
     setIsCapturing(true);
     try {
       const base = buildAllPdfData(store);
       const captures = store.showHydrogen ? {} : await captureSections();
       setData({ ...base, captures });
+      setShowModal(true);
     } finally {
       setIsCapturing(false);
     }
@@ -548,13 +645,13 @@ const PdfDownloadButtonInner: React.FC = () => {
     [data]
   );
 
-  if (!data || !pdfDocument) {
-    return (
+  return (
+    <>
       <button
-        onClick={prepare}
+        onClick={prepareAndOpen}
         disabled={isCapturing}
         className="flex items-center gap-1 bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-700 transition shadow-sm no-print disabled:opacity-60"
-        title="9 페이지 전체를 정확한 A4 가로 PDF로 다운로드 (3~7페이지는 웹 화면 캡처 사용)"
+        title="9 페이지 전체 PDF를 팝업 미리보기로 확인 후 다운로드"
       >
         {isCapturing ? (
           <>
@@ -562,42 +659,20 @@ const PdfDownloadButtonInner: React.FC = () => {
           </>
         ) : (
           <>
-            <LucideDownload size={16} /> PDF 다운로드
+            <LucideEye size={16} /> PDF 미리보기
           </>
         )}
       </button>
-    );
-  }
 
-  return (
-    <div className="flex items-center gap-1 no-print">
-      <PDFDownloadLink
-        document={pdfDocument}
-        fileName={`${data.page1.fileName}.pdf`}
-        className="flex items-center gap-1 bg-cyan-700 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-cyan-800 transition shadow-sm"
-      >
-        {({ loading }) =>
-          loading ? (
-            <>
-              <LucideLoader2 size={16} className="animate-spin" /> 생성 중...
-            </>
-          ) : (
-            <>
-              <LucideDownload size={16} /> PDF 다운로드
-            </>
-          )
-        }
-      </PDFDownloadLink>
-      <button
-        onClick={prepare}
-        disabled={isCapturing}
-        className="text-[10px] text-cyan-700 underline hover:text-cyan-900 disabled:opacity-50"
-        title="현재 입력값으로 PDF 다시 빌드 (3~7페이지 재캡처 포함)"
-      >
-        {isCapturing ? '캡처 중...' : '새로고침'}
-      </button>
-    </div>
+      {showModal && data && pdfDocument && (
+        <PdfPreviewModal
+          data={data}
+          pdfDocument={pdfDocument}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
   );
 };
 
-export const PdfDownloadButton = React.memo(PdfDownloadButtonInner);
+export const PdfPreviewButton = React.memo(PdfPreviewButtonInner);

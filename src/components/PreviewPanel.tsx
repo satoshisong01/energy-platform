@@ -3,7 +3,6 @@
 import React from 'react';
 import { useProposalStore } from '../lib/store';
 import styles from './PreviewPanel.module.css';
-import { LucidePrinter } from 'lucide-react';
 
 // 분리된 컴포넌트 임포트
 import PreviewChart from './preview/PreviewChart';
@@ -18,7 +17,7 @@ import PreviewSummary from './preview/PreviewSummary';
 import PreviewRequirementsTable from './preview/PreviewRequirementsTable';
 import PreviewSiteAnalysis from './preview/PreviewSiteAnalysis';
 import { computeMonthlyEnergyMetrics } from '../lib/energyCalculations';
-import { PdfDownloadButton } from './pdf/PdfDownloadButton';
+import { PdfPreviewButton } from './pdf/PdfPreviewButton';
 
 // [Helper] 반올림
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -54,10 +53,6 @@ export default function PreviewPanel() {
     ecSelfConsumptionCount,
     showHydrogen, // 청정수소 발전 모드: 수소 박스 + PDF 버튼만 표시
   } = store;
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const {
     computedData: baseComputedData,
@@ -106,15 +101,9 @@ export default function PreviewPanel() {
             <h2 className={styles.companyName}>(주)퍼스트씨앤디</h2>
             <p className={styles.companySub}>FIRST C&D Inc.</p>
           </div>
-          {/* 상단 컨트롤바 — 기존 인쇄 버튼 + 신규 PDF 직접 생성 버튼(베타) */}
+          {/* 상단 컨트롤바 — PDF 미리보기(팝업) → 모달 안에서 다운로드 */}
           <div className="flex gap-2 no-print">
-            <PdfDownloadButton />
-            <button
-              onClick={handlePrint}
-              className={`${styles.printButton} no-print`}
-            >
-              <LucidePrinter size={18} /> PDF 저장 / 인쇄
-            </button>
+            <PdfPreviewButton />
           </div>
         </div>
 
