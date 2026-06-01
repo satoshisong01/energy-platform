@@ -59,6 +59,19 @@ export interface Page1Data {
   shareRevenueAvgUk: number;
   shareSaveRate: number;
   showRentSub: boolean;
+  // "REC 5.0 비교" 확장 (웹 미리보기와 동일, 토글 ON 시에만 노출)
+  showExpansion: boolean;
+  expansion?: {
+    title: string;
+    invest: number; // 억원
+    ecCount: number;
+    annualProfit: number; // 억원
+    modelName: string;
+    totalProfit20: number; // 억원
+    profitRate: number; // %
+    roiYears: number;
+    deltaTotalProfit20: number; // 억원 (TYPE B - TYPE A, "Basic 대비")
+  };
   // 수소 모드용
   hydrogen?: HydrogenComparisonResult;
   fileName: string;
@@ -414,6 +427,95 @@ const PlanCard: React.FC<{ d: Page1Data }> = ({ d }) => (
   </View>
 );
 
+// "REC 5.0 비교" 확장 카드 (TYPE B) — 웹 미리보기 renderRow(expData) 와 동일 정보
+const ExpansionCard: React.FC<{ d: Page1Data }> = ({ d }) => {
+  const e = d.expansion;
+  if (!e) return null;
+  const AMBER = '#d97706';
+  return (
+    <View style={{ marginTop: 6 }}>
+      {/* 구분선 + "수익 극대화" 라벨 */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginBottom: 3,
+          gap: 4,
+        }}
+      >
+        <View style={{ flex: 1, height: 1, backgroundColor: '#fcd34d' }} />
+        <Text style={{ fontSize: 7, fontWeight: 800, color: AMBER }}>
+          ▼ 수익 극대화
+        </Text>
+        <View style={{ flex: 1, height: 1, backgroundColor: '#fcd34d' }} />
+      </View>
+      <Text style={{ fontSize: 8, fontWeight: 800, color: AMBER, marginBottom: 3 }}>
+        {e.title}
+      </Text>
+      <View style={s.flowRow}>
+        <View style={s.flowCard}>
+          <Text style={[s.flowCardHeader, { color: AMBER }]}>투자 (Investment)</Text>
+          <View style={s.flowCardBody}>
+            <Text style={s.flowCardValue}>
+              {e.invest.toFixed(2)} <Text style={s.flowCardUnit}>억원</Text>
+            </Text>
+            <Text style={s.flowCardUnit}>용량 {d.capacityKw} kW</Text>
+            <Text style={s.flowCardUnit}>
+              EC설비 {e.ecCount > 0 ? `${e.ecCount} 대` : '미적용'}
+            </Text>
+          </View>
+        </View>
+        <View style={s.flowCard}>
+          <Text style={[s.flowCardHeader, { color: AMBER }]}>연간 수익 (1차년)</Text>
+          <View style={s.flowCardBody}>
+            <Text style={s.flowCardValue}>
+              {e.annualProfit.toFixed(2)} <Text style={s.flowCardUnit}>억원</Text>
+            </Text>
+            <Text style={[s.flowCardUnit, { color: AMBER, fontWeight: 700 }]}>
+              {e.modelName}
+            </Text>
+          </View>
+        </View>
+        <View style={{ width: 50, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 7, color: PDF_COLORS.danger, fontWeight: 800 }}>
+            {d.re100Rate.toFixed(0)}% RE100
+          </Text>
+          <Text style={{ fontSize: 7, color: PDF_COLORS.primaryLight, fontWeight: 800 }}>
+            {d.customSavingRate.toFixed(0)}% 절감
+          </Text>
+        </View>
+        <View style={[s.flowCard, { borderColor: '#fcd34d', backgroundColor: '#fffbeb' }]}>
+          <Text style={[s.flowCardHeader, { color: AMBER }]}>20년 누적 수익</Text>
+          <View style={s.flowCardBody}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+              <Text style={[s.flowCardValue, { color: AMBER }]}>
+                {e.totalProfit20.toFixed(2)} <Text style={s.flowCardUnit}>억원</Text>
+              </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  color: AMBER,
+                  backgroundColor: '#fef3c7',
+                  paddingHorizontal: 3,
+                  paddingVertical: 1,
+                  borderRadius: 4,
+                  fontWeight: 800,
+                }}
+              >
+                {e.profitRate.toFixed(0)}%
+              </Text>
+            </View>
+            <Text style={s.flowCardUnit}>ROI {e.roiYears.toFixed(2)}년</Text>
+            <Text style={{ fontSize: 6, color: AMBER, fontWeight: 700 }}>
+              (Basic 대비 +{e.deltaTotalProfit20.toFixed(2)}억)
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 // 하단 비교 섹션 (단순임대/RE100임대/구독/수익배분형)
 const CompSection: React.FC<{ d: Page1Data }> = ({ d }) => (
   <View style={{ marginTop: 4 }}>
@@ -487,6 +589,7 @@ export const PdfPage1Summary: React.FC<{ data: Page1Data }> = ({ data }) => (
       <>
         {!data.isSurplusDiscarded && <KepcoBox d={data} />}
         <PlanCard d={data} />
+        {data.showExpansion && <ExpansionCard d={data} />}
         <CompSection d={data} />
       </>
     )}

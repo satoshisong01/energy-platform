@@ -207,6 +207,7 @@ export interface ProposalState {
   totalInvestment: number;
   recAveragePrice: number;
   showHydrogen: boolean; // 수소발전 비교 카드/박스 표시 토글 (Step0 + Preview 동기화, 기본 OFF)
+  showExpansion: boolean; // "REC 5.0 비교" 확장 행/카드 표시 토글 (Preview + PDF 동기화, 기본 OFF)
 
   setSiteImage: (img: string | null) => void;
   setClientName: (name: string) => void;
@@ -253,6 +254,7 @@ export interface ProposalState {
   setCapacityKw: (val: number) => void;
   setRecAveragePrice: (price: number) => void;
   setShowHydrogen: (val: boolean) => void;
+  setShowExpansion: (val: boolean) => void;
   getProposalFileName: () => string;
   checkDuplicateName: (name: string, excludeId?: number) => Promise<boolean>;
   saveProposal: (customName?: string) => Promise<boolean>;
@@ -387,6 +389,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   totalInvestment: 0,
   recAveragePrice: 80,
   showHydrogen: false,
+  showExpansion: false,
 
   setSiteImage: (img) => set({ siteImage: img }),
   setClientName: (name) => set({ clientName: name }),
@@ -572,6 +575,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
   setRecAveragePrice: (price) => set({ recAveragePrice: price }),
   setShowHydrogen: (val) => set({ showHydrogen: val }),
+  setShowExpansion: (val) => set({ showExpansion: val }),
   getProposalFileName: () => {
     const state = get();
     const date = new Date();
@@ -838,6 +842,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         siteImage: data.input_data.siteImage || null,
         config: { ...get().config, ...(data.input_data.config || {}) },
         showHydrogen: false, // UI 토글은 항상 OFF로 시작 (영속화하지 않음)
+        showExpansion: false, // UI 토글은 항상 OFF로 시작 (영속화하지 않음)
       });
       get().recalculateInvestment();
       await supabase
@@ -907,6 +912,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isEcSelfConsumption: false,
       ecSelfConsumptionCount: 1,
       showHydrogen: false,
+      showExpansion: false,
     });
   },
   getSimulationResults: () => {

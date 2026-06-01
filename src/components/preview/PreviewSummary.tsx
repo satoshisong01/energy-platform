@@ -11,12 +11,12 @@ import {
   LucideFlame,
 } from 'lucide-react';
 import { computeHydrogenComparison } from '../../lib/hydrogenCalculations';
+import { computeScenarioSummary } from '../../lib/scenarioCalculations';
 
 export default function PreviewSummary() {
   const store = useProposalStore();
   const {
     config,
-    rationalization,
     isRationalizationEnabled,
     isSurplusDiscarded,
     contractType,
@@ -28,22 +28,6 @@ export default function PreviewSummary() {
   // 자가소비(고정형) 모드면 임대/구독 숨김 여부
   const showRentSub = !isEcSelfConsumption;
 
-  // [합리화 절감액]
-  const calculateRationalizationSavings = () => {
-    if (!isRationalizationEnabled) return 0;
-    const isEul = contractType.includes('(을)');
-    if (!isEul) return 0;
-    const saving_base = rationalization.base_savings_manual || 0;
-    const diff_light = rationalization.light_eul - rationalization.light_gap;
-    const saving_light = diff_light * rationalization.light_usage;
-    const diff_mid = rationalization.mid_eul - rationalization.mid_gap;
-    const saving_mid = diff_mid * rationalization.mid_usage;
-    const diff_max = rationalization.max_eul - rationalization.max_gap;
-    const saving_max = diff_max * rationalization.max_usage;
-    return saving_base + saving_light + saving_mid + saving_max;
-  };
-
-  const fixedRationalizationSavings = calculateRationalizationSavings();
   const results = store.getSimulationResults();
 
   // 일조량 설정값 사용
@@ -54,7 +38,9 @@ export default function PreviewSummary() {
     return acc + store.capacityKw * solarRadiation * days;
   }, 0);
 
-  const [showExpansion, setShowExpansion] = useState(false);
+  // "REC 5.0 비교" 확장 토글 — store 공유 (PDF 미리보기와 동기화, 기본 OFF)
+  const showExpansion = store.showExpansion;
+  const setShowExpansion = store.setShowExpansion;
 
   const [applyEc, setApplyEc] = useState(
     (store.useEc || store.isEcSelfConsumption) &&
@@ -184,160 +170,9 @@ export default function PreviewSummary() {
   };
   const kepcoData = calculateKepcoData();
 
-  // [2] 시나리오 데이터
-  const getScenarioData = (isPremium: boolean) => {
-    let activeEcCount = 0;
-    if (isEcSelfConsumption) {
-      activeEcCount = ecSelfConsumptionCount || 1;
-    } else if (store.useEc) {
-      activeEcCount = store.truckCount > 0 ? store.truckCount : 3;
-    }
-
-    const cycles = isEcSelfConsumption ? 1 : 4;
-    const ecCapacityAnnual = activeEcCount * 100 * cycles * 365;
-
-    const annualGen = simpleAnnualGen;
-    const annualSelf = store.monthlyData.reduce(
-      (acc, cur) => acc + cur.selfConsumption,
-      0
-    );
-
-    const rawSurplus = Math.max(0, annualGen - annualSelf);
-    const volume_ec = Math.min(rawSurplus, ecCapacityAnnual);
-    const volume_surplus_final = Math.max(0, rawSurplus - volume_ec);
-
-    let targetEcPrice = 0;
-    let modelName = '';
-    let currentSolarPrice = config.price_solar_standard;
-    if (store.moduleTier === 'PREMIUM')
-      currentSolarPrice = config.price_solar_premium;
-    else if (store.moduleTier === 'ECONOMY')
-      currentSolarPrice = config.price_solar_economy;
-
-    if (isEcSelfConsumption) {
-      targetEcPrice = config.unit_price_ec_self;
-      modelName = isPremium
-        ? 'EC 자가소비 (수익 극대화)'
-        : 'EC 자가소비 (배터리)';
-    } else {
-      if (isPremium) {
-        targetEcPrice = config.unit_price_ec_5_0;
-        modelName = 'REC 5.0 (예상)';
-      } else {
-        targetEcPrice = config.unit_price_ec_1_5;
-        modelName = 'REC 1.5 (현행)';
-      }
-    }
-
-    const revenue_saving =
-      Math.min(annualGen, annualSelf) *
-      (store.unitPriceSavings || config.unit_price_savings);
-    const revenue_ec = volume_ec * targetEcPrice;
-    const revenue_surplus = isSurplusDiscarded
-      ? 0
-      : volume_surplus_final * config.unit_price_kepco;
-
-    // [수정] O&M 비율 계산용 매출 (합리화 + 기본료 절감 포함)
-    const grossRevenueForOandM =
-      revenue_saving +
-      revenue_ec +
-      revenue_surplus +
-      results.revenue_base_bill_savings +
-      fixedRationalizationSavings;
-
-    // [수정] 태양광 기반 변동 매출 (합리화 제외, 매년 감소 반영용)
-    const solarBasedRevenue = revenue_saving + revenue_ec + revenue_surplus;
-
-    const isMovingEcMode = activeEcCount > 0 && !isEcSelfConsumption;
-    const laborCostWon = isMovingEcMode ? config.price_labor_ec * 100000000 : 0;
-
-    // 유지보수 비율 결정 (합리화 포함 매출 기준)
-    let scenarioMaintenanceRate = 0;
-    if (!store.isMaintenanceAuto) {
-      scenarioMaintenanceRate = store.maintenanceRate;
-    } else {
-      let targetBaseRate = isMovingEcMode ? 25.0 : 5.0;
-      const maxAvailableForOandM = Math.max(0, MAX_LIMIT - laborCostWon);
-      let revenueBasedCapRate =
-        grossRevenueForOandM > 0
-          ? (maxAvailableForOandM / grossRevenueForOandM) * 100
-          : 0;
-      scenarioMaintenanceRate = Math.min(targetBaseRate, revenueBasedCapRate);
-      scenarioMaintenanceRate = Math.floor(scenarioMaintenanceRate * 100) / 100;
-    }
-
-    // 유지보수 비용
-    const maintenanceCost =
-      (grossRevenueForOandM * scenarioMaintenanceRate) / 100 + laborCostWon;
-
-    // [수정] 1차년도 연간 순수익 (표시용) -> 합리화 제외, 기본료 절감 포함
-    // Step4의 '연간 실제 순수익'과 맞추기
-    const annualNetProfitWon =
-      solarBasedRevenue + results.revenue_base_bill_savings - maintenanceCost;
-
-    // --- 투자비 계산 ---
-    const solarCost = (capacity / 100) * currentSolarPrice;
-    const ecCost = activeEcCount * config.price_ec_unit;
-    const calculatedPlatformCost = Math.min((capacity / 100) * 0.1, 0.3);
-
-    let infraCost = 0;
-    if (isEcSelfConsumption) {
-      infraCost = calculatedPlatformCost;
-    } else if (store.useEc && activeEcCount > 0) {
-      infraCost = config.price_tractor + calculatedPlatformCost;
-    }
-
-    const investUk = solarCost + ecCost + infraCost;
-    const investWon = investUk * 100000000;
-
-    // --- 20년 수익 상세 계산 (엑셀 J16과 동일) ---
-    const degradationRateDecimal = -(store.degradationRate / 100);
-    const R = 1 + degradationRateDecimal;
-    const n = 20;
-
-    // 1. 연간 수익총액(J16) 기준 20년 수익 (기본료 포함, 등비수열 적용)
-    const annualRevenueFor20Yr =
-      solarBasedRevenue + results.revenue_base_bill_savings;
-    const totalSolarRevenue20 =
-      (annualRevenueFor20Yr * (1 - Math.pow(R, n))) / (1 - R);
-
-    // 2. 합리화 절감액 (고정) -> 20년 총액에는 포함!
-    const totalRationalization20 = fixedRationalizationSavings * 20;
-
-    // 3. 유지보수 비용: 3년 무상, 17년 유상만
-    const totalMaintenance20 = maintenanceCost * 17;
-
-    // 4. 최종 20년 순수익 (태양광20년 + 합리화20년 - 유지보수17년)
-    const totalNet20Won =
-      totalSolarRevenue20 + totalRationalization20 - totalMaintenance20;
-
-    const totalCost20 = investWon + totalMaintenance20;
-    const roiYears =
-      annualNetProfitWon > 0 ? investWon / annualNetProfitWon : 0;
-    const profitRate =
-      totalCost20 > 0 ? (totalNet20Won / totalCost20) * 100 : 0;
-
-    return {
-      title: isPremium
-        ? isEcSelfConsumption
-          ? 'TYPE B. EC 자가소비 Plan'
-          : 'TYPE B. REC 5.0 Plan'
-        : isEcSelfConsumption
-        ? 'TYPE A. EC 자가소비 Plan'
-        : 'TYPE A. REC 1.5 Plan',
-      invest: investUk,
-      ecCount: activeEcCount,
-      annualProfit: annualNetProfitWon / 100000000,
-      totalProfit20: totalNet20Won / 100000000,
-      roiYears: roiYears,
-      profitRate: profitRate,
-      isPro: isPremium,
-      modelName: modelName,
-    };
-  };
-
-  const stdData = getScenarioData(false);
-  const expData = getScenarioData(true);
+  // [2] 시나리오 데이터 — 공유 모듈로 산정 (PDF 페이지 1과 동일 산식)
+  const stdData = computeScenarioSummary(store, false);
+  const expData = computeScenarioSummary(store, true);
 
   // [수소발전 역산 비교]
   // - 1순위: 실측 연간 사용량 (totalUsage = monthlyData.usageKwh 합계)

@@ -20,6 +20,9 @@
 # production
 /build
 
+#docx
+*.docx
+
 # misc
 .DS_Store
 *.pem

@@ -16,6 +16,7 @@ import { LucideEye, LucideDownload, LucideLoader2, LucideX } from 'lucide-react'
 import { useProposalStore, type ProposalState } from '../../lib/store';
 import { computeHydrogenComparison } from '../../lib/hydrogenCalculations';
 import { computeMonthlyEnergyMetrics } from '../../lib/energyCalculations';
+import { computeScenarioSummary } from '../../lib/scenarioCalculations';
 import { MyEnergyPdfDocument, MyEnergyPdfData } from './MyEnergyPdfDocument';
 import type { Page1Data } from './PdfPage1Summary';
 import type { Page2Data } from './PdfPage2SiteAnalysis';
@@ -133,6 +134,10 @@ function buildPage1Data(store: ProposalState): Page1Data {
   const simpleRentalSaveRate =
     totalBillBefore > 0 ? ((simpleRentalUk * 100000000) / totalBillBefore) * 100 : 0;
 
+  // "REC 5.0 비교" 확장 — 웹 미리보기(PreviewSummary)와 동일 시나리오 계산
+  const scenarioStd = computeScenarioSummary(store, false);
+  const scenarioExp = computeScenarioSummary(store, true);
+
   return {
     clientName: store.clientName,
     contractType: store.contractType,
@@ -177,6 +182,18 @@ function buildPage1Data(store: ProposalState): Page1Data {
         ? (results.share_revenue_avg_yr / totalBillBefore) * 100
         : 0,
     showRentSub: !store.isEcSelfConsumption,
+    showExpansion: store.showExpansion,
+    expansion: {
+      title: scenarioExp.title,
+      invest: scenarioExp.invest,
+      ecCount: scenarioExp.ecCount,
+      annualProfit: scenarioExp.annualProfit,
+      modelName: scenarioExp.modelName,
+      totalProfit20: scenarioExp.totalProfit20,
+      profitRate: scenarioExp.profitRate,
+      roiYears: scenarioExp.roiYears,
+      deltaTotalProfit20: scenarioExp.totalProfit20 - scenarioStd.totalProfit20,
+    },
     hydrogen,
     fileName: store.getProposalFileName(),
     pageNumber: 1,
