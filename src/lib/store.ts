@@ -282,6 +282,42 @@ const DEFAULT_TARIFFS: TariffPreset[] = [
   { id: 6, name: '일반용(갑)2 고압A-선택2', baseRate: 8230, savings: 132.87 },
 ];
 
+/**
+ * 저장/복제 시 DB(input_data)에 넣을 직렬화 데이터를 구성한다.
+ * saveProposal / saveAsProposal 양쪽이 공유 → 필드 누락(drift) 방지.
+ * 주의: 토글성 UI 상태(showHydrogen, showExpansion 등)는 영속화하지 않는다.
+ */
+const buildProposalSaveData = (state: ProposalState) => ({
+  clientName: state.clientName,
+  targetDate: state.targetDate,
+  address: state.address,
+  roofAreas: state.roofAreas,
+  monthlyData: state.monthlyData,
+  contractType: state.contractType,
+  baseRate: state.baseRate,
+  unitPriceSavings: state.unitPriceSavings,
+  energyNote: state.energyNote,
+  rationalization: state.rationalization,
+  selectedModel: state.selectedModel,
+  moduleTier: state.moduleTier,
+  useEc: state.useEc,
+  truckCount: state.truckCount,
+  maintenanceRate: state.maintenanceRate,
+  isMaintenanceAuto: state.isMaintenanceAuto,
+  maintenanceCostLimit: state.maintenanceCostLimit,
+  isRationalizationEnabled: state.isRationalizationEnabled,
+  isSurplusDiscarded: state.isSurplusDiscarded,
+  isEcSelfConsumption: state.isEcSelfConsumption,
+  ecSelfConsumptionCount: state.ecSelfConsumptionCount,
+  degradationRate: state.degradationRate,
+  config: state.config,
+  financialSettings: state.financialSettings,
+  tariffPresets: state.tariffPresets,
+  recAveragePrice: state.recAveragePrice,
+  siteImage: state.siteImage,
+  capacityKw: state.capacityKw,
+});
+
 export const useProposalStore = create<ProposalState>((set, get) => ({
   // ... (초기 상태값들은 기존과 동일, 생략 없이 유지) ...
   siteImage: null,
@@ -616,36 +652,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       alert('❌ 이미 같은 이름의 분석자료가 존재합니다.');
       return false;
     }
-    const saveData = {
-      clientName: state.clientName,
-      targetDate: state.targetDate,
-      address: state.address,
-      roofAreas: state.roofAreas,
-      monthlyData: state.monthlyData,
-      contractType: state.contractType,
-      baseRate: state.baseRate,
-      unitPriceSavings: state.unitPriceSavings,
-      energyNote: state.energyNote,
-      rationalization: state.rationalization,
-      selectedModel: state.selectedModel,
-      moduleTier: state.moduleTier,
-      useEc: state.useEc,
-      truckCount: state.truckCount,
-      maintenanceRate: state.maintenanceRate,
-      isMaintenanceAuto: state.isMaintenanceAuto,
-      maintenanceCostLimit: state.maintenanceCostLimit,
-      isRationalizationEnabled: state.isRationalizationEnabled,
-      isSurplusDiscarded: state.isSurplusDiscarded,
-      isEcSelfConsumption: state.isEcSelfConsumption,
-      ecSelfConsumptionCount: state.ecSelfConsumptionCount,
-      degradationRate: state.degradationRate,
-      config: state.config,
-      financialSettings: state.financialSettings,
-      tariffPresets: state.tariffPresets,
-      recAveragePrice: state.recAveragePrice,
-      siteImage: state.siteImage,
-      capacityKw: state.capacityKw,
-    };
+    const saveData = buildProposalSaveData(state);
     try {
       if (state.proposalId) {
         const { error } = await supabase
@@ -697,35 +704,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       );
       return false;
     }
-    const saveData = {
-      clientName: state.clientName,
-      targetDate: state.targetDate,
-      address: state.address,
-      roofAreas: state.roofAreas,
-      monthlyData: state.monthlyData,
-      contractType: state.contractType,
-      baseRate: state.baseRate,
-      unitPriceSavings: state.unitPriceSavings,
-      energyNote: state.energyNote,
-      rationalization: state.rationalization,
-      selectedModel: state.selectedModel,
-      moduleTier: state.moduleTier,
-      useEc: state.useEc,
-      truckCount: state.truckCount,
-      maintenanceRate: state.maintenanceRate,
-      isMaintenanceAuto: state.isMaintenanceAuto,
-      maintenanceCostLimit: state.maintenanceCostLimit,
-      isRationalizationEnabled: state.isRationalizationEnabled,
-      isSurplusDiscarded: state.isSurplusDiscarded,
-      isEcSelfConsumption: state.isEcSelfConsumption,
-      ecSelfConsumptionCount: state.ecSelfConsumptionCount,
-      degradationRate: state.degradationRate,
-      config: state.config,
-      financialSettings: state.financialSettings,
-      tariffPresets: state.tariffPresets,
-      recAveragePrice: state.recAveragePrice,
-      capacityKw: state.capacityKw,
-    };
+    const saveData = buildProposalSaveData(state);
     try {
       const { data, error } = await supabase
         .from('proposals')
