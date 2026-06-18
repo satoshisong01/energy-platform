@@ -521,6 +521,12 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
     'page6',
     'page7',
   ];
+  // 컬럼이 많은 가로 표(월별 상세=4, 투자/수익=5)는 화면 미리보기 폭(~760px)에선
+  // 긴 숫자가 컨테이너를 넘쳐 캡처 시 우측이 잘리고, 비율상 PDF에서도 좌우 여백이 크다.
+  // → 캡처 직전에만 A4 가로 폭(약 1240px)으로 넓게 펴서 찍어 잘림 방지 + 좌우 꽉 채움.
+  //   (표는 순수 HTML이라 동기 reflow → 캡처 후 원래 폭으로 즉시 복원)
+  const WIDE_SECTIONS = new Set(['4', '5']);
+  const WIDE_CAPTURE_PX = 1240;
   const result: NonNullable<MyEnergyPdfData['captures']> = {};
 
   for (const key of pages) {
@@ -529,12 +535,24 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
       `[data-pdf-section="${n}"]`
     );
     if (!el) continue;
+
+    const isWide = WIDE_SECTIONS.has(n);
+    const prevWidth = el.style.width;
+    const prevMaxWidth = el.style.maxWidth;
+    if (isWide) {
+      el.style.width = `${WIDE_CAPTURE_PX}px`;
+      el.style.maxWidth = 'none';
+    }
+
     try {
       const canvas = await html2canvas(el, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
         logging: false,
+        ...(isWide
+          ? { width: WIDE_CAPTURE_PX, windowWidth: WIDE_CAPTURE_PX }
+          : {}),
       });
       result[key] = {
         dataUrl: canvas.toDataURL('image/png'),
@@ -543,6 +561,11 @@ async function captureSections(): Promise<MyEnergyPdfData['captures']> {
       };
     } catch (err) {
       console.warn(`[PDF] page ${n} 캡처 실패 — native 폴백`, err);
+    } finally {
+      if (isWide) {
+        el.style.width = prevWidth;
+        el.style.maxWidth = prevMaxWidth;
+      }
     }
   }
   return result;
