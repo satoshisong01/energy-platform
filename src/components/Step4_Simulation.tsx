@@ -18,6 +18,7 @@ import {
   LucideChevronDown,
   LucideChevronUp,
   LucideBattery,
+  LucidePencil,
 } from 'lucide-react';
 
 const round2 = (num: number) => Math.round(num * 100) / 100;
@@ -29,6 +30,8 @@ export default function Step4_Simulation() {
 
   const [showRationalization, setShowRationalization] = useState(false);
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
+  // EC 대수: 1·2·3대 드롭다운이 기본, 연필 클릭 시 수기 입력(10·20대 등)으로 전환
+  const [manualEc, setManualEc] = useState(false);
 
   // [중요] 알림창 중복 방지용 Ref
   const isConfirmingRef = useRef(false);
@@ -282,6 +285,21 @@ export default function Step4_Simulation() {
     store.setSimulationOption('useEc', checked);
   };
 
+  // EC 대수 입력 모드: 프리셋(1·2·3)에 없는 값이면 자동으로 수기 입력 표시
+  // (저장된 분석자료에 10·20대가 들어있어도 그대로 보이도록)
+  const EC_PRESET_COUNTS = [1, 2, 3];
+  const isCustomEcCount = !EC_PRESET_COUNTS.includes(truckCount);
+  const showManualEc = manualEc || isCustomEcCount;
+  const toggleManualEc = () => {
+    if (showManualEc) {
+      // 드롭다운으로 복귀 — 프리셋에 없는 값이면 기본 3대로 스냅
+      setManualEc(false);
+      if (isCustomEcCount) store.setTruckCount(3);
+    } else {
+      setManualEc(true);
+    }
+  };
+
   let ecRecommendation = '';
   let ecRecColor = 'text-gray-500';
   if (dailySurplus < 800) {
@@ -424,15 +442,54 @@ export default function Step4_Simulation() {
                 onChange={(e) => handleEcToggle(e.target.checked)}
               />
               {(store.useEc || store.isEcSelfConsumption) && (
-                <select
-                  className="ml-2 border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={truckCount}
-                  onChange={(e) => store.setTruckCount(Number(e.target.value))}
-                >
-                  <option value={1}>1대 (100kW)</option>
-                  <option value={2}>2대 (200kW)</option>
-                  <option value={3}>3대 (300kW)</option>
-                </select>
+                <div className="ml-2 flex items-center gap-1">
+                  {showManualEc ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="w-16 border rounded p-1 text-sm bg-white border-blue-400 focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                        value={truckCount}
+                        onChange={(e) =>
+                          store.setTruckCount(
+                            Math.max(0, Math.floor(Number(e.target.value) || 0))
+                          )
+                        }
+                      />
+                      <span className="text-sm text-slate-600 whitespace-nowrap">
+                        대 ({(truckCount * 100).toLocaleString()}kW)
+                      </span>
+                    </div>
+                  ) : (
+                    <select
+                      className="border rounded p-1 text-sm bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={truckCount}
+                      onChange={(e) => store.setTruckCount(Number(e.target.value))}
+                    >
+                      <option value={1}>1대 (100kW)</option>
+                      <option value={2}>2대 (200kW)</option>
+                      <option value={3}>3대 (300kW)</option>
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggleManualEc}
+                    title={
+                      showManualEc
+                        ? '드롭다운 선택으로 전환'
+                        : '직접 입력 (10대·20대 등)'
+                    }
+                    aria-label="EC 대수 직접 입력 전환"
+                    className={`p-1 rounded transition-colors ${
+                      showManualEc
+                        ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                        : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <LucidePencil size={15} />
+                  </button>
+                </div>
               )}
             </div>
           </div>
