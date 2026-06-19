@@ -30,8 +30,11 @@ export default function Step4_Simulation() {
 
   const [showRationalization, setShowRationalization] = useState(false);
   const [suppressCostAlerts, setSuppressCostAlerts] = useState(false);
-  // EC 대수: 1·2·3대 드롭다운이 기본, 연필 클릭 시 수기 입력(10·20대 등)으로 전환
+  // EC 대수: 1·2·3대 드롭다운이 기본, 연필 클릭 시 수기 입력(10·20대, 2.5대 등)으로 전환
   const [manualEc, setManualEc] = useState(false);
+  // 수기 입력 텍스트 — 소수점 입력 중 "2." 같은 중간 상태를 보존하기 위해 문자열로 보관
+  const [ecText, setEcText] = useState(String(truckCount));
+  const ecEditingRef = useRef(false);
 
   // [중요] 알림창 중복 방지용 Ref
   const isConfirmingRef = useRef(false);
@@ -52,6 +55,12 @@ export default function Step4_Simulation() {
     store.isEcSelfConsumption,
     store.ecSelfConsumptionCount,
   ]);
+
+  // 외부(드롭다운/불러오기/스냅)에서 truckCount가 바뀌면 수기 입력 텍스트 동기화.
+  // 단, 사용자가 입력란을 편집 중일 때는 덮어쓰지 않음(소수점 타이핑 보존).
+  useEffect(() => {
+    if (!ecEditingRef.current) setEcText(String(truckCount));
+  }, [truckCount]);
 
   // 2. 비용 자동 조정 로직
   useEffect(() => {
@@ -447,18 +456,29 @@ export default function Step4_Simulation() {
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        min={1}
-                        step={1}
+                        min={0}
+                        step="any"
                         className="w-16 border rounded p-1 text-sm bg-white border-blue-400 focus:ring-2 focus:ring-blue-500 outline-none text-right"
-                        value={truckCount}
-                        onChange={(e) =>
-                          store.setTruckCount(
-                            Math.max(0, Math.floor(Number(e.target.value) || 0))
-                          )
-                        }
+                        value={ecText}
+                        onFocus={() => {
+                          ecEditingRef.current = true;
+                        }}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setEcText(raw);
+                          const n = parseFloat(raw);
+                          if (!isNaN(n) && n >= 0) store.setTruckCount(n);
+                        }}
+                        onBlur={() => {
+                          ecEditingRef.current = false;
+                          const n = parseFloat(ecText);
+                          const safe = !isNaN(n) && n >= 0 ? n : 0;
+                          store.setTruckCount(safe);
+                          setEcText(String(safe)); // "2." → "2", "" → "0"
+                        }}
                       />
                       <span className="text-sm text-slate-600 whitespace-nowrap">
-                        대 ({(truckCount * 100).toLocaleString()}kW)
+                        대 ({Math.round(truckCount * 100).toLocaleString()}kW)
                       </span>
                     </div>
                   ) : (
