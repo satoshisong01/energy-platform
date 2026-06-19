@@ -1158,8 +1158,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       (acc, cur) => acc + cur.selfConsumption,
       0
     );
+    // 태양광으로 발전한 것보다 더 자가소비할 수는 없음 → 발전량으로 상한.
+    // 엑셀의 IF(자가소비>발전, 발전량 기준, …) 분기와 동일한 효과(절감분 = 60.5 × min(발전,자가소비)).
+    // 자가소비 < 발전(잉여 양수)이면 min=자가소비라 기존 동작과 동일, 자가소비 > 발전일 때만 교정됨.
+    const subSelfConsumed = Math.min(
+      initialAnnualGen,
+      annualSelfConsumptionForSub
+    );
     const sub_benefit_savings =
-      annualSelfConsumptionForSub * (price_standard - config.sub_price_self);
+      subSelfConsumed * (price_standard - config.sub_price_self);
     const rawSurplusForSub = Math.max(
       0,
       initialAnnualGen - annualSelfConsumptionForSub
