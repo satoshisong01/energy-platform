@@ -43,6 +43,11 @@ export default function Home() {
   );
   const warningShownRef = useRef(false);
 
+  // 전역 공통 설정(단가·금융·요금제) 불러오기 — 앱 진입 시 1회
+  useEffect(() => {
+    useProposalStore.getState().loadGlobalConfig();
+  }, []);
+
   // 상단 타이머 표시용: 남은 시간(초) 1초마다 갱신
   useEffect(() => {
     const updateRemaining = () => {

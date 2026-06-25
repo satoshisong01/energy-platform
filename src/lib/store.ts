@@ -264,6 +264,10 @@ export interface ProposalState {
   loadProposal: (id: number) => Promise<void>;
   deleteProposal: (id: number) => Promise<void>;
   resetProposal: () => void;
+  /** 전역 공통 설정(단가·금융·요금제) 불러오기 — 앱 시작 시 1회. 비어있으면 코드 기본값으로 자동 시드. */
+  loadGlobalConfig: () => Promise<void>;
+  /** 현재 단가·금융·요금제를 전역 공통 설정으로 저장 → 모든 자료에 적용. */
+  saveGlobalConfig: () => Promise<boolean>;
   getSimulationResults: () => SimulationResult;
 }
 
@@ -311,9 +315,8 @@ const buildProposalSaveData = (state: ProposalState) => ({
   isEcSelfConsumption: state.isEcSelfConsumption,
   ecSelfConsumptionCount: state.ecSelfConsumptionCount,
   degradationRate: state.degradationRate,
-  config: state.config,
-  financialSettings: state.financialSettings,
-  tariffPresets: state.tariffPresets,
+  // [전역화] config·financialSettings·tariffPresets 는 자료에 저장하지 않는다.
+  //          단가·금융·요금제는 app_config(전역 공통)에서만 관리 → 자료는 항상 최신 단가로 계산.
   recAveragePrice: state.recAveragePrice,
   siteImage: state.siteImage,
   capacityKw: state.capacityKw,
@@ -778,23 +781,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         .single();
       if (error) throw error;
       if (!data) throw new Error('데이터 없음');
-      const savedPresets = data.input_data.tariffPresets || [];
-      const newPresets = DEFAULT_TARIFFS.filter(
-        (def) =>
-          !savedPresets.find((saved: TariffPreset) => saved.id === def.id)
+      // [전역화] 단가·금융·요금제는 전역(app_config)에서 이미 로드된 값을 사용한다.
+      //          자료에 박혀 있던 옛 복사본은 무시하고, 선택한 요금제(contractType)의
+      //          기본요금·절감단가만 전역 요금제표에서 최신값으로 다시 끌어온다.
+      const globalPresets = get().tariffPresets;
+      const matchedPreset = globalPresets.find(
+        (p) => p.name === data.input_data.contractType
       );
-      const mergedPresets = [...savedPresets, ...newPresets].sort(
-        (a, b) => a.id - b.id
-      );
-      const defaultFin = get().financialSettings;
-      const savedFin = data.input_data.financialSettings || {};
-      const mergedFinancial = {
-        rps: { ...defaultFin.rps, ...(savedFin.rps || {}) },
-        factoring: {
-          ...defaultFin.factoring,
-          ...(savedFin.factoring || {}),
-        },
-      };
       let finalCapacity = data.input_data.capacityKw;
       if (finalCapacity === undefined || finalCapacity === null) {
         const totalM2 = (data.input_data.roofAreas || []).reduce(
@@ -809,8 +802,14 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
         capacityKw: finalCapacity,
-        financialSettings: mergedFinancial,
-        tariffPresets: mergedPresets,
+        // 전역 설정 유지(자료에 저장된 옛 config/financial/tariff 무시)
+        config: get().config,
+        financialSettings: get().financialSettings,
+        tariffPresets: globalPresets,
+        baseRate: matchedPreset ? matchedPreset.baseRate : data.input_data.baseRate,
+        unitPriceSavings: matchedPreset
+          ? matchedPreset.savings
+          : data.input_data.unitPriceSavings,
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
         maintenanceCostLimit: data.input_data.maintenanceCostLimit ?? 80000000,
         isRationalizationEnabled:
@@ -820,7 +819,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         ecSelfConsumptionCount: data.input_data.ecSelfConsumptionCount ?? 1,
         recAveragePrice: data.input_data.recAveragePrice ?? 80,
         siteImage: data.input_data.siteImage || null,
-        config: { ...get().config, ...(data.input_data.config || {}) },
         showHydrogen: false, // UI 토글은 항상 OFF로 시작 (영속화하지 않음)
         showExpansion: false, // UI 토글은 항상 OFF로 시작 (영속화하지 않음)
       });
@@ -884,7 +882,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       maintenanceRate: 5.0,
       totalInvestment: 0,
       recAveragePrice: 80,
-      tariffPresets: DEFAULT_TARIFFS,
+      // tariffPresets/config/financialSettings 는 전역값 유지(여기서 초기화하지 않음)
       isMaintenanceAuto: true,
       maintenanceCostLimit: 80000000,
       isRationalizationEnabled: false,
@@ -894,6 +892,47 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       showHydrogen: false,
       showExpansion: false,
     });
+  },
+  loadGlobalConfig: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('config, financial_settings, tariff_presets')
+        .eq('id', 1)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        set((state) => ({
+          config: { ...state.config, ...(data.config || {}) },
+          financialSettings: data.financial_settings || state.financialSettings,
+          tariffPresets: data.tariff_presets || state.tariffPresets,
+        }));
+        get().recalculateInvestment();
+      } else {
+        // 전역 설정이 아직 없으면 현재 코드 기본값으로 1회 시드
+        await get().saveGlobalConfig();
+      }
+    } catch (err) {
+      console.warn('전역 설정 로드 실패 — 코드 기본값 사용', err);
+    }
+  },
+  saveGlobalConfig: async () => {
+    try {
+      const state = get();
+      const { error } = await supabase.from('app_config').upsert({
+        id: 1,
+        config: state.config,
+        financial_settings: state.financialSettings,
+        tariff_presets: state.tariffPresets,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error('전역 설정 저장 실패', err);
+      alert(`전역 설정 저장 실패: ${err.message}`);
+      return false;
+    }
   },
   getSimulationResults: () => {
     const state = get();
