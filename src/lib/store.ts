@@ -907,6 +907,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
           financialSettings: data.financial_settings || state.financialSettings,
           tariffPresets: data.tariff_presets || state.tariffPresets,
         }));
+        // 현재 선택된 요금제의 기본요금·절감단가도 전역 요금제표 최신값으로 동기화.
+        // (이게 없으면 새로고침 시 tariffPresets만 갱신되고 화면의 baseRate는 옛값으로 남음)
+        const s = get();
+        const matched = s.tariffPresets.find((p) => p.name === s.contractType);
+        if (matched) {
+          set({ baseRate: matched.baseRate, unitPriceSavings: matched.savings });
+        }
         get().recalculateInvestment();
       } else {
         // 전역 설정이 아직 없으면 현재 코드 기본값으로 1회 시드
