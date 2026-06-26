@@ -25,12 +25,14 @@ export default function Step2_SiteInfo() {
   // 2. 평수 계산
   const totalAreaPyeong = totalAreaM2 / 3.3058;
 
+  // 불러온 자료면 스냅샷, 아니면 전역 단가
+  const config = store.activeConfig ?? store.config;
   // 3. 최대 설치 가능 용량 (평수 / 설정값) [NEW]
-  const factor = store.config.solar_capacity_factor || 2.0;
+  const factor = config.solar_capacity_factor || 2.0;
   const calculatedMaxCapacity = Math.floor(totalAreaPyeong / factor);
 
   // 4. 모듈 수량 계산 (설정값 사용)
-  const panelWatt = store.config.solar_panel_wattage || 645;
+  const panelWatt = config.solar_panel_wattage || 645;
   const panelCount =
     store.capacityKw > 0
       ? Math.round((store.capacityKw * 1000) / panelWatt)

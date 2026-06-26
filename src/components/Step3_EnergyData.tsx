@@ -88,7 +88,9 @@ const NumberInput = ({
 export default function Step3_EnergyData() {
   const store = useProposalStore();
   // [중요] config를 가져와야 판매단가/일조량에 접근 가능
-  const { config, monthlyData, capacityKw } = store;
+  const { monthlyData, capacityKw } = store;
+  // 불러온 자료면 스냅샷, 아니면 전역 단가
+  const config = store.activeConfig ?? store.config;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTariffChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

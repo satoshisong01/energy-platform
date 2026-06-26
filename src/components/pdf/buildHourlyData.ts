@@ -15,7 +15,7 @@ export interface HourlyPoint {
 export function buildHourlyData(
   store: ProposalState
 ): { hourly: HourlyPoint[]; isEcActive: boolean } {
-  const { config } = store;
+  const config = store.activeConfig ?? store.config;
   const solarRadiation = config.solar_radiation || 3.8;
 
   const initialAnnualGen = store.monthlyData.reduce((acc, cur) => {

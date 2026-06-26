@@ -16,7 +16,6 @@ import { computeScenarioSummary } from '../../lib/scenarioCalculations';
 export default function PreviewSummary() {
   const store = useProposalStore();
   const {
-    config,
     isRationalizationEnabled,
     isSurplusDiscarded,
     contractType,
@@ -24,6 +23,7 @@ export default function PreviewSummary() {
     ecSelfConsumptionCount,
     maintenanceCostLimit,
   } = store;
+  const config = store.activeConfig ?? store.config;
 
   // 자가소비(고정형) 모드면 임대/구독 숨김 여부
   const showRentSub = !isEcSelfConsumption;

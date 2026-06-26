@@ -49,7 +49,8 @@ const ViewerSpinner: React.FC = () => (
 // ---- 페이지별 데이터 빌더 ----
 
 function buildPage1Data(store: ProposalState): Page1Data {
-  const { config, monthlyData } = store;
+  const { monthlyData } = store;
+  const config = store.activeConfig ?? store.config;
   const solarRadiation = config.solar_radiation || 3.8;
   const totalUsage = monthlyData.reduce((acc, cur) => acc + cur.usageKwh, 0);
   const totalBillBefore = monthlyData.reduce((acc, cur) => acc + cur.totalBill, 0);
@@ -201,7 +202,8 @@ function buildPage1Data(store: ProposalState): Page1Data {
 }
 
 function buildPage2Data(store: ProposalState): Page2Data {
-  const { roofAreas, capacityKw, address, siteImage, config } = store;
+  const { roofAreas, capacityKw, address, siteImage } = store;
+  const config = store.activeConfig ?? store.config;
   const totalAreaM2 = roofAreas.reduce((acc, cur) => acc + (cur.valueM2 || 0), 0);
   const totalAreaPyeong = totalAreaM2 / 3.3058;
   const capacityFactor = config.solar_capacity_factor || 2.0;
@@ -224,13 +226,13 @@ function buildPage2Data(store: ProposalState): Page2Data {
 }
 
 function buildPage3Data(store: ProposalState): Page3Data {
+  const config = store.activeConfig ?? store.config;
   const metrics = computeMonthlyEnergyMetrics({
     monthlyData: store.monthlyData,
     capacityKw: store.capacityKw,
     baseRate: store.baseRate,
-    unitPriceSavings:
-      store.unitPriceSavings || store.config.unit_price_savings,
-    config: store.config,
+    unitPriceSavings: store.unitPriceSavings || config.unit_price_savings,
+    config,
   });
   const monthly = metrics.computedData.map((row) => ({
     name: `${row.month}월`,
@@ -253,13 +255,13 @@ function buildPage3Data(store: ProposalState): Page3Data {
 }
 
 function buildPage4Data(store: ProposalState): Page4Data {
+  const config = store.activeConfig ?? store.config;
   const metrics = computeMonthlyEnergyMetrics({
     monthlyData: store.monthlyData,
     capacityKw: store.capacityKw,
     baseRate: store.baseRate,
-    unitPriceSavings:
-      store.unitPriceSavings || store.config.unit_price_savings,
-    config: store.config,
+    unitPriceSavings: store.unitPriceSavings || config.unit_price_savings,
+    config,
   });
   return {
     rows: metrics.computedData.map((r) => ({
@@ -292,7 +294,8 @@ function buildPage4Data(store: ProposalState): Page4Data {
 }
 
 function buildPage5Data(store: ProposalState): Page5Data {
-  const { config, capacityKw, truckCount, selectedModel, moduleTier, useEc, isEcSelfConsumption, ecSelfConsumptionCount } = store;
+  const { capacityKw, truckCount, selectedModel, moduleTier, useEc, isEcSelfConsumption, ecSelfConsumptionCount } = store;
+  const config = store.activeConfig ?? store.config;
   const results = store.getSimulationResults();
   let solarPrice = config.price_solar_standard;
   if (moduleTier === 'PREMIUM') solarPrice = config.price_solar_premium;
@@ -409,7 +412,10 @@ function buildPage7Data(store: ProposalState): Page7Data {
 }
 
 function buildPage8Data(store: ProposalState): Page8Data {
-  const { config, financialSettings, isEcSelfConsumption } = store;
+  const { isEcSelfConsumption } = store;
+  const config = store.activeConfig ?? store.config;
+  const financialSettings =
+    store.activeFinancialSettings ?? store.financialSettings;
   const results = store.getSimulationResults();
   const displayedAnnualGross =
     results.revenue_saving +
@@ -482,9 +488,10 @@ function buildPage8Data(store: ProposalState): Page8Data {
 }
 
 function buildPage9Data(store: ProposalState): Page9Data {
+  const config = store.activeConfig ?? store.config;
   return {
-    loanRateRps: store.config.loan_rate_rps,
-    loanRateFactoring: store.config.loan_rate_factoring,
+    loanRateRps: config.loan_rate_rps,
+    loanRateFactoring: config.loan_rate_factoring,
     showRentSub: !store.isEcSelfConsumption,
     fileName: store.getProposalFileName(),
     pageNumber: 9,

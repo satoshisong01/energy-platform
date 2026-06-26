@@ -41,7 +41,8 @@ function calcRationalizationSavings(store: ProposalState): number {
 
 /** 단순 연간 발전량 (일조량 × 용량 × 일수, 365일 평년 기준 월별 합산) */
 function calcSimpleAnnualGen(store: ProposalState): number {
-  const solarRadiation = store.config.solar_radiation || 3.8;
+  const solarRadiation =
+    (store.activeConfig ?? store.config).solar_radiation || 3.8;
   return store.monthlyData.reduce((acc, cur) => {
     const days = new Date(2025, cur.month, 0).getDate();
     return acc + store.capacityKw * solarRadiation * days;
@@ -55,8 +56,9 @@ export function computeScenarioSummary(
   store: ProposalState,
   isPremium: boolean
 ): ScenarioSummary {
-  const { config, isEcSelfConsumption, ecSelfConsumptionCount, isSurplusDiscarded } =
+  const { isEcSelfConsumption, ecSelfConsumptionCount, isSurplusDiscarded } =
     store;
+  const config = store.activeConfig ?? store.config;
   const capacity = store.capacityKw;
   const MAX_LIMIT = store.maintenanceCostLimit;
 

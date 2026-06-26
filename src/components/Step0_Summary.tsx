@@ -26,7 +26,6 @@ const toUk = (val: number) =>
 export default function Step0_Summary() {
   const store = useProposalStore();
   const {
-    config,
     contractType,
     useEc,
     isEcSelfConsumption,
@@ -37,6 +36,7 @@ export default function Step0_Summary() {
     capacityKw,
     monthlyData,
   } = store;
+  const config = store.activeConfig ?? store.config;
 
   const results = store.getSimulationResults();
 

@@ -10,7 +10,10 @@ const toWon = (val: number) => Math.round(val).toLocaleString();
 
 export default function Step5_Comparison() {
   const store = useProposalStore();
-  const { config, financialSettings, isEcSelfConsumption } = store;
+  const { isEcSelfConsumption } = store;
+  const config = store.activeConfig ?? store.config;
+  const financialSettings =
+    store.activeFinancialSettings ?? store.financialSettings;
 
   // 중앙 계산 로직 호출 (store.ts에서 이미 투자비 절삭 완료)
   const results = store.getSimulationResults();

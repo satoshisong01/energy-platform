@@ -19,12 +19,13 @@ const EmptyCell = () => (
 export default function PreviewComparisonTable() {
   const store = useProposalStore();
   const {
-    config,
     recAveragePrice,
     setRecAveragePrice,
-    financialSettings,
     isEcSelfConsumption,
   } = store;
+  const config = store.activeConfig ?? store.config;
+  const financialSettings =
+    store.activeFinancialSettings ?? store.financialSettings;
   // 수익배분형 비율 (헤더 배지·수익셀에서 사용)
   const shareCompanyPct = Math.round((config.share_company_ratio ?? 0.5) * 100);
   const sharePartnerPct = Math.round((config.share_partner_ratio ?? 0.5) * 100);

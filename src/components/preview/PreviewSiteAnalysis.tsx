@@ -7,7 +7,8 @@ import { LucideArrowDown } from 'lucide-react';
 
 export default function PreviewSiteAnalysis() {
   const store = useProposalStore();
-  const { roofAreas, capacityKw, address, siteImage, config } = store;
+  const { roofAreas, capacityKw, address, siteImage } = store;
+  const config = store.activeConfig ?? store.config;
 
   // 1. 전체 면적 m² 계산
   const totalAreaM2 = roofAreas.reduce(

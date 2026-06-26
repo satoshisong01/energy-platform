@@ -6,7 +6,8 @@ import styles from './PreviewComparisonTable.module.css'; // 스타일은 비교
 
 export default function PreviewRequirementsTable() {
   const store = useProposalStore();
-  const { config, isEcSelfConsumption } = store;
+  const { isEcSelfConsumption } = store;
+  const config = store.activeConfig ?? store.config;
 
   // [NEW] 자가소비(고정형) 모드면 임대/구독 숨김
   const showRentSub = !isEcSelfConsumption;

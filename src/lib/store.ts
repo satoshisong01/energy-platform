@@ -187,9 +187,13 @@ export interface ProposalState {
   peakReductionRatio: number;
   energyNote: string;
   rationalization: RationalizationData;
-  config: SystemConfig;
-  financialSettings: FinancialSettings;
+  config: SystemConfig; // 전역(회사 공통) 단가 — 설정 화면/새 문서가 보는 값
+  financialSettings: FinancialSettings; // 전역 금융
   tariffPresets: TariffPreset[];
+  // 불러온 자료의 스냅샷(저장 당시 단가/금융). null이면 전역값 사용.
+  // 계산은 activeConfig ?? config 를 쓰고, 설정 화면은 항상 전역 config 를 본다.
+  activeConfig: SystemConfig | null;
+  activeFinancialSettings: FinancialSettings | null;
   selectedModel: BusinessModel;
   moduleTier: ModuleTier;
   useEc: boolean;
@@ -317,8 +321,9 @@ const buildProposalSaveData = (state: ProposalState) => ({
   degradationRate: state.degradationRate,
   // [스냅샷] 저장 당시의 단가·금융·요금제를 자료에 함께 저장한다.
   //   → 기존 자료는 과거 값 유지(전역 단가 변경은 새 자료에만 영향).
-  config: state.config,
-  financialSettings: state.financialSettings,
+  //   불러온 자료면 그 스냅샷(activeConfig), 새 문서면 현재 전역값을 저장.
+  config: state.activeConfig ?? state.config,
+  financialSettings: state.activeFinancialSettings ?? state.financialSettings,
   tariffPresets: state.tariffPresets,
   recAveragePrice: state.recAveragePrice,
   siteImage: state.siteImage,
@@ -417,6 +422,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     },
   },
   tariffPresets: DEFAULT_TARIFFS,
+  activeConfig: null,
+  activeFinancialSettings: null,
   selectedModel: 'RE100',
   moduleTier: 'STANDARD',
   useEc: false,
@@ -463,7 +470,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     const state = get();
     const totalM2 = areas.reduce((sum, area) => sum + area.valueM2, 0);
     const totalPyeong = totalM2 * 0.3025;
-    const factor = state.config.solar_capacity_factor || 2.0;
+    const factor =
+      (state.activeConfig ?? state.config).solar_capacity_factor || 2.0;
     const capacity = Math.floor(totalPyeong / factor);
     set({ totalAreaPyeong: Math.round(totalPyeong), capacityKw: capacity });
     get().recalculateInvestment();
@@ -576,7 +584,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   recalculateInvestment: () => {
     const state = get();
     const {
-      config,
       capacityKw,
       moduleTier,
       useEc,
@@ -585,6 +592,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       isEcSelfConsumption,
       ecSelfConsumptionCount,
     } = state;
+    // 불러온 자료면 스냅샷, 아니면 전역 단가
+    const config = state.activeConfig ?? state.config;
     let unitPrice = config.price_solar_standard;
     if (moduleTier === 'PREMIUM') unitPrice = config.price_solar_premium;
     if (moduleTier === 'ECONOMY') unitPrice = config.price_solar_economy;
@@ -801,12 +810,16 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
         capacityKw: finalCapacity,
-        // 스냅샷(자료 저장 당시 값) 유지. 누락된 신규 키만 전역값으로 보정.
-        // baseRate/unitPriceSavings 는 위 ...data.input_data 스냅샷 그대로 사용(재조회 안 함).
-        config: { ...get().config, ...(data.input_data.config || {}) },
-        financialSettings:
-          data.input_data.financialSettings ?? get().financialSettings,
-        tariffPresets: data.input_data.tariffPresets ?? get().tariffPresets,
+        // 전역 설정(config/financial/tariff)은 그대로 유지한다(설정 화면·새 문서는 전역을 본다).
+        // 자료의 스냅샷은 activeConfig/activeFinancialSettings 에 담아 '계산만' 그 값을 쓴다.
+        // baseRate/unitPriceSavings 는 위 ...data.input_data 스냅샷 그대로 사용.
+        config: get().config,
+        financialSettings: get().financialSettings,
+        tariffPresets: get().tariffPresets,
+        activeConfig: data.input_data.config
+          ? { ...get().config, ...data.input_data.config }
+          : null,
+        activeFinancialSettings: data.input_data.financialSettings ?? null,
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
         maintenanceCostLimit: data.input_data.maintenanceCostLimit ?? 80000000,
         isRationalizationEnabled:
@@ -880,6 +893,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       totalInvestment: 0,
       recAveragePrice: 80,
       // tariffPresets/config/financialSettings 는 전역값 유지(여기서 초기화하지 않음)
+      // 스냅샷 해제 → 새 문서는 전역 단가로 계산
+      activeConfig: null,
+      activeFinancialSettings: null,
       isMaintenanceAuto: true,
       maintenanceCostLimit: 80000000,
       isRationalizationEnabled: false,
@@ -941,20 +957,22 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   getSimulationResults: () => {
     const state = get();
     const {
-      config,
       rationalization,
       truckCount,
       monthlyData,
       capacityKw,
       selectedModel,
       useEc,
-      financialSettings,
       isRationalizationEnabled,
       isSurplusDiscarded,
       contractType,
       isEcSelfConsumption,
       ecSelfConsumptionCount,
     } = state;
+    // 불러온 자료면 스냅샷(activeConfig), 아니면 전역값으로 계산
+    const config = state.activeConfig ?? state.config;
+    const financialSettings =
+      state.activeFinancialSettings ?? state.financialSettings;
 
     // 1. 투자비 계산 (플랫폼 비용 자동화 포함)
     const calculatedPlatformCost = Math.min((capacityKw / 100) * 0.1, 0.3);

@@ -18,8 +18,8 @@ import styles from './PreviewModelVisual.module.css';
 // [수정] 차트 데이터 생성 로직 (EC 방전 로직 추가 + 일조량 반영)
 const useChartData = () => {
   const store = useProposalStore();
-  // [수정] config 가져오기
-  const { config } = store;
+  // 불러온 자료면 스냅샷, 아니면 전역 단가
+  const config = store.activeConfig ?? store.config;
 
   // 1. 연간 데이터 가져오기
   const totalUsageYear = store.monthlyData.reduce(

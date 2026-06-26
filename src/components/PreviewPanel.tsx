@@ -45,7 +45,6 @@ const PageFooter = ({ page }: { page: number }) => {
 export default function PreviewPanel() {
   const store = useProposalStore();
   const {
-    config,
     rationalization,
     truckCount,
     isSurplusDiscarded,
@@ -53,6 +52,8 @@ export default function PreviewPanel() {
     ecSelfConsumptionCount,
     showHydrogen, // 청정수소 발전 모드: 수소 박스 + PDF 버튼만 표시
   } = store;
+  // 불러온 자료면 스냅샷(activeConfig), 아니면 전역 단가로 표시/계산
+  const config = store.activeConfig ?? store.config;
 
   const {
     computedData: baseComputedData,

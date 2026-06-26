@@ -7,7 +7,6 @@ import styles from '../PreviewPanel.module.css';
 export default function PreviewFinancialTable() {
   const store = useProposalStore();
   const {
-    config,
     truckCount,
     selectedModel,
     moduleTier,
@@ -15,6 +14,7 @@ export default function PreviewFinancialTable() {
     isEcSelfConsumption,
     ecSelfConsumptionCount,
   } = store;
+  const config = store.activeConfig ?? store.config;
 
   // 스토어 계산 함수 호출
   const results = store.getSimulationResults();
