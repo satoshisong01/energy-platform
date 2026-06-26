@@ -853,6 +853,11 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
   resetProposal: () => {
+    // 새 문서는 전역 요금제표의 기본 요금제로 시작(과거 자료의 요금제/기본요금이 안 남도록)
+    const g = get();
+    const defaultName = '산업용(을) 고압A - 선택2';
+    const dp =
+      g.tariffPresets.find((p) => p.name === defaultName) ?? g.tariffPresets[0];
     set({
       siteImage: null,
       proposalId: null,
@@ -896,6 +901,10 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       // 스냅샷 해제 → 새 문서는 전역 단가로 계산
       activeConfig: null,
       activeFinancialSettings: null,
+      // 요금제 선택값(기본요금·절감단가)도 전역 기본 요금제로 리셋
+      contractType: dp ? dp.name : defaultName,
+      baseRate: dp ? dp.baseRate : 8320,
+      unitPriceSavings: dp ? dp.savings : 210.5,
       isMaintenanceAuto: true,
       maintenanceCostLimit: 80000000,
       isRationalizationEnabled: false,
