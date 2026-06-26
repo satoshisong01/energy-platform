@@ -315,8 +315,11 @@ const buildProposalSaveData = (state: ProposalState) => ({
   isEcSelfConsumption: state.isEcSelfConsumption,
   ecSelfConsumptionCount: state.ecSelfConsumptionCount,
   degradationRate: state.degradationRate,
-  // [전역화] config·financialSettings·tariffPresets 는 자료에 저장하지 않는다.
-  //          단가·금융·요금제는 app_config(전역 공통)에서만 관리 → 자료는 항상 최신 단가로 계산.
+  // [스냅샷] 저장 당시의 단가·금융·요금제를 자료에 함께 저장한다.
+  //   → 기존 자료는 과거 값 유지(전역 단가 변경은 새 자료에만 영향).
+  config: state.config,
+  financialSettings: state.financialSettings,
+  tariffPresets: state.tariffPresets,
   recAveragePrice: state.recAveragePrice,
   siteImage: state.siteImage,
   capacityKw: state.capacityKw,
@@ -781,13 +784,9 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         .single();
       if (error) throw error;
       if (!data) throw new Error('데이터 없음');
-      // [전역화] 단가·금융·요금제는 전역(app_config)에서 이미 로드된 값을 사용한다.
-      //          자료에 박혀 있던 옛 복사본은 무시하고, 선택한 요금제(contractType)의
-      //          기본요금·절감단가만 전역 요금제표에서 최신값으로 다시 끌어온다.
-      const globalPresets = get().tariffPresets;
-      const matchedPreset = globalPresets.find(
-        (p) => p.name === data.input_data.contractType
-      );
+      // [스냅샷 유지] 자료 저장 당시의 단가·금융·요금제(스냅샷)를 그대로 사용한다.
+      //   → 기존 자료는 과거 값 유지. 전역 단가 변경은 새 자료에만 영향.
+      //   (스냅샷에 없는 신규 키만 전역값으로 보정)
       let finalCapacity = data.input_data.capacityKw;
       if (finalCapacity === undefined || finalCapacity === null) {
         const totalM2 = (data.input_data.roofAreas || []).reduce(
@@ -802,14 +801,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         proposalName: data.proposal_name || data.client_name,
         ...data.input_data,
         capacityKw: finalCapacity,
-        // 전역 설정 유지(자료에 저장된 옛 config/financial/tariff 무시)
-        config: get().config,
-        financialSettings: get().financialSettings,
-        tariffPresets: globalPresets,
-        baseRate: matchedPreset ? matchedPreset.baseRate : data.input_data.baseRate,
-        unitPriceSavings: matchedPreset
-          ? matchedPreset.savings
-          : data.input_data.unitPriceSavings,
+        // 스냅샷(자료 저장 당시 값) 유지. 누락된 신규 키만 전역값으로 보정.
+        // baseRate/unitPriceSavings 는 위 ...data.input_data 스냅샷 그대로 사용(재조회 안 함).
+        config: { ...get().config, ...(data.input_data.config || {}) },
+        financialSettings:
+          data.input_data.financialSettings ?? get().financialSettings,
+        tariffPresets: data.input_data.tariffPresets ?? get().tariffPresets,
         isMaintenanceAuto: data.input_data.isMaintenanceAuto ?? true,
         maintenanceCostLimit: data.input_data.maintenanceCostLimit ?? 80000000,
         isRationalizationEnabled:

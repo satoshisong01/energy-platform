@@ -186,27 +186,28 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                 {/* 전역 공통 설정 — 단가·금융·요금제는 모든 자료에 공통 적용 */}
                 <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="text-xs text-amber-800 leading-relaxed">
-                    <b>전역 공통 설정</b> — 여기 단가·금융·요금제는 <b>모든 분석자료</b>에
-                    공통 적용됩니다. 수정 후 <b>[전역 저장]</b>을 누르면 새 자료는 물론
-                    기존 자료도 다시 열 때 최신 단가로 계산됩니다.
+                    <b>전역 기본 단가</b> — 여기 단가·금융·요금제는 <b>앞으로 만드는
+                    새 자료</b>의 기본값으로 적용됩니다. <b>기존 자료는 저장 당시 단가를
+                    그대로 유지</b>합니다(과거 값 보존). 수정 후 <b>[전역 저장]</b>을 눌러야
+                    회사 기본값이 갱신됩니다.
                   </div>
                   <button
                     onClick={async () => {
                       if (
                         !confirm(
-                          '현재 단가·금융·요금제를 전역 공통값으로 저장합니다.\n모든 분석자료(기존 포함)에 적용됩니다. 계속할까요?',
+                          '현재 단가·금융·요금제를 전역 기본값으로 저장합니다.\n앞으로 만드는 새 자료에 적용되며, 기존 자료는 과거 단가를 유지합니다. 계속할까요?',
                         )
                       )
                         return;
                       const ok = await store.saveGlobalConfig();
                       if (ok)
                         alert(
-                          '✅ 전역 설정이 저장되었습니다. 모든 자료에 적용됩니다.',
+                          '✅ 전역 기본 단가가 저장되었습니다. 새 자료부터 적용됩니다.',
                         );
                     }}
                     className="shrink-0 flex items-center gap-1 bg-amber-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-amber-700 transition shadow-sm"
                   >
-                    <LucideSave size={14} /> 전역 저장 (전체 적용)
+                    <LucideSave size={14} /> 전역 저장 (새 자료 기준)
                   </button>
                 </div>
 
