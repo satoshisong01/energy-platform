@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useProposalStore } from '../lib/store';
+import CommaNumberInput from './CommaNumberInput';
 import {
   LucideMaximize,
   LucideSun,
@@ -135,17 +136,13 @@ export default function Step2_SiteInfo() {
                 }
               />
               <div className="relative w-32">
-                <input
-                  type="number"
+                <CommaNumberInput
                   placeholder="0"
                   className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                  value={area.valueM2 || ''}
-                  onChange={(e) =>
-                    store.updateRoofArea(
-                      area.id,
-                      'valueM2',
-                      Number(e.target.value),
-                    )
+                  value={area.valueM2}
+                  blankZero
+                  onChange={(v) =>
+                    store.updateRoofArea(area.id, 'valueM2', v)
                   }
                 />
                 <span className="absolute right-2 top-1.5 text-xs text-slate-400">
@@ -225,12 +222,12 @@ export default function Step2_SiteInfo() {
               실제 설비 용량 (설계값)
             </label>
             <div className="relative">
-              <input
-                type="number"
+              <CommaNumberInput
                 className="w-full border border-blue-300 bg-white rounded-lg px-3 py-2 text-blue-800 font-extrabold focus:ring-2 focus:ring-blue-500 outline-none text-right pr-10 shadow-sm"
                 placeholder="0"
-                value={store.capacityKw || ''}
-                onChange={(e) => store.setCapacityKw(Number(e.target.value))}
+                value={store.capacityKw}
+                blankZero
+                onChange={(v) => store.setCapacityKw(v)}
               />
               <span className="absolute right-3 top-2 text-xs text-blue-600 font-bold pt-0.5">
                 kW

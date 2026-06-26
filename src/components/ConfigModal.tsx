@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import ProposalListModal from './ProposalListModal';
+import CommaNumberInput from './CommaNumberInput';
 import Step1_BasicInfo from './Step1_BasicInfo';
 import Step2_SiteInfo from './Step2_SiteInfo';
 import Step3_EnergyData from './Step3_EnergyData';
@@ -1012,16 +1013,11 @@ export default function ConfigModal({ isOpen, onClose }: Props) {
                               <label className="block text-[10px] text-gray-400 mb-0.5">
                                 기본요금
                               </label>
-                              <input
-                                type="number"
+                              <CommaNumberInput
                                 className="w-full p-2 border border-gray-200 rounded text-sm text-right focus:border-purple-500 outline-none"
                                 value={preset.baseRate}
-                                onChange={(e) =>
-                                  store.updateTariffPreset(
-                                    index,
-                                    'baseRate',
-                                    Number(e.target.value),
-                                  )
+                                onChange={(v) =>
+                                  store.updateTariffPreset(index, 'baseRate', v)
                                 }
                               />
                             </div>
@@ -1215,23 +1211,20 @@ const ConfigInput = ({
   label,
   field,
   store,
-  step = 0.01,
 }: {
   label: string;
   field: keyof SystemConfig;
   store: any;
-  step?: number;
+  step?: number; // (콤마 입력으로 전환 — step 미사용, 호출부 호환 위해 타입만 유지)
 }) => (
   <div>
     <label className="block text-xs font-semibold text-gray-500 mb-1">
       {label}
     </label>
-    <input
-      type="number"
-      step={step}
+    <CommaNumberInput
       className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-right"
-      value={store.config[field]}
-      onChange={(e) => store.updateConfig(field, Number(e.target.value))}
+      value={store.config[field] as number}
+      onChange={(v) => store.updateConfig(field, v)}
     />
   </div>
 );
